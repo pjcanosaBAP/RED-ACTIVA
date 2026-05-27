@@ -912,6 +912,9 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
           </div>
           <button class="btn btn-sm btn-out" onclick="batchAssignPais()" title="Asigna el país ingresado a todas las auditorías que no tienen país">🏳️ Aplicar</button>
         </div>
+        <div style="display:flex;align-items:flex-end;gap:6px;padding-bottom:2px">
+          <button class="btn btn-sm btn-out" id="btn-freeze-ed" onclick="freezeCurrentFilter()" title="Congela / descongela todas las auditorías del filtro activo" style="white-space:nowrap">🔒 Congelar edición filtrada</button>
+        </div>
         <div style="font-size:10px;color:var(--g400);padding-top:16px">💡 Usá <strong>Backup JSON</strong> para guardar y <strong>Importar JSON</strong> para restaurar.</div>
       </div>
       <div class="card-bd" id="saved-wrap"></div>
@@ -2911,6 +2914,32 @@ function loadAudit(idx){
   updateHistPanelForDist(a.distribuidor);
   // Update comparison columns after loading
   setTimeout(function(){renderCmpColumns();renderDashResumen();}, 50);
+}
+// ── FREEZE / UNFREEZE ──────────────────────────────────────────────────────
+function freezeAudit(id){
+  const sid = String(id);
+  const a = saved.find(x=>String(x.id)===sid);
+  if(!a) return;
+  const nowFrozen = !a.frozen;
+  a.frozen = nowFrozen;
+  persist();
+  renderSaved();
+  showToast(nowFrozen ? '🔒 Auditoría congelada — scores fijos' : '🔓 Auditoría descongelada');
+}
+function freezeEdition(pais, edicion){
+  const count = saved.filter(a=>a.pais===pais&&a.edicion===edicion&&!a.frozen).length;
+  const allFrozen = count===0;
+  // If all already frozen → unfreeze all; else → freeze all
+  if(allFrozen){
+    if(!confirm(`¿Descongelar TODAS las auditorías de ${pais} ${edicion}?`)) return;
+    saved.filter(a=>a.pais===pais&&a.edicion===edicion).forEach(a=>{ a.frozen=false; });
+    showToast(`🔓 ${pais} ${edicion} — scores activos`);
+  } else {
+    if(!confirm(`¿Congelar las ${count} auditorías de ${pais} ${edicion}?\nLos scores actuales quedarán fijos y no se recalcularán.`)) return;
+    saved.filter(a=>a.pais===pais&&a.edicion===edicion).forEach(a=>{ a.frozen=true; });
+    showToast(`🔒 ${pais} ${edicion} — ${count} auditorías congeladas`);
+  }
+  persist(); renderSaved();
 }
 function deleteAudit(id){
   const sid = String(id);
@@ -6846,6 +6875,26 @@ function exportSnapshot(){
   }
 }
 
+// ── CONGELAR FILTRO ACTIVO ─────────────────────────────────────────────────
+function freezeCurrentFilter(){
+  const paisFil=(document.getElementById('saved-fil-pais')||{}).value||'';
+  const edFil=(document.getElementById('saved-fil-ed')||{}).value||'';
+  const targets = saved.filter(a=>(!paisFil||a.pais===paisFil)&&(!edFil||a.edicion===edFil));
+  if(!targets.length){ showToast('⚠️ Sin auditorías en el filtro actual'); return; }
+  const allFrozen = targets.every(a=>a.frozen);
+  const label = (paisFil||'todos')+' '+(edFil||'ediciones');
+  if(allFrozen){
+    if(!confirm(`¿Descongelar ${targets.length} auditorías de ${label}?`)) return;
+    targets.forEach(a=>{ a.frozen=false; });
+    showToast(`🔓 Descongeladas: ${targets.length}`);
+  } else {
+    const n = targets.filter(a=>!a.frozen).length;
+    if(!confirm(`¿Congelar ${n} auditorías de ${label}?\nLos scores actuales quedarán fijos.`)) return;
+    targets.forEach(a=>{ a.frozen=true; });
+    showToast(`🔒 Congeladas: ${n}`);
+  }
+  persist(); renderSaved();
+}
 // ── ASIGNAR PAÍS EN LOTE ───────────────────────────────────────────────────
 async function batchAssignPais(){
   const inp = document.getElementById('batch-pais-inp');
@@ -8928,7 +8977,7 @@ function renderSaved(){
     })();
     const _flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
     const _pf=a.pais?(_flags[a.pais]||'🌍')+' '+a.pais:'—';
-    return `<tr>
+    return `<tr style="${a.frozen?'background:#f0f7ff;':''}">
       <td style="font-size:11px;white-space:nowrap">${_pf}</td>
       <td>${a.edicion||'—'}</td>
       <td style="font-weight:700">${a.distribuidor||'—'} ${frozenBadge}</td>
@@ -8938,9 +8987,10 @@ function renderSaved(){
       <td style="font-weight:800;color:${col}">${pct}</td>
       <td>${(()=>{const cm=s.critMet||0,tc=auditTotalCrits(a),bg=cm>=tc?'var(--green)':'var(--g200)',fc=cm>=tc?'#fff':'var(--g600)';return `<span style="background:${bg};color:${fc};border-radius:10px;padding:2px 7px;font-size:10px;font-weight:700">${cm}/${tc}</span>`;})()}</td>
       <td>${catBadge(cat)}</td>
-      <td style="display:flex;gap:4px;min-width:90px">
+      <td style="display:flex;gap:4px;min-width:100px">
         ${warnBadge}
         <button class="btn btn-xs btn-blue" onclick="loadAudit(${saved.findIndex(x=>x.id===a.id)})">📂</button>
+        <button class="btn btn-xs" onclick="freezeAudit('${a.id}')" title="${a.frozen?'Descongelar — permitir recálculo':'Congelar — fijar scores actuales'}" style="background:${a.frozen?'#e3f2fd':'var(--g100)'};border:1px solid ${a.frozen?'#1565c0':'var(--g300)'};color:${a.frozen?'#1565c0':'var(--g600)'}">${a.frozen?'🔒':'🔓'}</button>
         <button class="btn btn-xs btn-red" onclick="deleteAudit('${a.id}')">🗑</button>
       </td>
     </tr>`;
