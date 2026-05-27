@@ -905,6 +905,13 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
             <option value="">Todas</option>
           </select>
         </div>
+        <div style="display:flex;align-items:flex-end;gap:6px;padding-bottom:2px">
+          <div class="fg">
+            <label>Etiquetar sin país como</label>
+            <input type="text" id="batch-pais-inp" class="cfg-input" placeholder="ej: CHILE" style="width:100px;text-transform:uppercase">
+          </div>
+          <button class="btn btn-sm btn-out" onclick="batchAssignPais()" title="Asigna el país ingresado a todas las auditorías que no tienen país">🏳️ Aplicar</button>
+        </div>
         <div style="font-size:10px;color:var(--g400);padding-top:16px">💡 Usá <strong>Backup JSON</strong> para guardar y <strong>Importar JSON</strong> para restaurar.</div>
       </div>
       <div class="card-bd" id="saved-wrap"></div>
@@ -6836,6 +6843,19 @@ function exportSnapshot(){
   }
 }
 
+// ── ASIGNAR PAÍS EN LOTE ───────────────────────────────────────────────────
+async function batchAssignPais(){
+  const inp = document.getElementById('batch-pais-inp');
+  const pais = (inp ? inp.value.trim().toUpperCase() : '') || cfg.pais || '';
+  if(!pais){ showToast('⚠️ Ingresá un país primero'); return; }
+  const untagged = saved.filter(a => !a.pais);
+  if(!untagged.length){ showToast('✅ Todas las auditorías ya tienen país asignado'); return; }
+  if(!confirm(`¿Asignar "${pais}" a ${untagged.length} auditoría(s) sin país?`)) return;
+  untagged.forEach(a => { a.pais = pais; });
+  persist();
+  renderSaved();
+  showToast(`✅ ${untagged.length} auditoría(s) etiquetadas como ${pais}`);
+}
 // ── IMPORTAR SNAPSHOT HTML (browser, no Electron) ──────────────────────────
 function importSnapshotBrowser(input){
   const file = input.files && input.files[0];
