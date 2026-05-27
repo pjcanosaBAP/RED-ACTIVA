@@ -3038,6 +3038,8 @@ async function loadFromSupabase(){
     dot.title = 'Supabase: ' + msg;
   };
   try {
+    // isFirstLoad: true on page startup, false on real-time re-fires
+    const isFirstLoad = !_sbOnline;
     // ── Load audits ──────────────────────────────────────────
     const {data:audData, error:audErr} = await _sbc.from('audits').select('*');
     if(audErr) throw audErr;
@@ -3083,29 +3085,41 @@ async function loadFromSupabase(){
       if(error) console.warn('[SB] initial upload autoevals:', error.message);
     }
 
-    // ── Load config + structures ──────────────────────────────
-    const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
-    if(cfgRow && cfgRow.data){
-      const remote = cfgRow.data;
-      // Restore all structures to localStorage
-      if(remote.structures && typeof remote.structures === 'object'){
-        Object.entries(remote.structures).forEach(([key, val])=>{
-          localStorage.setItem(key, JSON.stringify(val));
-        });
-      }
-      // Restore distributors (merge, no duplicates)
-      if(remote.dists && Array.isArray(remote.dists)){
-        remote.dists.forEach(d=>{ if(!DISTRIBUTORS.includes(d)) DISTRIBUTORS.push(d); });
-        try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
-      }
-      // Restore pais/anio and load their structure (only if not set locally)
-      const hasLocalCfg = !!(cfg.pais);
-      if(!hasLocalCfg && remote.pais){
-        cfg.pais = remote.pais;
-        cfg.anio = remote.anio;
-        localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
-        if(loadStructure(remote.pais, remote.anio)){
-          try{ rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas(); }catch(e){}
+    // ── Load config + structures (only on first page load, not on realtime) ──
+    if(isFirstLoad){
+      const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
+      if(cfgRow && cfgRow.data){
+        const remote = cfgRow.data;
+        // 1. Write all structures to localStorage so loadStructure() can find them
+        if(remote.structures && typeof remote.structures === 'object'){
+          Object.entries(remote.structures).forEach(([key, val])=>{
+            localStorage.setItem(key, JSON.stringify(val));
+          });
+        }
+        // 2. Replace DISTRIBUTORS entirely (not merge — avoids stale defaults)
+        if(remote.dists && remote.dists.length > 0){
+          DISTRIBUTORS.length = 0;
+          remote.dists.forEach(d=>DISTRIBUTORS.push(d));
+          try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+        }
+        // 3. Always apply pais/anio + structure from Supabase on startup
+        if(remote.pais){
+          cfg.pais = remote.pais;
+          cfg.anio = remote.anio||2025;
+          if(remote.thr) Object.assign(THR, remote.thr);
+          if(remote.aw)  Object.assign(AW,  remote.aw);
+          localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
+          // Load the structure (Q, AC, AN, AW, WCfg, NV)
+          const structLoaded = loadStructure(remote.pais, remote.anio||2025);
+          if(structLoaded){
+            try{
+              // Rebuild everything so Netlify looks like Electron
+              ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
+                const el=document.getElementById(id); if(el) el.innerHTML='';
+              });
+              rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas();
+            }catch(e){ console.warn('[SB] rebuild after struct load:', e); }
+          }
         }
       }
     }
