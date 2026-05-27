@@ -2849,9 +2849,10 @@ function saveAudit(){
     wcfg: JSON.parse(JSON.stringify(WCfg)),
     matrixCfg: JSON.parse(JSON.stringify(MATRIX_CFG)),
   };
-  const audit={id:String(Date.now()),distribuidor:dist,fecha,auditor,edicion,pais:cfg.pais||'',answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
-  // Match by dist + edicion
+  // Match by dist + edicion — reuse existing id to avoid Supabase duplicates
   const idx=saved.findIndex(a=>a.distribuidor===dist&&a.edicion===edicion);
+  const existingId = idx>=0 ? saved[idx].id : null;
+  const audit={id:existingId||String(Date.now()),distribuidor:dist,fecha,auditor,edicion,pais:cfg.pais||'',answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
   if(idx>=0){if(!confirm(`¿Reemplazar auditoría de ${dist} (${edicion})?`)) return; saved[idx]=audit;}
   else saved.push(audit);
   persist(); showToast('✅ Guardado: '+dist+' · '+edicion);
@@ -4129,14 +4130,16 @@ function importEVFile(input){
         const sc=computeScores(answers);
 
         if(fileType==='EV'){
-          const audit={id:String(Date.now()+Math.random()),distribuidor:distName,fecha,auditor:'',edicion:edYear,pais:cfg.pais||'',answers,comments:evComments,scores:sc};
-          const idx=saved.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
-          if(idx>=0) saved[idx]=audit; else saved.push(audit);
+          const _evIdx=saved.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
+          const _evId=_evIdx>=0?saved[_evIdx].id:String(Date.now()+Math.random());
+          const audit={id:_evId,distribuidor:distName,fecha,auditor:'',edicion:edYear,pais:cfg.pais||'',answers,comments:evComments,scores:sc};
+          if(_evIdx>=0) saved[_evIdx]=audit; else saved.push(audit);
           totalEV++;
         } else {
-          const ae={id:String(Date.now()+Math.random()),distribuidor:distName,fecha,edicion:edYear,answers,scores:sc};
-          const idx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
-          if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
+          const _aeIdx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
+          const _aeId=_aeIdx>=0?autoevals[_aeIdx].id:String(Date.now()+Math.random());
+          const ae={id:_aeId,distribuidor:distName,fecha,edicion:edYear,answers,scores:sc};
+          if(_aeIdx>=0) autoevals[_aeIdx]=ae; else autoevals.push(ae);
           totalAE++;
         }
 
