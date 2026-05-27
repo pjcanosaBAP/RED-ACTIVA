@@ -884,6 +884,10 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
             📂 Importar JSON
             <input type="file" accept=".json" id="import-file-input" style="display:none" onchange="importBackupJSON(this)">
           </label>
+          <label class="btn btn-blue btn-sm" style="cursor:pointer;margin:0;background:var(--blue-xl);color:var(--blue);border:1.5px solid var(--blue)" title="Cargar un snapshot .html completo (reemplaza datos actuales)">
+            📥 Cargar Snapshot
+            <input type="file" accept=".html" id="snap-import-input" style="display:none" onchange="importSnapshotBrowser(this)">
+          </label>
           <button class="btn btn-red btn-sm" onclick="clearAll()" id="btn-clear-all" title="Borra la edición seleccionada, o TODAS si no hay filtro">🗑 Borrar Edición</button>
           <button class="btn btn-out btn-sm" style="background:var(--g200);color:var(--g700)" onclick="toggleSaved()">✕ Cerrar</button>
         </div>
@@ -6830,6 +6834,72 @@ function exportSnapshot(){
   }
 }
 
+// ── IMPORTAR SNAPSHOT HTML (browser, no Electron) ──────────────────────────
+function importSnapshotBrowser(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(e.target.result, 'text/html');
+      const snapEl = doc.getElementById('__snap_embed__');
+      if(!snapEl){ showToast('❌ No es un snapshot válido de RED Activa'); return; }
+      const d = JSON.parse(snapEl.textContent);
+      if(!d || (!d.saved && !d.distributors)){
+        showToast('❌ Snapshot vacío o formato inválido'); return;
+      }
+      if(saved.length > 0 && !confirm(
+        '¿Cargar este snapshot?\n\nSe reemplazarán los datos actuales ('+saved.length+' auditorías).\n'+
+        'Los datos ya subidos a Supabase NO se borran automáticamente.\n\n'+
+        'Usá "Fusionar Edición" para agregar sin borrar.'
+      )) return;
+
+      // Clear and reload — same logic as Electron onOpenSnapshot
+      saved.length=0; autoevals.length=0; DISTRIBUTORS.length=0;
+      ans={}; coms={}; _loadedFrozenAudit=null; _loadedAuditMatrix=null;
+      Q=[...Q_BASE.map(q=>({...q}))];
+      Object.keys(AC).forEach(k=>delete AC[k]);
+      Object.assign(AC,{IFT:'#1565c0',PLG:'#6a1b9a',GST:'#e65100',IDP:'#1b5e20'});
+      Object.keys(AN).forEach(k=>delete AN[k]);
+      Object.assign(AN,{IFT:'Infraestructura',PLG:'Procesos Logísticos',GST:'Gestión',IDP:'Integridad del Producto'});
+      Object.keys(AW).forEach(k=>delete AW[k]); Object.assign(AW,{...AW_DEFAULT});
+
+      if(d.saved)        saved.push(...d.saved);
+      if(d.autoevals && d.autoevals.length) autoevals.push(...d.autoevals);
+      if(d.cfg)          Object.assign(cfg, d.cfg);
+      if(d.distributors && d.distributors.length) d.distributors.forEach(x=>DISTRIBUTORS.push(x));
+      if(d.aw)           Object.assign(AW, d.aw);
+      if(d.wcfg)         WCfg = d.wcfg;
+      if(d.matrixCfg)    try{ MATRIX_CFG=d.matrixCfg; saveMatrixCfg(MATRIX_CFG); }catch(_){}
+      if(d.qCustom)      try{ Q=JSON.parse(d.qCustom); }catch(_){}
+      if(d.areasCfg)     try{ const ac=JSON.parse(d.areasCfg); if(ac.ac&&ac.an){
+        Object.keys(AC).forEach(k=>delete AC[k]); Object.assign(AC,ac.ac);
+        Object.keys(AN).forEach(k=>delete AN[k]); Object.assign(AN,ac.an);
+      }}catch(_){}
+      cfg.aw = {...AW};
+
+      // Save locally and push to Supabase
+      saveStructure();
+      persist();
+      setTimeout(()=>_sbPushConfig(), 50);
+
+      // Rebuild UI
+      ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.innerHTML='';
+      });
+      try{ rebuildAll(); }catch(err){ console.error('[RA2] rebuildAll after snap import:', err); }
+      rebuildDynamicUI(); rebuildDistSelect();
+      renderSaved(); updateAudCnt(); loadPaisAnio();
+      showToast('✅ Snapshot cargado: '+saved.length+' auditorías · '+(cfg.pais||'')+' '+(cfg.anio||''));
+    } catch(err){
+      showToast('❌ Error al leer snapshot: '+err.message);
+      console.error('[RA2] importSnapshotBrowser:', err);
+    }
+  };
+  reader.readAsText(file);
+}
 // ── RESET STRUCTURE ────────────────────────────────────
 function resetQToBase(){
   if(!confirm('¿Restablecer la estructura original? Se perderán todos los cambios de áreas, preguntas y BPLs. Las auditorías guardadas NO se borran.')) return;
