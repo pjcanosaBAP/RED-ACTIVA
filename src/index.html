@@ -894,13 +894,15 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
       </div>
       <div style="padding:8px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div class="fg">
+          <label>Filtrar por País</label>
+          <select id="saved-fil-pais" onchange="renderSaved()" style="min-width:100px">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="fg">
           <label>Filtrar por Edición</label>
           <select id="saved-fil-ed" onchange="renderSaved()" style="min-width:90px">
             <option value="">Todas</option>
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-            <option value="2028">2028</option>
           </select>
         </div>
         <div style="font-size:10px;color:var(--g400);padding-top:16px">💡 Usá <strong>Backup JSON</strong> para guardar y <strong>Importar JSON</strong> para restaurar.</div>
@@ -2840,7 +2842,7 @@ function saveAudit(){
     wcfg: JSON.parse(JSON.stringify(WCfg)),
     matrixCfg: JSON.parse(JSON.stringify(MATRIX_CFG)),
   };
-  const audit={id:String(Date.now()),distribuidor:dist,fecha,auditor,edicion,answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
+  const audit={id:String(Date.now()),distribuidor:dist,fecha,auditor,edicion,pais:cfg.pais||'',answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
   // Match by dist + edicion
   const idx=saved.findIndex(a=>a.distribuidor===dist&&a.edicion===edicion);
   if(idx>=0){if(!confirm(`¿Reemplazar auditoría de ${dist} (${edicion})?`)) return; saved[idx]=audit;}
@@ -2945,7 +2947,7 @@ async function persist(){
     if(saved.length){
       const rows = saved.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', auditor:a.auditor||'',
+        pais:a.pais||'', fecha:a.fecha||'', auditor:a.auditor||'',
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
         updated_at:new Date().toISOString()
@@ -3004,7 +3006,7 @@ async function pushAllToSupabase(){
     if(saved.length){
       const rows = saved.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', auditor:a.auditor||'',
+        pais:a.pais||'', fecha:a.fecha||'', auditor:a.auditor||'',
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
         updated_at:new Date().toISOString()
@@ -3053,7 +3055,7 @@ async function loadFromSupabase(){
     if(audData && audData.length > 0){
       saved = audData.map(r=>({
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
-        fecha:r.fecha||'', auditor:r.auditor||'',
+        pais:r.pais||'', fecha:r.fecha||'', auditor:r.auditor||'',
         answers:r.answers||{}, comments:r.comments||{},
         scores:r.scores||{}, weights:r.weights||{}
       }));
@@ -4120,7 +4122,7 @@ function importEVFile(input){
         const sc=computeScores(answers);
 
         if(fileType==='EV'){
-          const audit={id:String(Date.now()+Math.random()),distribuidor:distName,fecha,auditor:'',edicion:edYear,answers,comments:evComments,scores:sc};
+          const audit={id:String(Date.now()+Math.random()),distribuidor:distName,fecha,auditor:'',edicion:edYear,pais:cfg.pais||'',answers,comments:evComments,scores:sc};
           const idx=saved.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
           if(idx>=0) saved[idx]=audit; else saved.push(audit);
           totalEV++;
@@ -5176,7 +5178,7 @@ function importExcelAudits(input){
       let added=0,replaced=0;
       Object.values(byDist).forEach(d=>{
         const sc=computeScores(d.answers); // imported without weight snapshot — uses current weights
-        const audit={id:String(Date.now()+Math.random()),distribuidor:d.dist,fecha:d.fecha||new Date().toISOString().slice(0,10),auditor:d.auditor,edicion:anio,answers:d.answers,comments:d.comments,scores:sc};
+        const audit={id:String(Date.now()+Math.random()),distribuidor:d.dist,fecha:d.fecha||new Date().toISOString().slice(0,10),auditor:d.auditor,edicion:anio,pais:cfg.pais||'',answers:d.answers,comments:d.comments,scores:sc};
         const idx=saved.findIndex(a=>a.distribuidor===d.dist&&a.edicion===anio);
         if(idx>=0){saved[idx]=audit;replaced++;}else{saved.push(audit);added++;}
       });
@@ -8847,18 +8849,29 @@ function renderSaved(){
     wrap.innerHTML='<tr><td colspan="'+(7+_sh.length)+'" style="text-align:center;padding:24px;color:var(--g400)">No hay auditorías guardadas</td></tr>';
     return;
   }
-  // Populate edition filter dropdown
+  // Populate country filter
+  const paisFilEl=document.getElementById('saved-fil-pais');
+  if(paisFilEl){
+    const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
+    const curPais=paisFilEl.value;
+    paisFilEl.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
+    if(curPais && paises.includes(curPais)) paisFilEl.value=curPais;
+  }
+  const paisFil=paisFilEl?paisFilEl.value:'';
+  // Populate edition filter (respects country filter)
   const filEl=document.getElementById('saved-fil-ed');
   if(filEl){
-    const editions=[...new Set(saved.map(a=>a.edicion||'').filter(Boolean))].sort().reverse();
+    const editions=[...new Set(saved.filter(a=>!paisFil||a.pais===paisFil).map(a=>a.edicion||'').filter(Boolean))].sort().reverse();
     const curFil=filEl.value;
     filEl.innerHTML='<option value="">Todas</option>'+editions.map(e=>`<option value="${e}">${e}</option>`).join('');
-    if(curFil) filEl.value=curFil;
+    if(curFil && editions.includes(curFil)) filEl.value=curFil;
   }
   const edFil=filEl?filEl.value:'';
   const data=[...saved]
-    .filter(a=>!edFil||a.edicion===edFil)
+    .filter(a=>(!paisFil||a.pais===paisFil)&&(!edFil||a.edicion===edFil))
     .sort((a,b)=>{
+      const pa=a.pais||'',pb=b.pais||'';
+      if(pa!==pb) return pa.localeCompare(pb);
       const ea=a.edicion||'',eb=b.edicion||'';
       if(ea!==eb) return eb.localeCompare(ea);
       return (a.distribuidor||'').localeCompare(b.distribuidor||'');
@@ -8867,6 +8880,7 @@ function renderSaved(){
   const _nc=auditTotalCrits(data[0]||{});
   wrap.innerHTML=`<table class="saved-table" style="width:100%;border-collapse:collapse;font-size:12px">
   <thead><tr style="background:var(--navy2);color:#fff">
+    <th style="padding:8px 6px;text-align:left">País</th>
     <th style="padding:8px 10px;text-align:left">Edición</th>
     <th style="padding:8px 10px;text-align:left">Distribuidor</th>
     <th style="padding:8px 10px;text-align:left">Fecha</th>
@@ -8889,7 +8903,10 @@ function renderSaved(){
       const diff=SHEETS().some(sh=>Math.abs((a.weights.aw[sh]||0)-(AW[sh]||0))>0.001);
       return diff?'<span title="Ponderaciones distintas a las actuales" style="color:var(--orange);font-size:14px;cursor:help">⚖️</span>':'';
     })();
+    const _flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
+    const _pf=a.pais?(_flags[a.pais]||'🌍')+' '+a.pais:'—';
     return `<tr>
+      <td style="font-size:11px;white-space:nowrap">${_pf}</td>
       <td>${a.edicion||'—'}</td>
       <td style="font-weight:700">${a.distribuidor||'—'} ${frozenBadge}</td>
       <td>${a.fecha||'—'}</td>
