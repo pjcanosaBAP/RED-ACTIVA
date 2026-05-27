@@ -859,7 +859,10 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
     <!-- Spacer -->
     <div style="flex:1"></div>
     <!-- Supabase status -->
-    <div id="sb-dot" title="Supabase: iniciando..." style="width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;margin-right:4px;cursor:pointer;transition:background .4s" onclick="loadFromSupabase()"></div>
+    <div style="display:flex;align-items:center;gap:5px;margin-right:4px">
+      <div id="sb-dot" title="Supabase: iniciando... (clic = re-sincronizar)" style="width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;cursor:pointer;transition:background .4s" onclick="loadFromSupabase()"></div>
+      <button class="btn btn-out" onclick="pushAllToSupabase()" title="Subir todos los datos locales a Supabase" style="padding:2px 7px;font-size:11px;line-height:1.4">☁️↑</button>
+    </div>
     <button class="btn btn-out" onclick="toggleSaved()" style="gap:4px">📋 Guardadas <span id="aud-cnt-badge" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 6px;font-size:10px">0</span></button>
     <button class="btn btn-green" onclick="saveAudit()">💾 Guardar</button>
     <button class="btn btn-blue" onclick="exportExcel()">📊 Excel</button>
@@ -2958,6 +2961,50 @@ async function persist(){
       if(error) console.warn('[SB] persist autoevals:', error.message);
     }
   } catch(e){ console.warn('[SB] persist error:', e); }
+}
+// ── SUPABASE: force-push ALL local data ──────────────────────────────────────
+async function pushAllToSupabase(){
+  if(!_sbc){ showToast('⚠️ Supabase no configurado'); return; }
+  const dot = document.getElementById('sb-dot');
+  if(dot){ dot.style.background='#f59e0b'; dot.title='Supabase: subiendo...'; }
+  try {
+    // Connect first if offline
+    if(!_sbOnline){
+      const {error:pingErr} = await _sbc.from('audits').select('id').limit(1);
+      if(pingErr) throw pingErr;
+      _sbOnline = true;
+    }
+    let ev=0, ae=0;
+    if(saved.length){
+      const rows = saved.map(a=>({
+        id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
+        fecha:a.fecha||'', auditor:a.auditor||'',
+        answers:a.answers||{}, comments:a.comments||{},
+        scores:a.scores||{}, weights:a.weights||{},
+        updated_at:new Date().toISOString()
+      }));
+      const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
+      if(error) throw error;
+      ev = rows.length;
+    }
+    if(autoevals.length){
+      const rows = autoevals.map(a=>({
+        id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
+        fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
+      }));
+      const {error} = await _sbc.from('autoevals').upsert(rows, {onConflict:'id'});
+      if(error) throw error;
+      ae = rows.length;
+    }
+    // Push config too
+    await _sbc.from('app_config').upsert({id:1, data:{...cfg, dists:[...DISTRIBUTORS]}, updated_at:new Date().toISOString()});
+    if(dot){ dot.style.background='#22c55e'; dot.title='Supabase: conectado'; }
+    showToast('☁️ Subido: '+ev+' EV · '+ae+' AE → Supabase');
+  } catch(e){
+    if(dot){ dot.style.background='#ef4444'; dot.title='Supabase: error · '+e.message; }
+    showToast('❌ Error al subir: '+e.message);
+    console.warn('[SB] pushAllToSupabase:', e);
+  }
 }
 // ── SUPABASE: load + realtime ────────────────────────────────────────────────
 async function loadFromSupabase(){
