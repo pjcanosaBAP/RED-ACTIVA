@@ -1938,11 +1938,8 @@ function saveCfg(){
   cfg.dists = [...DISTRIBUTORS];
   cfg.aw = {...AW};
   localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
-  // Supabase: push config (fire-and-forget)
-  if(_sbc && _sbOnline){
-    _sbc.from('app_config').upsert({id:1, data:{...cfg, dists:[...DISTRIBUTORS]}, updated_at:new Date().toISOString()})
-      .then(({error})=>{ if(error) console.warn('[SB] saveCfg:', error.message); });
-  }
+  // Supabase: push config + structures (fire-and-forget)
+  _sbPushConfig();
   // Also persist AW into the per-país structure
   const _sk=structureKey(); const _sd=localStorage.getItem(_sk);
   if(_sd){ try{ const _sd2=JSON.parse(_sd); _sd2.aw={...AW}; localStorage.setItem(_sk,JSON.stringify(_sd2)); }catch(_){} }
@@ -2962,6 +2959,31 @@ async function persist(){
     }
   } catch(e){ console.warn('[SB] persist error:', e); }
 }
+// ── SUPABASE: push full config + structures ───────────────────────────────────
+async function _sbPushConfig(){
+  if(!_sbc || !_sbOnline) return;
+  try {
+    // Collect ALL structure keys from localStorage
+    const structures = {};
+    for(let i=0; i<localStorage.length; i++){
+      const k=localStorage.key(i);
+      if(k && k.startsWith('bpl_struct_')){
+        try{ structures[k]=JSON.parse(localStorage.getItem(k)); }catch(e){}
+      }
+    }
+    const data = {
+      pais: cfg.pais||'URUGUAY',
+      anio: cfg.anio||2025,
+      dists: [...DISTRIBUTORS],
+      thr: {...THR},
+      aw: {...AW},
+      structures
+    };
+    const {error} = await _sbc.from('app_config')
+      .upsert({id:1, data, updated_at:new Date().toISOString()});
+    if(error) console.warn('[SB] _sbPushConfig:', error.message);
+  } catch(e){ console.warn('[SB] _sbPushConfig error:', e); }
+}
 // ── SUPABASE: force-push ALL local data ──────────────────────────────────────
 async function pushAllToSupabase(){
   if(!_sbc){ showToast('⚠️ Supabase no configurado'); return; }
@@ -2996,8 +3018,8 @@ async function pushAllToSupabase(){
       if(error) throw error;
       ae = rows.length;
     }
-    // Push config too
-    await _sbc.from('app_config').upsert({id:1, data:{...cfg, dists:[...DISTRIBUTORS]}, updated_at:new Date().toISOString()});
+    // Push config + all structures
+    await _sbPushConfig();
     if(dot){ dot.style.background='#22c55e'; dot.title='Supabase: conectado'; }
     showToast('☁️ Subido: '+ev+' EV · '+ae+' AE → Supabase');
   } catch(e){
@@ -3061,11 +3083,31 @@ async function loadFromSupabase(){
       if(error) console.warn('[SB] initial upload autoevals:', error.message);
     }
 
-    // ── Load config (distributors) ────────────────────────────
+    // ── Load config + structures ──────────────────────────────
     const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
-    if(cfgRow && cfgRow.data && cfgRow.data.dists && Array.isArray(cfgRow.data.dists)){
-      cfgRow.data.dists.forEach(d=>{ if(!DISTRIBUTORS.includes(d)) DISTRIBUTORS.push(d); });
-      try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+    if(cfgRow && cfgRow.data){
+      const remote = cfgRow.data;
+      // Restore all structures to localStorage
+      if(remote.structures && typeof remote.structures === 'object'){
+        Object.entries(remote.structures).forEach(([key, val])=>{
+          localStorage.setItem(key, JSON.stringify(val));
+        });
+      }
+      // Restore distributors (merge, no duplicates)
+      if(remote.dists && Array.isArray(remote.dists)){
+        remote.dists.forEach(d=>{ if(!DISTRIBUTORS.includes(d)) DISTRIBUTORS.push(d); });
+        try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+      }
+      // Restore pais/anio and load their structure (only if not set locally)
+      const hasLocalCfg = !!(cfg.pais);
+      if(!hasLocalCfg && remote.pais){
+        cfg.pais = remote.pais;
+        cfg.anio = remote.anio;
+        localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
+        if(loadStructure(remote.pais, remote.anio)){
+          try{ rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas(); }catch(e){}
+        }
+      }
     }
 
     // ── Setup realtime channel ────────────────────────────────
@@ -4527,6 +4569,7 @@ function savePaisAnio(){
   const anio=parseInt(document.getElementById('cfg-anio').value)||2025;
   cfg.pais=pais; cfg.anio=anio;
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  _sbPushConfig();
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
   const flag=flags[pais]||'🌍';
   const pv=document.getElementById('sb-prog-val');
@@ -4569,6 +4612,8 @@ function saveStructure(){
   // Legacy keys for backward compat
   saveQCustom(); saveAreasCfg();
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  // Supabase: push full config + structures (fire-and-forget)
+  _sbPushConfig();
 }
 function loadStructure(pais, anio){
   try{
@@ -8325,6 +8370,8 @@ if(window.electronAPI){
         // Persist structure under this snapshot's país/año key
         saveStructure();
         persist();
+        // Push config+structures to Supabase immediately (before realtime fires)
+        setTimeout(()=>_sbPushConfig(), 50);
         // Rebuild UI — keep renderSaved outside try so panel always updates
         try{ rebuildAll(); }catch(rebuildErr){ console.error('[RA2] rebuildAll error after snapshot load:',rebuildErr); }
         rebuildDynamicUI();
