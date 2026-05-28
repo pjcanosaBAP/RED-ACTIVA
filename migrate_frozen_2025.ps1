@@ -2,14 +2,18 @@
 # migrate_frozen_2025.ps1
 # Migra los snapshots congelados de UY 2025 y CH 2025 a Supabase.
 #
-# ANTES DE CORRER ESTE SCRIPT:
-#   1. En el SQL Editor de Supabase, ejecutar:
-#      ALTER TABLE audits ADD COLUMN IF NOT EXISTS frozen boolean DEFAULT false;
+# IMPORTANTE: Ya corrido el 2026-05-27. Datos OK en Supabase.
 #
-#   2. Tener los archivos de snapshot en:
-#      C:\Users\Lenovo\Desktop\RedActiva-Desktop\Varios\
-#      - RedActiva_URUGUAY_2025_FROZEN.html
-#      - RedActiva_CHILE_2025_FROZEN.html
+# Para completar la configuración de frozen, ejecutar en Supabase SQL Editor:
+#
+#   -- 1. Agregar columna frozen
+#   ALTER TABLE audits ADD COLUMN IF NOT EXISTS frozen boolean DEFAULT false;
+#
+#   -- 2. Marcar UY y CH 2025 como congelados
+#   UPDATE audits SET frozen = true WHERE edicion = '2025' AND pais IN ('URUGUAY', 'CHILE');
+#
+# Este script (si se necesita volver a correr) re-inserta los datos desde
+# los snapshots HTML en Varios/.
 ##############################################################################
 
 $SBURL = 'https://fkyifkbfgdxgmwbgnhud.supabase.co'
@@ -31,96 +35,91 @@ function Extract-SnapData($htmlPath) {
     return $content.Substring($start, $end - $start).Trim()
 }
 
-function Build-Row($audit, $pais) {
-    return @{
-        id          = [string]$audit.id
-        distribuidor = $audit.distribuidor
-        edicion     = $audit.edicion
-        pais        = $pais
-        fecha       = if ($audit.fecha) { $audit.fecha } else { '' }
-        auditor     = if ($audit.auditor) { $audit.auditor } else { '' }
-        answers     = $audit.answers
-        comments    = if ($audit.comments) { $audit.comments } else { [pscustomobject]@{} }
-        scores      = $audit.scores
-        weights     = if ($audit.weights) { $audit.weights } else { [pscustomobject]@{} }
-        frozen      = $true
-        updated_at  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-    }
-}
-
 Write-Host "`n=== MIGRACION FROZEN 2025 ===" -ForegroundColor Cyan
 
-# ── PASO 1: Leer snapshots ────────────────────────────────────────────────────
 $variosPath = "C:\Users\Lenovo\Desktop\RedActiva-Desktop\Varios"
-$uyHtml = Join-Path $variosPath "RedActiva_URUGUAY_2025_FROZEN.html"
-$chHtml = Join-Path $variosPath "RedActiva_CHILE_2025_FROZEN.html"
-
-Write-Host "Leyendo UY snapshot..." -ForegroundColor Yellow
-$uyJson = Extract-SnapData $uyHtml
+$uyJson = Extract-SnapData (Join-Path $variosPath "RedActiva_URUGUAY_2025_FROZEN.html")
 $uyData = $uyJson | ConvertFrom-Json
-
-Write-Host "Leyendo CH snapshot..." -ForegroundColor Yellow
-$chJson = Extract-SnapData $chHtml
+$chJson = Extract-SnapData (Join-Path $variosPath "RedActiva_CHILE_2025_FROZEN.html")
 $chData = $chJson | ConvertFrom-Json
 
-Write-Host "UY: $($uyData.saved.Count) auditorias" -ForegroundColor Green
-Write-Host "CH: $($chData.saved.Count) auditorias" -ForegroundColor Green
+Write-Host "UY: $($uyData.saved.Count) | CH: $($chData.saved.Count)" -ForegroundColor Green
 
-# ── PASO 2: Construir filas ───────────────────────────────────────────────────
+# ── Construir filas ───────────────────────────────────────────────────────────
 $rows = @()
-foreach ($a in $uyData.saved) { $rows += Build-Row $a 'URUGUAY' }
-foreach ($a in $chData.saved) { $rows += Build-Row $a 'CHILE' }
-Write-Host "Total filas a upsert: $($rows.Count)" -ForegroundColor Cyan
-
-# ── PASO 3: Borrar registros 2025 existentes de UY y CH ──────────────────────
-Write-Host "`nBorrando registros 2025 existentes de UY y CH..." -ForegroundColor Yellow
-
-$uyDists = ($uyData.saved | ForEach-Object { [uri]::EscapeDataString($_.distribuidor) }) -join ','
-$chDists = ($chData.saved | ForEach-Object { [uri]::EscapeDataString($_.distribuidor) }) -join ','
-
-# Supabase REST DELETE con filtro in()
-# Borramos todos los registros edicion=2025 para los distribuidores de cada pais
-try {
-    # UY
-    $uyDistList = ($uyData.saved | ForEach-Object { '"' + $_.distribuidor.Replace('"','\"') + '"' }) -join ','
-    $delUyUri = "$SBURL/rest/v1/audits?edicion=eq.2025&distribuidor=in.($uyDistList)"
-    $r = Invoke-RestMethod -Uri $delUyUri -Method DELETE -Headers $headers
-    Write-Host "  Borrados UY 2025: OK" -ForegroundColor Green
-} catch {
-    Write-Host "  Aviso al borrar UY: $($_.Exception.Message)" -ForegroundColor DarkYellow
+$uyData.saved | ForEach-Object {
+    $a = $_
+    $row = @{
+        id           = [string]$a.id
+        distribuidor = $a.distribuidor
+        edicion      = $a.edicion
+        pais         = 'URUGUAY'
+        fecha        = if ($a.fecha) { $a.fecha } else { '' }
+        auditor      = if ($a.auditor) { $a.auditor } else { '' }
+        answers      = $a.answers
+        comments     = if ($a.comments) { $a.comments } else { [pscustomobject]@{} }
+        scores       = $a.scores
+        weights      = if ($a.weights) { $a.weights } else { [pscustomobject]@{} }
+        updated_at   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
+    # Add frozen if column exists
+    try {
+        $testResult = Invoke-RestMethod -Uri "$SBURL/rest/v1/audits?select=frozen&limit=1" `
+            -Method GET -Headers $headers -ErrorAction Stop
+        $row['frozen'] = $true
+    } catch {}
+    $rows += $row
 }
 
-try {
-    # CH
-    $chDistList = ($chData.saved | ForEach-Object { '"' + $_.distribuidor.Replace('"','\"') + '"' }) -join ','
-    $delChUri = "$SBURL/rest/v1/audits?edicion=eq.2025&distribuidor=in.($chDistList)"
-    $r = Invoke-RestMethod -Uri $delChUri -Method DELETE -Headers $headers
-    Write-Host "  Borrados CH 2025: OK" -ForegroundColor Green
-} catch {
-    Write-Host "  Aviso al borrar CH: $($_.Exception.Message)" -ForegroundColor DarkYellow
+$chData.saved | ForEach-Object {
+    $a = $_
+    $row = @{
+        id           = [string]$a.id
+        distribuidor = $a.distribuidor
+        edicion      = $a.edicion
+        pais         = 'CHILE'
+        fecha        = if ($a.fecha) { $a.fecha } else { '' }
+        auditor      = if ($a.auditor) { $a.auditor } else { '' }
+        answers      = $a.answers
+        comments     = if ($a.comments) { $a.comments } else { [pscustomobject]@{} }
+        scores       = $a.scores
+        weights      = if ($a.weights) { $a.weights } else { [pscustomobject]@{} }
+        updated_at   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
+    $rows += $row
 }
 
-# ── PASO 4: Upsert en lotes de 20 ────────────────────────────────────────────
-Write-Host "`nInsertando datos congelados en Supabase..." -ForegroundColor Yellow
-$batchSize = 20
-$ok = 0
-$errors = 0
+# ── Borrar 2025 existentes ────────────────────────────────────────────────────
+$uyDistFilter = ($uyData.saved | ForEach-Object { '"' + $_.distribuidor.Replace('"','\"') + '"' }) -join ','
+$chDistFilter = ($chData.saved | ForEach-Object { '"' + $_.distribuidor.Replace('"','\"') + '"' }) -join ','
 
+try {
+    Invoke-RestMethod -Uri "$SBURL/rest/v1/audits?edicion=eq.2025&distribuidor=in.($uyDistFilter)" `
+        -Method DELETE -Headers $headers | Out-Null
+    Write-Host "UY 2025 borrados OK" -ForegroundColor Green
+} catch { Write-Host "Aviso UY delete: $($_.ErrorDetails.Message)" -ForegroundColor DarkYellow }
+
+try {
+    Invoke-RestMethod -Uri "$SBURL/rest/v1/audits?edicion=eq.2025&distribuidor=in.($chDistFilter)" `
+        -Method DELETE -Headers $headers | Out-Null
+    Write-Host "CH 2025 borrados OK" -ForegroundColor Green
+} catch { Write-Host "Aviso CH delete: $($_.ErrorDetails.Message)" -ForegroundColor DarkYellow }
+
+# ── Insertar en lotes ─────────────────────────────────────────────────────────
+$batchSize = 20; $ok = 0; $errors = 0
 for ($i = 0; $i -lt $rows.Count; $i += $batchSize) {
     $batch = $rows[$i .. [Math]::Min($i + $batchSize - 1, $rows.Count - 1)]
     $body = $batch | ConvertTo-Json -Depth 20 -Compress
     try {
         Invoke-RestMethod -Uri "$SBURL/rest/v1/audits?on_conflict=id" `
             -Method POST -Headers $headers -Body $body | Out-Null
-        $ok += $batch.Count
-        Write-Host "  Lote $([Math]::Ceiling(($i+1)/$batchSize)): $($batch.Count) registros OK" -ForegroundColor Green
+        $ok += $batch.Count; Write-Host "  Lote OK: $($batch.Count)" -ForegroundColor Green
     } catch {
-        $errors += $batch.Count
-        Write-Host "  ERROR lote $([Math]::Ceiling(($i+1)/$batchSize)): $($_.Exception.Message)" -ForegroundColor Red
+        $errors += $batch.Count; Write-Host "  ERROR: $($_.ErrorDetails.Message)" -ForegroundColor Red
     }
 }
 
-Write-Host "`n=== RESULTADO ===" -ForegroundColor Cyan
-Write-Host "Insertados OK: $ok" -ForegroundColor Green
-if ($errors -gt 0) { Write-Host "Con errores:  $errors" -ForegroundColor Red }
-Write-Host "`nListo! Abrí Netlify y recargá la pagina para ver los datos actualizados." -ForegroundColor Cyan
+Write-Host "`nInsertados: $ok | Errores: $errors" -ForegroundColor Cyan
+Write-Host "`nPRÓXIMO PASO: Ejecutar en Supabase SQL Editor:" -ForegroundColor Yellow
+Write-Host "  ALTER TABLE audits ADD COLUMN IF NOT EXISTS frozen boolean DEFAULT false;" -ForegroundColor White
+Write-Host "  UPDATE audits SET frozen = true WHERE edicion = '2025' AND pais IN ('URUGUAY', 'CHILE');" -ForegroundColor White
