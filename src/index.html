@@ -1265,6 +1265,12 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
         <div class="card-bd" style="padding:12px 16px">
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
             <div class="fg">
+              <label>País</label>
+              <select id="cmp-pais" onchange="initCompare()" style="min-width:110px">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="fg">
               <label>Modo de análisis</label>
               <select id="cmp-mode" onchange="onCmpModeChange()" style="min-width:260px">
                 <option value="editions">Comparación global entre ediciones</option>
@@ -1523,6 +1529,16 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
 <div class="panel" id="panel-analisis">
   <div class="content">
     <h2>🎯 Análisis Avanzado</h2>
+    <!-- Shared país + edición filters — apply to ALL sub-tabs -->
+    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:var(--g50);border-radius:8px;border:1px solid var(--g100)">
+      <div class="fg">
+        <label>País</label>
+        <select id="an-pais" onchange="onAnPaisChange()" style="min-width:110px">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div style="font-size:10px;color:var(--g400);padding-bottom:4px">← Filtra distribuidores y promedios de red en todos los sub-módulos</div>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px">
       <button class="btn btn-blue btn-sm an-tab-btn on" onclick="goAnTab('m1')">📊 Individual</button>
       <button class="btn btn-blue btn-sm an-tab-btn" onclick="goAnTab('m2')">🌐 Global</button>
@@ -4007,7 +4023,7 @@ function renderStats(){
   const wrap=document.getElementById('an-stats-out');
   if(!wrap) return;
   const ed=(document.getElementById('an-stats-ed')||{}).value||'';
-  const audits=saved.filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
+  const audits=_anSaved().filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
   if(!audits.length){wrap.innerHTML='<div class="an-empty">No hay auditorías cargadas.</div>';return;}
   const totals=audits.map(function(a){return a.scores.total||0;});
   const sheets=SHEETS();
@@ -7029,14 +7045,15 @@ function resetAllWeights(){
 // Patch renderCompareEditions with edition-over-edition delta + trend arrows
 function renderCompareEditionsFull(){
   const wrap=document.getElementById('compare-output'); if(!wrap) return;
-  const editions=[...new Set(saved.map(a=>a.edicion).filter(Boolean))].sort();
+  const _cs=_cmpSaved();
+  const editions=[...new Set(_cs.map(a=>a.edicion).filter(Boolean))].sort();
   if(!editions.length){
     wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400)">⚠️ No hay auditorías guardadas.</div>';
     return;
   }
 
   const edData=editions.map(ed=>{
-    const data=saved.filter(a=>a.edicion===ed);
+    const data=_cs.filter(a=>a.edicion===ed);
     const avg=data.length?data.reduce((s,a)=>s+((a.scores||{}).total||0)*100,0)/data.length:0;
     const areas=Object.fromEntries(SHEETS().map(sh=>[sh,
       data.length?data.reduce((s,a)=>s+((a.scores||{}).areas[sh]||0)*100,0)/data.length:0
@@ -7264,22 +7281,24 @@ function goAnTab(t){
 }
 
 function initAnalisis(){
-  // Populate all selectors — include distributors from autoevals too
-  const dists=[...new Set([...saved.map(a=>a.distribuidor),...autoevals.map(a=>a.distribuidor)])].sort();
-  const eds=[...new Set([...saved.map(a=>a.edicion),...autoevals.map(a=>a.edicion)].filter(Boolean))].sort();
+  _populatePaisSelect('an-pais');
+  const _as = _anSaved();
+  // Populate all selectors — distributors filtered by country, editions from filtered set
+  const dists=[...new Set([..._as.map(a=>a.distribuidor),...autoevals.map(a=>a.distribuidor)])].sort();
+  const eds=[...new Set([..._as.map(a=>a.edicion),...autoevals.map(a=>a.edicion)].filter(Boolean))].sort();
   ['an-sel-dist','an-nv-dist'].forEach(id=>{
     const s=document.getElementById(id); if(!s) return;
     const cur=s.value;
     const lbl=id==='an-nv-dist'?'— Red completa —':'— Seleccioná —';
     s.innerHTML=`<option value="">${lbl}</option>`+dists.map(d=>`<option value="${d}">${d}</option>`).join('');
-    if(cur) s.value=cur;
+    if(cur && dists.includes(cur)) s.value=cur; else s.value='';
   });
   ['an-sel-ed','an-m2-ed','an-m4-ed','an-nv-ed','an-stats-ed'].forEach(id=>{
     const s=document.getElementById(id); if(!s) return;
     const cur=s.value;
     const label=id==='an-sel-ed'?'— Última —':'Todas';
     s.innerHTML=`<option value="">${label}</option>`+eds.map(e=>`<option value="${e}">${e}</option>`).join('');
-    if(cur) s.value=cur;
+    if(cur && eds.includes(cur)) s.value=cur;
   });
   // Show/hide NV tab based on whether NV areas exist
   const nvBtn=document.getElementById('an-tab-nv-btn');
@@ -7299,7 +7318,7 @@ function renderNV(){
   }
   const distSel=(document.getElementById('an-nv-dist')||{}).value||'';
   const edSel=(document.getElementById('an-nv-ed')||{}).value||'';
-  let data=saved;
+  let data=_anSaved();
   if(distSel) data=data.filter(a=>a.distribuidor===distSel);
   if(edSel) data=data.filter(a=>a.edicion===edSel);
   if(!data.length){
@@ -7430,15 +7449,16 @@ function renderM1(){
   const out=document.getElementById('an-m1-out');
   if(!dist){out.innerHTML='<div class="an-empty">Seleccioná un distribuidor.</div>';return;}
 
+  const _as=_anSaved();
   // Get audits for this dist, pick edition
-  const allAudits=saved.filter(a=>a.distribuidor===dist).sort((a,b)=>(a.edicion||'').localeCompare(b.edicion||''));
+  const allAudits=_as.filter(a=>a.distribuidor===dist).sort((a,b)=>(a.edicion||'').localeCompare(b.edicion||''));
   if(!allAudits.length){out.innerHTML='<div class="an-empty">No hay auditorías para este distribuidor.</div>';return;}
   const audit=edSel?allAudits.find(a=>a.edicion===edSel)||allAudits[allAudits.length-1]:allAudits[allAudits.length-1];
   const sc=audit.scores||{}; const at=sc.areas||{}; const ans=audit.answers||{};
   const sheets=SHEETS();
 
-  // Network benchmark for this edition
-  const netAudits=saved.filter(a=>a.edicion===audit.edicion);
+  // Network benchmark for this edition (uses same country filter)
+  const netAudits=_as.filter(a=>a.edicion===audit.edicion);
   const netAvg=netAudits.length?netAudits.reduce((s,a)=>s+((a.scores||{}).total||0),0)/netAudits.length:0;
   const netAreas=Object.fromEntries(sheets.map(sh=>[sh,
     netAudits.length?netAudits.reduce((s,a)=>s+((a.scores||{}).areas[sh]||0),0)/netAudits.length:0]));
@@ -7701,13 +7721,14 @@ function toggleM1Prev(){
 function renderM2(){
   const edSel=(document.getElementById('an-m2-ed')||{}).value||'';
   const out=document.getElementById('an-m2-out');
-  const data=edSel?saved.filter(a=>a.edicion===edSel):saved;
+  const _as=_anSaved();
+  const data=edSel?_as.filter(a=>a.edicion===edSel):_as;
   if(!data.length){out.innerHTML='<div class="an-empty">No hay auditorías para mostrar.</div>';return;}
 
   const sheets=SHEETS();
-  const eds=[...new Set(saved.map(a=>a.edicion).filter(Boolean))].sort();
+  const eds=[...new Set(_as.map(a=>a.edicion).filter(Boolean))].sort();
   const prevEd=eds.length>1?eds[eds.indexOf(edSel||eds[eds.length-1])-1]:null;
-  const prevData=prevEd?saved.filter(a=>a.edicion===prevEd):[];
+  const prevData=prevEd?_as.filter(a=>a.edicion===prevEd):[];
 
   const sorted=[...data].sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
   const cats={PROACTIVO:0,ACTIVO:0,REACTIVO:0,INACTIVO:0};
@@ -7916,12 +7937,13 @@ function toggleM2Prev(){const btn=document.getElementById('m2-btn-prev');if(btn)
 // ════════════════════════════════════════════════════
 function renderM3(){
   const out=document.getElementById('an-m3-out');
-  const eds=[...new Set(saved.map(a=>a.edicion).filter(Boolean))].sort();
+  const _as=_anSaved();
+  const eds=[...new Set(_as.map(a=>a.edicion).filter(Boolean))].sort();
   if(eds.length<2){out.innerHTML='<div class="an-empty">Necesitás auditorías de al menos 2 ediciones distintas para ver tendencias.</div>';return;}
 
   const sheets=SHEETS();
   const edData=eds.map(ed=>{
-    const data=saved.filter(a=>a.edicion===ed);
+    const data=_as.filter(a=>a.edicion===ed);
     const avg=data.length?data.reduce((s,a)=>s+((a.scores||{}).total||0),0)/data.length:0;
     const areas=Object.fromEntries(sheets.map(sh=>[sh,
       data.length?data.reduce((s,a)=>s+((a.scores||{}).areas[sh]||0),0)/data.length:0]));
@@ -7973,9 +7995,9 @@ function renderM3(){
   </div>`;
 
   // ── Velocidad de mejora por distribuidor ──
-  const dists=[...new Set(saved.map(a=>a.distribuidor))];
+  const dists=[...new Set(_as.map(a=>a.distribuidor))];
   const mejoras=dists.map(dist=>{
-    const audits=eds.map(ed=>saved.find(a=>a.distribuidor===dist&&a.edicion===ed)).filter(Boolean);
+    const audits=eds.map(ed=>_as.find(a=>a.distribuidor===dist&&a.edicion===ed)).filter(Boolean);
     if(audits.length<2) return null;
     const first=(audits[0].scores||{}).total||0, last=(audits[audits.length-1].scores||{}).total||0;
     const delta=last-first; const n=audits.length-1;
@@ -8004,8 +8026,8 @@ function renderM3(){
     const move={up:0,down:0,same:0,details:[]};
     const catOrder={PROACTIVO:4,ACTIVO:3,REACTIVO:2,INACTIVO:1};
     dists.forEach(dist=>{
-      const a1=saved.find(a=>a.distribuidor===dist&&a.edicion===e1);
-      const a2=saved.find(a=>a.distribuidor===dist&&a.edicion===e2);
+      const a1=_as.find(a=>a.distribuidor===dist&&a.edicion===e1);
+      const a2=_as.find(a=>a.distribuidor===dist&&a.edicion===e2);
       if(!a1||!a2) return;
       const c1=recomputeCategory(a1)||'INACTIVO', c2=recomputeCategory(a2)||'INACTIVO';
       const diff=(catOrder[c2]||0)-(catOrder[c1]||0);
@@ -8035,7 +8057,7 @@ function renderM3(){
 
   // ── Consistencia (varianza) ──
   const consistencia=dists.map(dist=>{
-    const vals=eds.map(ed=>{const a=saved.find(x=>x.distribuidor===dist&&x.edicion===ed);return a?((a.scores||{}).total||0):null;}).filter(v=>v!==null);
+    const vals=eds.map(ed=>{const a=_as.find(x=>x.distribuidor===dist&&x.edicion===ed);return a?((a.scores||{}).total||0):null;}).filter(v=>v!==null);
     if(vals.length<2) return null;
     const avg2=vals.reduce((s,v)=>s+v,0)/vals.length;
     const variance=vals.reduce((s,v)=>s+Math.pow(v-avg2,2),0)/vals.length;
@@ -8090,7 +8112,8 @@ function renderM3(){
 function renderM4(){
   const edSel=(document.getElementById('an-m4-ed')||{}).value||'';
   const out=document.getElementById('an-m4-out');
-  const data=edSel?saved.filter(a=>a.edicion===edSel):saved;
+  const _as=_anSaved();
+  const data=edSel?_as.filter(a=>a.edicion===edSel):_as;
   if(!data.length){out.innerHTML='<div class="an-empty">No hay auditorías para analizar.</div>';return;}
 
   const sheets=SHEETS();
@@ -8104,7 +8127,7 @@ function renderM4(){
     const s=a.scores||{};
     const scoreRisk=Math.max(0,1-(s.total||0));
     const critRisk=CRIT_LIST.length?(1-(s.critMet||0)/CRIT_LIST.length):0;
-    const allA=saved.filter(x=>x.distribuidor===a.distribuidor).sort((x,y)=>(x.edicion||'').localeCompare(y.edicion||''));
+    const allA=_as.filter(x=>x.distribuidor===a.distribuidor).sort((x,y)=>(x.edicion||'').localeCompare(y.edicion||''));
     const idx2=allA.indexOf(a);
     const prev=idx2>0?allA[idx2-1]:null;
     const trendRisk=prev?Math.max(0,-((s.total||0)-((prev.scores||{}).total||0))):0;
@@ -8579,7 +8602,28 @@ if(window.electronAPI){
 //   subattr  (field) = BPL en la UI       (ej: ENTORNO - ACCESO)
 // ═══════════════════════════════════════════════════════
 
+// ── País filter helpers ──────────────────────────────────────────────────────
+function _populatePaisSelect(selId, triggerFn){
+  const sel=document.getElementById(selId); if(!sel) return;
+  const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
+  if(cur && paises.includes(cur)) sel.value=cur;
+}
+function _cmpSaved(){
+  const p=(document.getElementById('cmp-pais')||{}).value||'';
+  return p ? saved.filter(a=>a.pais===p) : saved;
+}
+function _anSaved(){
+  const p=(document.getElementById('an-pais')||{}).value||'';
+  return p ? saved.filter(a=>a.pais===p) : saved;
+}
+function onAnPaisChange(){
+  initAnalisis();
+}
+
 function initCompare() {
+  _populatePaisSelect('cmp-pais');
   if (!saved.length) {
     document.getElementById('cmp-nodata-msg').style.display = '';
     document.getElementById('compare-output').innerHTML =
@@ -8589,9 +8633,9 @@ function initCompare() {
   }
   document.getElementById('cmp-nodata-msg').style.display = 'none';
 
-  // Populate distributor selector
+  // Populate distributor selector (filtered by country)
   const sel = document.getElementById('cmp-dist');
-  const dists = [...new Set(saved.map(a=>a.distribuidor))].sort();
+  const dists = [...new Set(_cmpSaved().map(a=>a.distribuidor))].sort();
   const curVal = sel.value;
   sel.innerHTML = '<option value="">— Seleccionar —</option>' +
     dists.map(d=>`<option value="${d}"${d===curVal?' selected':''}>${d}</option>`).join('');
@@ -8615,7 +8659,8 @@ function renderCompare() {
 // ── MODE 1: Global comparison between editions ──────────
 function renderCompareEditions() {
   const wrap = document.getElementById('compare-output');
-  const editions = [...new Set(saved.map(a=>a.edicion).filter(Boolean))].sort();
+  const _cs = _cmpSaved();
+  const editions = [...new Set(_cs.map(a=>a.edicion).filter(Boolean))].sort();
   const catCols = {PROACTIVO:'#2e7d32',ACTIVO:'#00695c',REACTIVO:'#e65100',INACTIVO:'#c62828'};
   const edCols = ['#1565c0','#6a1b9a','#00695c','#e65100','#c62828','#1b5e20'];
 
@@ -8626,7 +8671,7 @@ function renderCompareEditions() {
 
   // Build per-edition summary data
   const edData = editions.map((ed,i) => {
-    const data = saved.filter(a=>a.edicion===ed);
+    const data = _cs.filter(a=>a.edicion===ed);
     const avg = data.length ? data.reduce((s,a)=>s+((a.scores||{}).total||0)*100,0)/data.length : 0;
     const cats = {PROACTIVO:0,ACTIVO:0,REACTIVO:0,INACTIVO:0};
     data.forEach(a=>{ const c=recomputeCategory(a); if(c&&cats[c]!==undefined) cats[c]++; });
@@ -8755,7 +8800,7 @@ function renderCompareDistributor() {
     return;
   }
 
-  const audits = saved.filter(a=>a.distribuidor===dist).sort((a,b)=>(a.edicion||'').localeCompare(b.edicion||''));
+  const audits = _cmpSaved().filter(a=>a.distribuidor===dist).sort((a,b)=>(a.edicion||'').localeCompare(b.edicion||''));
   if (!audits.length) {
     wrap.innerHTML = '<p style="font-size:12px;color:var(--g400)">No hay auditorías para este distribuidor.</p>';
     return;
