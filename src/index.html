@@ -4316,28 +4316,30 @@ function clearActiveAudit(){
 }
 
 function _updateSbResp(){
-  const _isPeso0 = q => (q.bpl_weight===0||q.bpl_weight==='0'||q.weight_attr===0||q.peso_bpl===0);
-  const vincQs    = Q.filter(q => !_isPeso0(q));
-  const novincQs  = Q.filter(q =>  _isPeso0(q));
-  const vincPend  = vincQs.filter(q  => !ans[q.comp_num]).length;
-  const novincPend= novincQs.filter(q => !ans[q.comp_num]).length;
-  const vincEl    = document.getElementById('sb-resp-vinc');
-  const novincEl  = document.getElementById('sb-resp-novinc');
+  const core = SHEETS_CORE();
+  const nv   = SHEETS_NV();
+  const vincQs   = Q.filter(q => core.includes(q.sheet));
+  const novincQs = Q.filter(q => nv.includes(q.sheet));
+  const vincPend   = vincQs.filter(q   => !ans[q.comp_num]).length;
+  const novincPend = novincQs.filter(q => !ans[q.comp_num]).length;
+  const vincEl   = document.getElementById('sb-resp-vinc');
+  const novincEl = document.getElementById('sb-resp-novinc');
   if(vincEl){
     if(vincPend > 0){
-      vincEl.textContent = `⚠️ ${vincPend} sin responder · ${vincQs.length-vincPend}/${vincQs.length} vinculantes`;
+      vincEl.textContent = `⚠️ ${vincPend} sin responder · ${vincQs.length-vincPend}/${vincQs.length} resultado`;
       vincEl.style.color = '#ffb74d';
     } else {
-      vincEl.textContent = `✅ ${vincQs.length}/${vincQs.length} vinculantes respondidas`;
+      vincEl.textContent = `✅ ${vincQs.length}/${vincQs.length} resultado respondidas`;
       vincEl.style.color = 'rgba(255,255,255,.45)';
     }
   }
   if(novincEl){
-    if(novincPend > 0){
-      novincEl.textContent = `${novincPend} PESO 0 pendientes (${novincQs.length-novincPend}/${novincQs.length} respondidas)`;
-      novincEl.style.display = '';
-    } else if(novincQs.length > 0){
-      novincEl.textContent = `${novincQs.length}/${novincQs.length} PESO 0 respondidas`;
+    if(novincQs.length > 0){
+      if(novincPend > 0){
+        novincEl.textContent = `${novincQs.length-novincPend}/${novincQs.length} no vinculantes · ${novincPend} pendientes`;
+      } else {
+        novincEl.textContent = `✅ ${novincQs.length}/${novincQs.length} no vinculantes respondidas`;
+      }
       novincEl.style.display = '';
     } else {
       novincEl.style.display = 'none';
