@@ -863,8 +863,11 @@ body.readonly .admin-only{display:none!important;}
     <div class="sc-box">
       <div class="sc-lbl">Puntaje Ponderado</div>
       <div class="sc-val" id="sb-score">—</div>
-      <div class="sc-sub" id="sb-sub">0 / 187 respondidas</div>
       <span class="cat-pill cp-PENDIENTE" id="sb-cat">PENDIENTE</span>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">
+        <div id="sb-resp-vinc" style="font-size:10px;color:rgba(255,255,255,.45)">0 / 0 vinculantes</div>
+        <div id="sb-resp-novinc" style="font-size:10px;color:rgba(255,255,255,.28);display:none"></div>
+      </div>
     </div>
   </div>
 </aside>
@@ -2316,8 +2319,7 @@ function displayFrozenScores(a){
   if(sbSc) sbSc.textContent = p;
   const sbCat = document.getElementById('sb-cat');
   if(sbCat){ sbCat.textContent = cat; sbCat.className = 'cat-pill cp-'+cat; }
-  const sbSub = document.getElementById('sb-sub');
-  if(sbSub) sbSub.textContent = (sc.answered||0)+' / '+Q.length+' respondidas';
+  _updateSbResp();
 
   // KPIs
   const kpiSc = document.getElementById('kpi-score');
@@ -2741,11 +2743,7 @@ function recalc(){
   const pStr=sc.answered>0?fmt(sc.total):'—';
   // Sidebar
   document.getElementById('sb-score').textContent=pStr;
-  const _unanswered = Q.length - sc.answered;
-  const _sbSub = _unanswered > 0
-    ? `⚠️ ${_unanswered} sin responder · ${sc.answered}/${Q.length}`
-    : `✅ Todas respondidas · ${sc.answered}/${Q.length}`;
-  document.getElementById('sb-sub').textContent = _sbSub;
+  _updateSbResp();
   const sbCat=document.getElementById('sb-cat');
   sbCat.textContent=sc.category; sbCat.className='cat-pill cp-'+sc.category;
   // Nav bars
@@ -4317,28 +4315,40 @@ function clearActiveAudit(){
   showToast('🗑 Respuestas limpiadas');
 }
 
+function _updateSbResp(){
+  const _isPeso0 = q => (q.bpl_weight===0||q.bpl_weight==='0'||q.weight_attr===0||q.peso_bpl===0);
+  const vincQs    = Q.filter(q => !_isPeso0(q));
+  const novincQs  = Q.filter(q =>  _isPeso0(q));
+  const vincPend  = vincQs.filter(q  => !ans[q.comp_num]).length;
+  const novincPend= novincQs.filter(q => !ans[q.comp_num]).length;
+  const vincEl    = document.getElementById('sb-resp-vinc');
+  const novincEl  = document.getElementById('sb-resp-novinc');
+  if(vincEl){
+    if(vincPend > 0){
+      vincEl.textContent = `⚠️ ${vincPend} sin responder · ${vincQs.length-vincPend}/${vincQs.length} vinculantes`;
+      vincEl.style.color = '#ffb74d';
+    } else {
+      vincEl.textContent = `✅ ${vincQs.length}/${vincQs.length} vinculantes respondidas`;
+      vincEl.style.color = 'rgba(255,255,255,.45)';
+    }
+  }
+  if(novincEl){
+    if(novincPend > 0){
+      novincEl.textContent = `${novincPend} PESO 0 pendientes (${novincQs.length-novincPend}/${novincQs.length} respondidas)`;
+      novincEl.style.display = '';
+    } else if(novincQs.length > 0){
+      novincEl.textContent = `${novincQs.length}/${novincQs.length} PESO 0 respondidas`;
+      novincEl.style.display = '';
+    } else {
+      novincEl.style.display = 'none';
+    }
+  }
+}
 function updateAudCnt(){
   document.getElementById('aud-cnt-badge').textContent=saved.length;
   // Update autoevals count badge if it exists
   const aeBadge=document.getElementById('ae-cnt-badge');
   if(aeBadge) aeBadge.textContent=autoevals.length;
-  // Pending indicator in topbar
-  const _pend = Q.filter(q=>!ans[q.comp_num]).length;
-  let pendEl = document.getElementById('tb-pending');
-  if(_pend > 0){
-    if(!pendEl){
-      pendEl = document.createElement('span');
-      pendEl.id = 'tb-pending';
-      pendEl.style.cssText='font-size:10px;background:#ff9800;color:#fff;border-radius:10px;padding:1px 7px;font-weight:700;margin-left:6px;cursor:pointer';
-      pendEl.onclick = scrollToUnanswered;
-      const tbTitle = document.querySelector('.tb-title');
-      if(tbTitle) tbTitle.appendChild(pendEl);
-    }
-    pendEl.textContent = _pend+' sin responder';
-    pendEl.style.display='';
-  } else {
-    if(pendEl) pendEl.style.display='none';
-  }
 }
 
 // ── GLOBAL ──
