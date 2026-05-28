@@ -802,6 +802,34 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
 .hist-kpi:last-child{ border-right:none }
 .hist-kpi-val{ font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900 }
 .hist-kpi-lbl{ font-size:9px;color:var(--g400);text-transform:uppercase;letter-spacing:.5px }
+/* ═══ AUTH ═══ */
+#auth-overlay{position:fixed;inset:0;background:var(--navy);z-index:9999;
+  display:flex;align-items:center;justify-content:center;}
+#auth-overlay.hidden{display:none;}
+.auth-box{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:36px 40px;width:360px;box-shadow:0 24px 48px rgba(0,0,0,.5);}
+.auth-logo{text-align:center;margin-bottom:24px;}
+.auth-logo-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#fff;letter-spacing:1px;}
+.auth-logo-sub{font-size:10px;color:var(--blue-l);letter-spacing:2px;text-transform:uppercase;margin-top:3px;}
+.auth-field{margin-bottom:14px;}
+.auth-field label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+.auth-field input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:7px;padding:9px 12px;color:#fff;font-size:13px;outline:none;transition:border .2s;font-family:'Barlow',sans-serif;}
+.auth-field input:focus{border-color:var(--blue2);}
+.auth-btn{width:100%;padding:11px;background:var(--blue2);border:none;border-radius:7px;
+  color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:4px;font-family:'Barlow',sans-serif;}
+.auth-btn:hover{background:var(--blue);}
+.auth-btn:disabled{background:var(--g500);cursor:not-allowed;}
+.auth-err{font-size:12px;color:#f87171;margin-top:10px;text-align:center;min-height:18px;}
+/* readonly: oculta controles de escritura */
+body.readonly .admin-only{display:none!important;}
+/* user chip en topbar */
+.tb-user{display:flex;align-items:center;gap:6px;margin-right:2px;}
+.tb-user-email{font-size:10px;color:rgba(255,255,255,.5);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tb-role-chip{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
+.tb-role-chip.admin{background:rgba(29,78,216,.4);color:var(--blue-l);}
+.tb-role-chip.readonly{background:rgba(234,88,12,.3);color:#fdba74;}
 </style>
 <div id="__snap_embed__" style="display:none" aria-hidden="true">/* __SNAP_PLACEHOLDER__ */</div>
 </head>
@@ -861,13 +889,18 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
     <!-- Supabase status -->
     <div style="display:flex;align-items:center;gap:5px;margin-right:4px">
       <div id="sb-dot" title="Supabase: iniciando... (clic = re-sincronizar)" style="width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;cursor:pointer;transition:background .4s" onclick="loadFromSupabase()"></div>
-      <button class="btn btn-out" onclick="pushAllToSupabase()" title="Subir todos los datos locales a Supabase" style="padding:2px 7px;font-size:11px;line-height:1.4">☁️↑</button>
+      <button class="btn btn-out admin-only" onclick="pushAllToSupabase()" title="Subir todos los datos locales a Supabase" style="padding:2px 7px;font-size:11px;line-height:1.4">☁️↑</button>
     </div>
     <button class="btn btn-out" onclick="toggleSaved()" style="gap:4px">📋 Guardadas <span id="aud-cnt-badge" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 6px;font-size:10px">0</span></button>
-    <button class="btn btn-green" onclick="saveAudit()">💾 Guardar</button>
+    <button class="btn btn-green admin-only" onclick="saveAudit()">💾 Guardar</button>
     <button class="btn btn-blue" onclick="exportExcel()">📊 Excel</button>
     <button class="btn btn-out" onclick="printCurrentTab()" title="Imprimir como PDF">🖨️ PDF</button>
     <button class="btn btn-out" onclick="generatePPTX()" title="Generar informe PPTX">📊 Informe</button>
+    <div class="tb-user" id="tb-user" style="display:none">
+      <span class="tb-role-chip admin" id="tb-role-chip">Admin</span>
+      <span class="tb-user-email" id="tb-user-email"></span>
+      <button class="btn btn-out" onclick="doLogout()" style="padding:2px 8px;font-size:11px" title="Cerrar sesión">⏻</button>
+    </div>
   </div>
 
   <!-- SAVED PANEL -->
@@ -888,7 +921,7 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
             📥 Cargar Snapshot
             <input type="file" accept=".html" id="snap-import-input" style="display:none" onchange="importSnapshotBrowser(this)">
           </label>
-          <button class="btn btn-red btn-sm" onclick="clearAll()" id="btn-clear-all" title="Borra la edición seleccionada, o TODAS si no hay filtro">🗑 Borrar Edición</button>
+          <button class="btn btn-red btn-sm admin-only" onclick="clearAll()" id="btn-clear-all" title="Borra la edición seleccionada, o TODAS si no hay filtro">🗑 Borrar Edición</button>
           <button class="btn btn-out btn-sm" style="background:var(--g200);color:var(--g700)" onclick="toggleSaved()">✕ Cerrar</button>
         </div>
       </div>
@@ -913,7 +946,7 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
           <button class="btn btn-sm btn-out" onclick="batchAssignPais()" title="Asigna el país ingresado a todas las auditorías que no tienen país">🏳️ Aplicar</button>
         </div>
         <div style="display:flex;align-items:flex-end;gap:6px;padding-bottom:2px">
-          <button class="btn btn-sm btn-out" id="btn-freeze-ed" onclick="freezeCurrentFilter()" title="Congela / descongela todas las auditorías del filtro activo" style="white-space:nowrap">🔒 Congelar edición filtrada</button>
+          <button class="btn btn-sm btn-out admin-only" id="btn-freeze-ed" onclick="freezeCurrentFilter()" title="Congela / descongela todas las auditorías del filtro activo" style="white-space:nowrap">🔒 Congelar edición filtrada</button>
         </div>
         <div style="font-size:10px;color:var(--g400);padding-top:16px">💡 Usá <strong>Backup JSON</strong> para guardar y <strong>Importar JSON</strong> para restaurar.</div>
       </div>
@@ -1892,6 +1925,51 @@ const _SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const _sbc = (!__IS_SNAPSHOT_BROWSER && typeof supabase !== 'undefined')
   ? supabase.createClient(_SBURL, _SBKEY) : null;
 let _sbOnline = false;
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+let _userRole = null;
+function _applyRole(role){
+  _userRole = role;
+  if(role === 'readonly') document.body.classList.add('readonly');
+  else document.body.classList.remove('readonly');
+  const chip = document.getElementById('tb-role-chip');
+  if(chip){ chip.textContent = role==='admin'?'Admin':'Solo lectura'; chip.className='tb-role-chip '+(role==='admin'?'admin':'readonly'); }
+}
+function _showApp(user){
+  const ov = document.getElementById('auth-overlay'); if(ov) ov.classList.add('hidden');
+  const tb = document.getElementById('tb-user'); if(tb) tb.style.display='flex';
+  const em = document.getElementById('tb-user-email'); if(em) em.textContent=user.email;
+  _applyRole((user.user_metadata&&user.user_metadata.role)||'readonly');
+}
+async function doLogin(){
+  const email=(document.getElementById('auth-email')||{}).value||'';
+  const pass=(document.getElementById('auth-pass')||{}).value||'';
+  const btn=document.getElementById('auth-btn');
+  const err=document.getElementById('auth-err');
+  if(!email||!pass){err.textContent='Completá email y contraseña.';return;}
+  btn.disabled=true; btn.textContent='Iniciando sesión...'; err.textContent='';
+  try{
+    const {data,error}=await _sbc.auth.signInWithPassword({email,password:pass});
+    if(error) throw error;
+    _showApp(data.user);
+  }catch(e){
+    err.textContent=(e.message&&e.message.includes('Invalid login'))
+      ?'Email o contraseña incorrectos.':e.message;
+    btn.disabled=false; btn.textContent='Iniciar sesión';
+  }
+}
+async function doLogout(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  if(_sbc) await _sbc.auth.signOut();
+  location.reload();
+}
+async function checkAuthSession(){
+  if(!_sbc) return;
+  try{
+    const {data:{session}}=await _sbc.auth.getSession();
+    if(session&&session.user) _showApp(session.user);
+  }catch(e){ console.warn('[Auth] checkSession:',e); }
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 let saved = __IS_SNAPSHOT_BROWSER ? [] : (function(){
@@ -8522,8 +8600,9 @@ renderBplWeights();
 updateAudCnt();
 renderCritMatrix();
 
-// ── Supabase: load remote data (async, no-op in snapshot mode) ──
+// ── Supabase: load remote data + check auth session ──
 if(!__IS_SNAPSHOT_BROWSER) setTimeout(()=>loadFromSupabase(), 200);
+if(!__IS_SNAPSHOT_BROWSER) setTimeout(()=>checkAuthSession(), 100);
 
 // ── Electron desktop integration ──────────────────────
 if(window.electronAPI){
@@ -9062,8 +9141,8 @@ function renderSaved(){
       <td style="display:flex;gap:4px;min-width:100px">
         ${warnBadge}
         <button class="btn btn-xs btn-blue" onclick="loadAudit(${saved.findIndex(x=>x.id===a.id)})">📂</button>
-        <button class="btn btn-xs" onclick="freezeAudit('${a.id}')" title="${a.frozen?'Descongelar — permitir recálculo':'Congelar — fijar scores actuales'}" style="background:${a.frozen?'#e3f2fd':'var(--g100)'};border:1px solid ${a.frozen?'#1565c0':'var(--g300)'};color:${a.frozen?'#1565c0':'var(--g600)'}">${a.frozen?'🔒':'🔓'}</button>
-        <button class="btn btn-xs btn-red" onclick="deleteAudit('${a.id}')">🗑</button>
+        <button class="btn btn-xs admin-only" onclick="freezeAudit('${a.id}')" title="${a.frozen?'Descongelar — permitir recálculo':'Congelar — fijar scores actuales'}" style="background:${a.frozen?'#e3f2fd':'var(--g100)'};border:1px solid ${a.frozen?'#1565c0':'var(--g300)'};color:${a.frozen?'#1565c0':'var(--g600)'}">${a.frozen?'🔒':'🔓'}</button>
+        <button class="btn btn-xs btn-red admin-only" onclick="deleteAudit('${a.id}')">🗑</button>
       </td>
     </tr>`;
   }).join('')}</tbody></table>`;
@@ -9207,5 +9286,27 @@ function renderSaved(){
 		</Relationships>`),this.slideLayouts.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.slides.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.createChartMediaRels(this.masterSlide,i,o),yield Promise.all(o).then(()=>c(this,void 0,void 0,function*(){return"STREAM"===s.outputType?yield i.generateAsync({type:"nodebuffer",compression:s.compression?"DEFLATE":"STORE"}):s.outputType?yield i.generateAsync({type:s.outputType}):yield i.generateAsync({type:"blob",compression:s.compression?"DEFLATE":"STORE"})}))}))});this.LAYOUTS={LAYOUT_4x3:{name:"screen4x3",width:9144e3,height:6858e3},LAYOUT_16x9:{name:"screen16x9",width:9144e3,height:5143500},LAYOUT_16x10:{name:"screen16x10",width:9144e3,height:5715e3},LAYOUT_WIDE:{name:"custom",width:12192e3,height:6858e3}},this._author="PptxGenJS",this._company="PptxGenJS",this._revision="1",this._subject="PptxGenJS Presentation",this._title="PptxGenJS Presentation",this._presLayout={name:this.LAYOUTS[o].name,_sizeW:this.LAYOUTS[o].width,_sizeH:this.LAYOUTS[o].height,width:this.LAYOUTS[o].width,height:this.LAYOUTS[o].height},this._rtlMode=!1,this._slideLayouts=[{_margin:y,_name:t,_presLayout:this._presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3,_slideNumberProps:null,_slideObjects:[]}],this._slides=[],this._sections=[],this._masterSlide={addChart:null,addImage:null,addMedia:null,addNotes:null,addShape:null,addTable:null,addText:null,_name:null,_presLayout:this._presLayout,_rId:null,_rels:[],_relsChart:[],_relsMedia:[],_slideId:null,_slideLayout:null,_slideNum:null,_slideNumberProps:null,_slideObjects:[]}}stream(e){return c(this,void 0,void 0,function*(){return yield this.exportPresentation({compression:null==e?void 0:e.compression,outputType:"STREAM"})})}write(r){return c(this,void 0,void 0,function*(){var e="object"==typeof r&&null!=r&&r.outputType?r.outputType:r||null,t=!("object"!=typeof r||null==r||!r.compression)&&r.compression;return yield this.exportPresentation({compression:t,outputType:e})})}writeFile(a){return c(this,void 0,void 0,function*(){var e="undefined"!=typeof process&&!(null==(e=process.versions)||!e.node)&&"node"===(null==(e=process.release)?void 0:e.name),{fileName:t="Presentation.pptx",compression:r=!1}=("string"==typeof a&&(console.warn("[WARNING] writeFile(string) is deprecated - pass { fileName } instead."),a={fileName:a}),a),t=t.toLowerCase().endsWith(".pptx")?t:t+".pptx",r=yield this.exportPresentation({compression:r,outputType:e?"nodebuffer":null});return e?(e=(yield import("node:fs")).promises,e=e.writeFile,yield e(t,r)):yield this.writeFileToBrowser(t,r),t})}addSection(e){e?e.title||console.warn("addSection requires a title"):console.warn("addSection requires an argument");var t={_type:"user",_slides:[],title:e.title};e.order?this.sections.splice(e.order,0,t):this._sections.push(t)}addSlide(t){let r="string"==typeof t?t:null!=t&&t.masterName?t.masterName:"",e={_name:this.LAYOUTS[o].name,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slideNum:this.slides.length+1};r&&(n=this.slideLayouts.filter(e=>e._name===r)[0])&&(e=n);var a,n=new he({addSlide:this.addNewSlide,getSlide:this.getSlide,presLayout:this.presLayout,setSlideNum:this.setSlideNumber,slideId:this.slides.length+256,slideRId:this.slides.length+2,slideNumber:this.slides.length+1,slideLayout:e});return this._slides.push(n),null!=t&&t.sectionTitle?(a=this.sections.filter(e=>e.title===t.sectionTitle)[0])?a._slides.push(n):console.warn(`addSlide: unable to find section with title: "${t.sectionTitle}"`):this.sections&&0<this.sections.length&&(null==t||!t.sectionTitle)&&("default"===(a=this._sections[this.sections.length-1])._type?a._slides.push(n):this._sections.push({title:"Default-"+(this.sections.filter(e=>"default"===e._type).length+1),_type:"default",_slides:[n]})),n}defineLayout(e){e?e.name?e.width?e.height?"number"!=typeof e.height?console.warn("defineLayout `height` should be a number (inches)"):"number"!=typeof e.width&&console.warn("defineLayout `width` should be a number (inches)"):console.warn("defineLayout requires `height`"):console.warn("defineLayout requires `width`"):console.warn("defineLayout requires `name`"):console.warn("defineLayout requires `{name, width, height}`"),this.LAYOUTS[e.name]={name:e.name,_sizeW:Math.round(Number(e.width)*F),_sizeH:Math.round(Number(e.height)*F),width:Math.round(Number(e.width)*F),height:Math.round(Number(e.height)*F)}}defineSlideMaster(e){e=JSON.parse(JSON.stringify(e));if(!e.title)throw new Error("defineSlideMaster() object argument requires a `title` value. (https://gitbrent.github.io/PptxGenJS/docs/masters.html)");var t,n,r={_margin:e.margin||y,_name:e.title,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3+this.slideLayouts.length+1,_slideNumberProps:e.slideNumber||null,_slideObjects:[],background:e.background||null,bkgd:e.bkgd||null};n=r,(t=e).bkgd&&(n.bkgd=t.bkgd),t.objects&&Array.isArray(t.objects)&&0<t.objects.length&&t.objects.forEach((e,t)=>{var r=Object.keys(e)[0],a=n;x[r]&&"chart"===r?ce(a,e[r].type,e[r].data,e[r].opts):x[r]&&"image"===r?pe(a,e[r]):x[r]&&"line"===r?ue(a,b.LINE,e[r]):x[r]&&"rect"===r?ue(a,b.RECTANGLE,e[r]):x[r]&&"text"===r?fe(a,[{text:e[r].text}],e[r].options,!1):x[r]&&"placeholder"===r&&(e[r].options.placeholder=e[r].options.name,delete e[r].options.name,e[r].options._placeholderType=e[r].options.type,delete e[r].options.type,e[r].options._placeholderIdx=100+t,fe(a,[{text:e[r].text}],e[r].options,!0))}),t.slideNumber&&"object"==typeof t.slideNumber&&(n._slideNumberProps=t.slideNumber),this.slideLayouts.push(r),(e.background||e.bkgd)&&de(e.background,r),r._slideNumberProps&&!this.masterSlide._slideNumberProps&&(this.masterSlide._slideNumberProps=r._slideNumberProps)}tableToSlides(t,p={}){{var[u,f,t={},d]=[this,t,p,null!=p&&p.masterSlideName?this.slideLayouts.filter(e=>e._name===p.masterSlideName)[0]:null];let a=t||{},n=void(a.slideMargin=a.slideMargin||0===a.slideMargin?a.slideMargin:.5,a.w||u.presLayout.width),o=[],i=[],s=[],A=[],r=[],l=[.5,.5,.5,.5],c=0;if(!document.getElementById(f))throw new Error('tableToSlides: Table ID "'+f+'" does not exist!');null!=d&&d._margin?(Array.isArray(d._margin)?l=d._margin:isNaN(d._margin)||(l=[d._margin,d._margin,d._margin,d._margin]),a.slideMargin=l):null!=a&&a.slideMargin&&(Array.isArray(a.slideMargin)?l=a.slideMargin:isNaN(a.slideMargin)||(l=[a.slideMargin,a.slideMargin,a.slideMargin,a.slideMargin])),n=(a.w?M(a.w):u.presLayout.width)-M(l[1]+l[3]),a.verbose&&(console.log("[[VERBOSE MODE]]"),console.log("|-- `tableToSlides` ----------------------------------------------------|"),console.log("| tableProps.h .................................... = "+a.h),console.log("| tableProps.w .................................... = "+a.w),console.log("| pptx.presLayout.width ........................... = "+(u.presLayout.width/F).toFixed(1)),console.log("| pptx.presLayout.height .......................... = "+(u.presLayout.height/F).toFixed(1)),console.log("| emuSlideTabW .................................... = "+(n/F).toFixed(1)));let e=document.querySelectorAll(`#${f} tr:first-child th`);(e=0===e.length?document.querySelectorAll(`#${f} tr:first-child td`):e).forEach(e=>{var t=e;if(t.getAttribute("colspan"))for(let e=0;e<Number(t.getAttribute("colspan"));e++)r.push(Math.round(t.offsetWidth/Number(t.getAttribute("colspan"))));else r.push(t.offsetWidth)}),r.forEach(e=>{c+=e}),r.forEach((e,t)=>{e=Number((Number(n)*(e/c*100)/100/F).toFixed(2));let r=0;var a=document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`),a=(a&&(r=Number(a.getAttribute("data-pptx-min-width"))),document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`));a&&(r=Number(a.getAttribute("data-pptx-width"))),A.push(r>e?r:e)}),a.verbose&&console.log(`| arrColW ......................................... = [${A.join(", ")}]`),["thead","tbody","tfoot"].forEach(t=>{document.querySelectorAll(`#${f} ${t} tr`).forEach(e=>{let r=[];switch(Array.from(e.cells).forEach(a=>{var e=window.getComputedStyle(a).getPropertyValue("color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(",");let t=window.getComputedStyle(a).getPropertyValue("background-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),n=("rgba(0, 0, 0, 0)"!==window.getComputedStyle(a).getPropertyValue("background-color")&&!window.getComputedStyle(a).getPropertyValue("transparent")||(t=["255","255","255"]),{align:null,bold:!!("bold"===window.getComputedStyle(a).getPropertyValue("font-weight")||500<=Number(window.getComputedStyle(a).getPropertyValue("font-weight"))),border:null,color:ie(Number(e[0]),Number(e[1]),Number(e[2])),fill:{color:ie(Number(t[0]),Number(t[1]),Number(t[2]))},fontFace:(window.getComputedStyle(a).getPropertyValue("font-family")||"").split(",")[0].replace(/"/g,"").replace("inherit","").replace("initial","")||null,fontSize:Number(window.getComputedStyle(a).getPropertyValue("font-size").replace(/[a-z]/gi,"")),margin:null,colspan:Number(a.getAttribute("colspan"))||null,rowspan:Number(a.getAttribute("rowspan"))||null,valign:null});["left","center","right","start","end"].includes(window.getComputedStyle(a).getPropertyValue("text-align"))&&(e=window.getComputedStyle(a).getPropertyValue("text-align").replace("start","left").replace("end","right"),n.align="center"===e?"center":"left"===e?"left":"right"===e?"right":null),["top","middle","bottom"].includes(window.getComputedStyle(a).getPropertyValue("vertical-align"))&&(e=window.getComputedStyle(a).getPropertyValue("vertical-align"),n.valign="top"===e?"top":"middle"===e?"middle":"bottom"===e?"bottom":null),window.getComputedStyle(a).getPropertyValue("padding-left")&&(n.margin=[0,0,0,0],["padding-top","padding-right","padding-bottom","padding-left"].forEach((e,t)=>{n.margin[t]=Math.round(Number(window.getComputedStyle(a).getPropertyValue(e).replace(/\D/gi,"")))})),(window.getComputedStyle(a).getPropertyValue("border-top-width")||window.getComputedStyle(a).getPropertyValue("border-right-width")||window.getComputedStyle(a).getPropertyValue("border-bottom-width")||window.getComputedStyle(a).getPropertyValue("border-left-width"))&&(n.border=[null,null,null,null],["top","right","bottom","left"].forEach((e,t)=>{var r=Math.round(Number(window.getComputedStyle(a).getPropertyValue("border-"+e+"-width").replace("px",""))),e=window.getComputedStyle(a).getPropertyValue("border-"+e+"-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),e=ie(Number(e[0]),Number(e[1]),Number(e[2]));n.border[t]={pt:r,color:e}})),r.push({_type:I.tablecell,text:a.innerText,options:n})}),t){case"thead":o.push(r);break;case"tbody":i.push(r);break;case"tfoot":s.push(r);break;default:console.log("table parsing: unexpected table part: "+t)}})}),a._arrObjTabHeadRows=o||null,a.colW=A,Ae([...o,...i,...s],a,u.presLayout,d).forEach((e,t)=>{var r=u.addSlide({masterName:a.masterSlideName||null});0===t&&(a.y=a.y||l[0]),0<t&&(a.y=a.autoPageSlideStartY||a.newSlideStartY||l[0]),a.verbose&&console.log(`| opts.autoPageSlideStartY: ${a.autoPageSlideStartY} / arrInchMargins[0]: ${l[0]} => opts.y = `+a.y),r.addTable(e.rows,{x:a.x||l[3],y:a.y,w:Number(n)/F,colW:A,autoPage:!1}),a.addImage&&(a.addImage.options=a.addImage.options||{},a.addImage.image&&(a.addImage.image.path||a.addImage.image.data)?r.addImage({path:a.addImage.image.path,data:a.addImage.image.data,x:a.addImage.options.x,y:a.addImage.options.y,w:a.addImage.options.w,h:a.addImage.options.h}):console.warn("Warning: tableToSlides.addImage requires either `path` or `data`")),a.addShape&&r.addShape(a.addShape.shapeName,a.addShape.options||{}),a.addTable&&r.addTable(a.addTable.rows,a.addTable.options||{}),a.addText&&r.addText(a.addText.text,a.addText.options||{})})}}}return Fe})(JSZip);
 
 </script>
+
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-title">RED ACTIVA 2.0</div>
+      <div class="auth-logo-sub">BAP Partners</div>
+    </div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="auth-email" placeholder="usuario@empresa.com" autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
+    </div>
+    <div class="auth-field">
+      <label>Contraseña</label>
+      <input type="password" id="auth-pass" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="auth-btn" id="auth-btn" onclick="doLogin()">Iniciar sesión</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
 </body>
 </html>
