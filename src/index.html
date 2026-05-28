@@ -1147,17 +1147,23 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
           <button class="btn btn-sm btn-out" onclick="printCurrentTab()" title="Imprimir / PDF completo">🖨️ PDF</button>
         </div>
       </div>
-      <!-- Edition filter (shared) -->
+      <!-- Edition + País filter (shared) -->
       <div class="card" style="margin-bottom:14px">
         <div class="card-bd" style="padding:10px 16px">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div class="fg">
+              <label>Filtrar por País</label>
+              <select id="gl-pais" onchange="renderGlobal()" style="min-width:110px">
+                <option value="">Todos</option>
+              </select>
+            </div>
             <div class="fg">
               <label>Filtrar por Edición</label>
               <select id="gl-edicion" onchange="renderGlobal()" style="min-width:100px">
                 <option value="">Todas</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option></select>
             </div>
             <div style="font-size:11px;color:var(--g400);padding-top:18px">
-              ⚠️ Los resultados globales se calculan solo dentro de cada edición
+              ⚠️ Los resultados globales se calculan dentro del filtro aplicado
             </div>
           </div>
         </div>
@@ -2987,6 +2993,7 @@ async function persist(){
         pais:a.pais||'', fecha:a.fecha||'', auditor:a.auditor||'',
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
+        frozen:a.frozen||false,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -3046,6 +3053,7 @@ async function pushAllToSupabase(){
         pais:a.pais||'', fecha:a.fecha||'', auditor:a.auditor||'',
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
+        frozen:a.frozen||false,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -3094,16 +3102,18 @@ async function loadFromSupabase(){
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
         pais:r.pais||'', fecha:r.fecha||'', auditor:r.auditor||'',
         answers:r.answers||{}, comments:r.comments||{},
-        scores:r.scores||{}, weights:r.weights||{}
+        scores:r.scores||{}, weights:r.weights||{},
+        frozen:r.frozen||false
       }));
       localStorage.setItem('bpl_ra2_v6', JSON.stringify(saved));
     } else if(saved.length > 0){
       // First-time sync: push localStorage data up to Supabase
       const rows = saved.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', auditor:a.auditor||'',
+        pais:a.pais||'', fecha:a.fecha||'', auditor:a.auditor||'',
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
+        frozen:a.frozen||false,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -3767,7 +3777,8 @@ function renderGlobalHeatmap(audits){
 
 function renderGlobalRed(){
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
-  const audits=saved.filter(function(a){return !ed||a.edicion===ed;});
+  const pais=(document.getElementById('gl-pais')||{}).value||'';
+  const audits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
   if(!audits.length) return;
   const failWrap=document.getElementById('global-top-fail');
   const naWrap=document.getElementById('global-top-na');
@@ -3832,7 +3843,9 @@ function renderGlobalRed(){
 function renderGlobalEdiciones(){
   const wrap=document.getElementById('global-ediciones-content');
   if(!wrap) return;
-  const eds=[].concat(Array.from(new Set(saved.map(function(a){return a.edicion;}).filter(Boolean)))).sort();
+  const _glPais=(document.getElementById('gl-pais')||{}).value||'';
+  const _savedForEd=saved.filter(function(a){return !_glPais||a.pais===_glPais;});
+  const eds=[].concat(Array.from(new Set(_savedForEd.map(function(a){return a.edicion;}).filter(Boolean)))).sort();
   if(eds.length<2){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">📅 Necesitás auditorías de al menos 2 ediciones para ver la comparación.</div>';
     return;
@@ -3840,7 +3853,7 @@ function renderGlobalEdiciones(){
   const sheets=SHEETS();
   const byEd={};
   eds.forEach(function(ed){
-    const audits=saved.filter(function(a){return a.edicion===ed&&a.scores;});
+    const audits=_savedForEd.filter(function(a){return a.edicion===ed&&a.scores;});
     if(!audits.length) return;
     const total=audits.reduce(function(s,a){return s+(a.scores.total||0);},0)/audits.length;
     const areas={};
@@ -3916,7 +3929,8 @@ function renderGlobalAE(){
   const wrap=document.getElementById('global-ae-content');
   if(!wrap) return;
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
-  const evAudits=saved.filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
+  const _glPaisAE=(document.getElementById('gl-pais')||{}).value||'';
+  const evAudits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!_glPaisAE||a.pais===_glPaisAE)&&a.scores;});
   const aeAudits=autoevals.filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
   if(!aeAudits.length){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🟣 No hay autoevaluaciones importadas para la edición seleccionada.</div>';
@@ -4230,9 +4244,19 @@ function updateAudCnt(){
 }
 
 // ── GLOBAL ──
+function _populateGlPais(){
+  const sel=document.getElementById('gl-pais');
+  if(!sel) return;
+  const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
+  if(cur && paises.includes(cur)) sel.value=cur;
+}
 function getFilteredSaved(){
-  const ed=(document.getElementById('gl-edicion')||{}).value;
-  return ed ? saved.filter(a=>a.edicion===ed) : saved;
+  _populateGlPais();
+  const ed=(document.getElementById('gl-edicion')||{}).value||'';
+  const pais=(document.getElementById('gl-pais')||{}).value||'';
+  return saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
 }
 function renderGlobal(){
   const data=getFilteredSaved();
