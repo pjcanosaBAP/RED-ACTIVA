@@ -1928,6 +1928,7 @@ let _sbOnline = false;
 
 // ── AUTH ─────────────────────────────────────────────────────────────────────
 let _userRole = null;
+let _userPais = null;
 function _applyRole(role){
   _userRole = role;
   if(role === 'readonly') document.body.classList.add('readonly');
@@ -1938,8 +1939,11 @@ function _applyRole(role){
 function _showApp(user){
   const ov = document.getElementById('auth-overlay'); if(ov) ov.classList.add('hidden');
   const tb = document.getElementById('tb-user'); if(tb) tb.style.display='flex';
-  const em = document.getElementById('tb-user-email'); if(em) em.textContent=user.email;
-  _applyRole((user.user_metadata&&user.user_metadata.role)||'readonly');
+  const meta = user.user_metadata||{};
+  _userPais = meta.pais||null;
+  const em = document.getElementById('tb-user-email');
+  if(em) em.textContent = user.email + (_userPais ? ' · '+_userPais : '');
+  _applyRole(meta.role||'readonly');
 }
 async function doLogin(){
   const email=(document.getElementById('auth-email')||{}).value||'';
@@ -4344,12 +4348,13 @@ function _populateGlPais(){
   const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
   const cur=sel.value;
   sel.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
-  if(cur && paises.includes(cur)) sel.value=cur;
+  if(_userPais){ sel.value=_userPais; sel.disabled=true; sel.title='País restringido: '+_userPais; }
+  else if(cur && paises.includes(cur)) sel.value=cur;
 }
 function getFilteredSaved(){
   _populateGlPais();
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
-  const pais=(document.getElementById('gl-pais')||{}).value||'';
+  const pais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
   return saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
 }
 function renderGlobal(){
@@ -8687,14 +8692,15 @@ function _populatePaisSelect(selId, triggerFn){
   const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
   const cur=sel.value;
   sel.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
-  if(cur && paises.includes(cur)) sel.value=cur;
+  if(_userPais){ sel.value=_userPais; sel.disabled=true; sel.title='País restringido: '+_userPais; }
+  else if(cur && paises.includes(cur)) sel.value=cur;
 }
 function _cmpSaved(){
-  const p=(document.getElementById('cmp-pais')||{}).value||'';
+  const p=_userPais||(document.getElementById('cmp-pais')||{}).value||'';
   return p ? saved.filter(a=>a.pais===p) : saved;
 }
 function _anSaved(){
-  const p=(document.getElementById('an-pais')||{}).value||'';
+  const p=_userPais||(document.getElementById('an-pais')||{}).value||'';
   return p ? saved.filter(a=>a.pais===p) : saved;
 }
 function onAnPaisChange(){
@@ -9078,9 +9084,10 @@ function renderSaved(){
     const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
     const curPais=paisFilEl.value;
     paisFilEl.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
-    if(curPais && paises.includes(curPais)) paisFilEl.value=curPais;
+    if(_userPais){ paisFilEl.value=_userPais; paisFilEl.disabled=true; paisFilEl.title='País restringido: '+_userPais; }
+    else if(curPais && paises.includes(curPais)) paisFilEl.value=curPais;
   }
-  const paisFil=paisFilEl?paisFilEl.value:'';
+  const paisFil=_userPais||(paisFilEl?paisFilEl.value:'');
   // Populate edition filter (respects country filter)
   const filEl=document.getElementById('saved-fil-ed');
   if(filEl){
