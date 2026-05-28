@@ -1692,11 +1692,14 @@ body.readonly .admin-only{display:none!important;}
   <div class="content">
     <!-- Filter bar -->
     <div class="db-filter-bar">
-      <span class="db-filter-lbl">Edición</span>
-      <select class="db-sel" id="nw-ed-filter" onchange="renderNetworkDashboard()">
-        <option value="">Todas las ediciones</option>
+      <span class="db-filter-lbl">País</span>
+      <select class="db-sel" id="nw-pais-filter" onchange="renderNetworkDashboard()">
+        <option value="">Todos</option>
       </select>
-      <div id="nw-pais-chip" style="display:none"></div>
+      <span class="db-filter-lbl" style="margin-left:8px">Edición</span>
+      <select class="db-sel" id="nw-ed-filter" onchange="renderNetworkDashboard()">
+        <option value="">Todas</option>
+      </select>
       <button class="btn btn-sm btn-out admin-only" onclick="dbExportPPTX()" style="margin-left:auto" title="Generar PPTX desde los gráficos del dashboard">📥 PPTX Red</button>
     </div>
     <!-- Sub-nav -->
@@ -8797,24 +8800,26 @@ function dbCatBadge(cat){
 }
 
 function buildNetworkData(){
+  // País filter
+  const paisSel=document.getElementById('nw-pais-filter');
+  if(paisSel){
+    const paises=[...new Set(saved.map(a=>a.pais||'').filter(Boolean))].sort();
+    const cur=paisSel.value;
+    paisSel.innerHTML='<option value="">Todos</option>'+paises.map(p=>`<option value="${p}">${p}</option>`).join('');
+    if(_userPais){paisSel.value=_userPais;paisSel.disabled=true;paisSel.title='País restringido: '+_userPais;}
+    else if(cur&&paises.includes(cur)) paisSel.value=cur;
+  }
   // Edition filter
   const edSel=document.getElementById('nw-ed-filter');
   if(edSel){
     const eds=[...new Set(saved.map(a=>a.edicion||'').filter(Boolean))].sort().reverse();
     const cur=edSel.value;
-    edSel.innerHTML='<option value="">Todas las ediciones</option>'+eds.map(e=>`<option value="${e}">${e}</option>`).join('');
+    edSel.innerHTML='<option value="">Todas</option>'+eds.map(e=>`<option value="${e}">${e}</option>`).join('');
     if(cur&&eds.includes(cur)) edSel.value=cur;
   }
   const edFil=(document.getElementById('nw-ed-filter')||{}).value||'';
-  const paisFil=_userPais||(document.getElementById('gl-pais')||{}).value||'';
+  const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
   const data=saved.filter(a=>(!edFil||a.edicion===edFil)&&(!paisFil||a.pais===paisFil));
-
-  // País chip
-  const paisChip=document.getElementById('nw-pais-chip');
-  if(paisChip){
-    if(paisFil){paisChip.style.display='';paisChip.innerHTML=`<span style="font-size:11px;font-weight:700;background:#e8f1fb;color:#1a6db5;border:1px solid #a3c4ee;padding:3px 10px;border-radius:10px">${paisFil}</span>`;}
-    else paisChip.style.display='none';
-  }
 
   // resumen
   const resumen=data.map(a=>{
