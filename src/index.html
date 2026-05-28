@@ -4647,10 +4647,10 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb2,ws4,'Respuestas Detalle');
 
   // 5. Estadísticos por edición
-  const allEds=[...new Set(saved.map(function(a){return a.edicion||'';}).filter(Boolean))].sort();
+  const allEds=[...new Set(data.map(function(a){return a.edicion||'';}).filter(Boolean))].sort();
   const r5=[['Edición','N auditorías','Media %','Mediana %','Mínimo %','Máximo %','Desv.Est. %','PROACTIVO','ACTIVO','REACTIVO','INACTIVO','PENDIENTE']];
   allEds.forEach(function(ed){
-    const edAudits=saved.filter(function(a){return a.edicion===ed&&a.scores;});
+    const edAudits=data.filter(function(a){return a.edicion===ed&&a.scores;});
     const totals=edAudits.map(function(a){return a.scores.total||0;});
     if(!totals.length) return;
     const sortedT=[].concat(totals).sort(function(a,b){return a-b;});
@@ -4684,7 +4684,10 @@ function exportExcel(){
     XLSX.utils.book_append_sheet(wb2,ws6,'EV vs AE');
   }
 
-  XLSX.writeFile(wb2,'RedActiva2_BPL_UY_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  const _xPais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
+  const _xEd=(document.getElementById('gl-edicion')||{}).value||'';
+  const _xSuffix=(_xPais?'_'+_xPais:'')+(_xEd?'_'+_xEd:'');
+  XLSX.writeFile(wb2,'RedActiva2_BPL'+_xSuffix+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
   showToast('📊 Excel exportado — '+wb2.SheetNames.length+' hojas');
 }
 
@@ -7248,12 +7251,15 @@ function renderCompareEditionsFull(){
 function exportExcelFull(){
   if(typeof XLSX==='undefined'){showToast('⚠️ XLSX no disponible');return;}
   const wb=XLSX.utils.book_new();
+  const _fPais=_userPais||(document.getElementById('saved-fil-pais')||{}).value||'';
+  const _fEd=(document.getElementById('saved-fil-ed')||{}).value||'';
+  const _exData=saved.filter(a=>(!_fPais||a.pais===_fPais)&&(!_fEd||a.edicion===_fEd));
 
   // Sheet 1: Resumen General
   const sheets=SHEETS();
   const hdr1=['Edición','Distribuidor','Fecha','Auditor',...sheets.map(sh=>sh+' %'),'Total %','Críticos','Categoría'];
   const rows1=[hdr1];
-  saved.forEach(a=>{
+  _exData.forEach(a=>{
     const s=a.scores||{}; const at=s.areas||{};
     rows1.push([
       a.edicion||'',a.distribuidor,a.fecha||'',a.auditor||'',
@@ -7268,7 +7274,7 @@ function exportExcelFull(){
   // Sheet 2: Detalle de Respuestas
   const hdr2=['Edición','Distribuidor','Fecha','Auditor','Área','Atributo','BPL','#Pregunta','Pregunta','Respuesta','Crítico'];
   const rows2=[hdr2];
-  saved.forEach(a=>{
+  _exData.forEach(a=>{
     Q.forEach(q=>{
       const resp=(a.answers||{})[q.comp_num];
       if(resp){
@@ -7284,14 +7290,14 @@ function exportExcelFull(){
   XLSX.utils.book_append_sheet(wb,ws2,'Respuestas Detalle');
 
   // Sheet 3: Comparativo Ediciones
-  const editions=[...new Set(saved.map(a=>a.edicion).filter(Boolean))].sort();
+  const editions=[...new Set(_exData.map(a=>a.edicion).filter(Boolean))].sort();
   const hdr3=['Área',...editions];
   const rows3=[hdr3];
   sheets.forEach(sh=>{
     const row=[sh];
     editions.forEach(ed=>{
-      const data=saved.filter(a=>a.edicion===ed);
-      const avg=data.length?data.reduce((s,a)=>s+((a.scores||{}).areas[sh]||0)*100,0)/data.length:0;
+      const edD=_exData.filter(a=>a.edicion===ed);
+      const avg=edD.length?edD.reduce((s,a)=>s+((a.scores||{}).areas[sh]||0)*100,0)/edD.length:0;
       row.push(+avg.toFixed(1));
     });
     rows3.push(row);
@@ -7299,8 +7305,8 @@ function exportExcelFull(){
   // Total row
   const totRow=['TOTAL'];
   editions.forEach(ed=>{
-    const data=saved.filter(a=>a.edicion===ed);
-    const avg=data.length?data.reduce((s,a)=>s+((a.scores||{}).total||0)*100,0)/data.length:0;
+    const edD=_exData.filter(a=>a.edicion===ed);
+    const avg=edD.length?edD.reduce((s,a)=>s+((a.scores||{}).total||0)*100,0)/edD.length:0;
     totRow.push(+avg.toFixed(1));
   });
   rows3.push(totRow);
@@ -7310,7 +7316,7 @@ function exportExcelFull(){
   // Sheet 4: Condicionales Críticos
   const hdr4=['Edición','Distribuidor','Crítico','BPL','Estado'];
   const rows4=[hdr4];
-  saved.forEach(a=>{
+  _exData.forEach(a=>{
     CRIT_LIST.forEach(cr=>{
       const allSi=cr.qs.every(comp=>(((a.answers||{})[comp])||'')===('si'));
       rows4.push([a.edicion||'',a.distribuidor,cr.tag,cr.subattr,allSi?'✓ CUMPLE':'✗ NO CUMPLE']);
@@ -7319,7 +7325,8 @@ function exportExcelFull(){
   const ws4=XLSX.utils.aoa_to_sheet(rows4);
   XLSX.utils.book_append_sheet(wb,ws4,'Condicionales Críticos');
 
-  const fname=`RedActiva_${cfg.pais||'UY'}_${cfg.anio||2025}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  const _fnSuffix=(_fPais?'_'+_fPais:'')+(_fEd?'_'+_fEd:'');
+  const fname=`RedActiva_BPL${_fnSuffix}_${new Date().toISOString().slice(0,10)}.xlsx`;
   if(window.electronAPI){
     const wbOut = XLSX.write(wb, {bookType:'xlsx', type:'array'});
     window.electronAPI.saveExcel(wbOut, fname).then(res=>{
