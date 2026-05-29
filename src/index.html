@@ -245,6 +245,28 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .sb-cfg-item:hover{background:rgba(255,255,255,.08);}
 .sb-cfg-item-all{border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:6px;color:var(--blue-l);}
 body.sb-mini .sb-cfg-wrap{display:none;}
+/* ── Pending questions panel ── */
+#sb-pending-panel{position:fixed;left:var(--sb);bottom:88px;width:320px;max-height:440px;
+  background:#fff;border:1px solid var(--g200);border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:400;display:none;flex-direction:column;overflow:hidden;}
+#sb-pending-panel.open{display:flex;}
+.sbp-hd{padding:11px 14px 10px;display:flex;align-items:center;gap:7px;
+  border-bottom:1px solid var(--g100);font-size:13px;font-weight:700;color:var(--g700);}
+.sbp-hd-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--g400);font-size:18px;line-height:1;padding:0 2px;}
+.sbp-hd-close:hover{color:var(--g700);}
+.sbp-body{overflow-y:auto;flex:1;padding:6px 0 8px;}
+.sbp-area-lbl{padding:6px 14px 2px;font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;}
+.sbp-q{display:flex;align-items:center;gap:8px;padding:5px 14px;cursor:pointer;}
+.sbp-q:hover{background:#f0f4ff;}
+.sbp-qnum{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;color:var(--g400);min-width:38px;flex-shrink:0;}
+.sbp-qtxt{font-size:11px;color:var(--g700);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sbp-qarr{font-size:11px;color:var(--blue);opacity:.5;flex-shrink:0;}
+.sbp-q:hover .sbp-qarr{opacity:1;}
+.sbp-empty{padding:20px;text-align:center;color:var(--g400);font-size:12px;}
+.sbp-sect{padding:4px 14px 2px;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--g500);border-top:1px solid var(--g100);margin-top:4px;}
+.sb-resp-clickable{cursor:pointer;text-decoration:none;}
+.sb-resp-clickable:hover{opacity:.8;}
+body.sb-mini #sb-pending-panel{display:none!important;}
 .cmp-toggle-btn{padding:4px 11px;border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;
   border:1.5px solid var(--g200);background:#fff;color:var(--g500);font-family:'Barlow Condensed',sans-serif;
   letter-spacing:.3px;transition:all .15s;}
@@ -936,8 +958,8 @@ body.readonly .admin-only{display:none!important;}
       <div class="sc-val" id="sb-score">—</div>
       <span class="cat-pill cp-PENDIENTE" id="sb-cat">PENDIENTE</span>
       <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">
-        <div id="sb-resp-vinc" style="font-size:10px;color:rgba(255,255,255,.45)">0 / 0 vinculantes</div>
-        <div id="sb-resp-novinc" style="font-size:10px;color:rgba(255,255,255,.28);display:none"></div>
+        <div id="sb-resp-vinc" class="sb-resp-clickable" onclick="togglePendingPanel()" style="font-size:10px;color:rgba(255,255,255,.45)">0 / 0 vinculantes</div>
+        <div id="sb-resp-novinc" class="sb-resp-clickable" onclick="togglePendingPanel()" style="font-size:10px;color:rgba(255,255,255,.28);display:none"></div>
       </div>
     </div>
   </div>
@@ -2194,11 +2216,77 @@ function toggleSbCfg(){
   const d=document.getElementById('sb-cfg-drop');
   if(d) d.classList.toggle('open');
 }
+function togglePendingPanel(){
+  const p=document.getElementById('sb-pending-panel');
+  if(!p) return;
+  if(p.classList.contains('open')){ p.classList.remove('open'); return; }
+  _buildPendingPanel();
+  p.classList.add('open');
+}
+function _buildPendingPanel(){
+  const body=document.getElementById('sbp-body');
+  const title=document.getElementById('sbp-title');
+  if(!body) return;
+  const core=SHEETS_CORE(), nv=SHEETS_NV();
+  const pendVinc=Q.filter(q=>core.includes(q.sheet)&&!ans[q.comp_num]);
+  const pendNV=Q.filter(q=>nv.includes(q.sheet)&&!ans[q.comp_num]);
+  const total=pendVinc.length+pendNV.length;
+  if(title) title.innerHTML=total>0
+    ?`<span style="color:#f59e0b">⚠️</span> ${total} sin responder`
+    :`<span style="color:#22c55e">✅</span> Todo respondido`;
+  if(total===0){ body.innerHTML='<div class="sbp-empty">✅ Todas las preguntas respondidas</div>'; return; }
+  let h='';
+  const _rows=(qs)=>{
+    const bySheet={};
+    qs.forEach(q=>{ if(!bySheet[q.sheet]) bySheet[q.sheet]=[]; bySheet[q.sheet].push(q); });
+    let r='';
+    Object.entries(bySheet).forEach(([sh,qlist])=>{
+      r+=`<div class="sbp-area-lbl" style="color:${AC[sh]||'var(--g500)'}">${AN[sh]||sh}</div>`;
+      qlist.forEach(q=>{
+        const k=q.comp_num.replace(/\./g,'_');
+        r+=`<div class="sbp-q" onclick="goToPendingQ('${sh}','${k}')" title="${q.question.replace(/"/g,'&quot;')}">
+          <span class="sbp-qnum">${q.comp_num}</span>
+          <span class="sbp-qtxt">${q.question}</span>
+          <span class="sbp-qarr">→</span>
+        </div>`;
+      });
+    });
+    return r;
+  };
+  if(pendVinc.length){
+    if(nv.length) h+=`<div class="sbp-sect" style="border-top:none;color:var(--blue)">Vinculantes · ${pendVinc.length}</div>`;
+    h+=_rows(pendVinc);
+  }
+  if(pendNV.length){
+    h+=`<div class="sbp-sect">No vinculantes · ${pendNV.length}</div>`;
+    h+=_rows(pendNV);
+  }
+  body.innerHTML=h;
+}
+function goToPendingQ(sheet, k){
+  togglePendingPanel();
+  goTab('form');
+  setTimeout(()=>{
+    const ab=document.getElementById('ab-'+sheet);
+    if(ab&&ab.style.display==='none') togArea(sheet);
+    setTimeout(()=>{
+      const el=document.getElementById('si-'+k);
+      if(!el) return;
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      const row=el.closest('.q-row');
+      if(row){ row.style.transition='background .3s'; row.style.background='#fffde7'; setTimeout(()=>row.style.background='',1800); }
+    },250);
+  },120);
+}
 document.addEventListener('click',function(e){
   if(!e.target.closest('.tb-more-wrap')) closeTbMore();
   if(!e.target.closest('.sb-cfg-wrap')){
     const d=document.getElementById('sb-cfg-drop');
     if(d) d.classList.remove('open');
+  }
+  if(!e.target.closest('#sb-pending-panel')&&!e.target.closest('.sb-resp-clickable')){
+    const p=document.getElementById('sb-pending-panel');
+    if(p) p.classList.remove('open');
   }
 });
 async function doLogout(){
@@ -9967,6 +10055,15 @@ function renderSaved(){
 		</Relationships>`),this.slideLayouts.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.slides.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.createChartMediaRels(this.masterSlide,i,o),yield Promise.all(o).then(()=>c(this,void 0,void 0,function*(){return"STREAM"===s.outputType?yield i.generateAsync({type:"nodebuffer",compression:s.compression?"DEFLATE":"STORE"}):s.outputType?yield i.generateAsync({type:s.outputType}):yield i.generateAsync({type:"blob",compression:s.compression?"DEFLATE":"STORE"})}))}))});this.LAYOUTS={LAYOUT_4x3:{name:"screen4x3",width:9144e3,height:6858e3},LAYOUT_16x9:{name:"screen16x9",width:9144e3,height:5143500},LAYOUT_16x10:{name:"screen16x10",width:9144e3,height:5715e3},LAYOUT_WIDE:{name:"custom",width:12192e3,height:6858e3}},this._author="PptxGenJS",this._company="PptxGenJS",this._revision="1",this._subject="PptxGenJS Presentation",this._title="PptxGenJS Presentation",this._presLayout={name:this.LAYOUTS[o].name,_sizeW:this.LAYOUTS[o].width,_sizeH:this.LAYOUTS[o].height,width:this.LAYOUTS[o].width,height:this.LAYOUTS[o].height},this._rtlMode=!1,this._slideLayouts=[{_margin:y,_name:t,_presLayout:this._presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3,_slideNumberProps:null,_slideObjects:[]}],this._slides=[],this._sections=[],this._masterSlide={addChart:null,addImage:null,addMedia:null,addNotes:null,addShape:null,addTable:null,addText:null,_name:null,_presLayout:this._presLayout,_rId:null,_rels:[],_relsChart:[],_relsMedia:[],_slideId:null,_slideLayout:null,_slideNum:null,_slideNumberProps:null,_slideObjects:[]}}stream(e){return c(this,void 0,void 0,function*(){return yield this.exportPresentation({compression:null==e?void 0:e.compression,outputType:"STREAM"})})}write(r){return c(this,void 0,void 0,function*(){var e="object"==typeof r&&null!=r&&r.outputType?r.outputType:r||null,t=!("object"!=typeof r||null==r||!r.compression)&&r.compression;return yield this.exportPresentation({compression:t,outputType:e})})}writeFile(a){return c(this,void 0,void 0,function*(){var e="undefined"!=typeof process&&!(null==(e=process.versions)||!e.node)&&"node"===(null==(e=process.release)?void 0:e.name),{fileName:t="Presentation.pptx",compression:r=!1}=("string"==typeof a&&(console.warn("[WARNING] writeFile(string) is deprecated - pass { fileName } instead."),a={fileName:a}),a),t=t.toLowerCase().endsWith(".pptx")?t:t+".pptx",r=yield this.exportPresentation({compression:r,outputType:e?"nodebuffer":null});return e?(e=(yield import("node:fs")).promises,e=e.writeFile,yield e(t,r)):yield this.writeFileToBrowser(t,r),t})}addSection(e){e?e.title||console.warn("addSection requires a title"):console.warn("addSection requires an argument");var t={_type:"user",_slides:[],title:e.title};e.order?this.sections.splice(e.order,0,t):this._sections.push(t)}addSlide(t){let r="string"==typeof t?t:null!=t&&t.masterName?t.masterName:"",e={_name:this.LAYOUTS[o].name,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slideNum:this.slides.length+1};r&&(n=this.slideLayouts.filter(e=>e._name===r)[0])&&(e=n);var a,n=new he({addSlide:this.addNewSlide,getSlide:this.getSlide,presLayout:this.presLayout,setSlideNum:this.setSlideNumber,slideId:this.slides.length+256,slideRId:this.slides.length+2,slideNumber:this.slides.length+1,slideLayout:e});return this._slides.push(n),null!=t&&t.sectionTitle?(a=this.sections.filter(e=>e.title===t.sectionTitle)[0])?a._slides.push(n):console.warn(`addSlide: unable to find section with title: "${t.sectionTitle}"`):this.sections&&0<this.sections.length&&(null==t||!t.sectionTitle)&&("default"===(a=this._sections[this.sections.length-1])._type?a._slides.push(n):this._sections.push({title:"Default-"+(this.sections.filter(e=>"default"===e._type).length+1),_type:"default",_slides:[n]})),n}defineLayout(e){e?e.name?e.width?e.height?"number"!=typeof e.height?console.warn("defineLayout `height` should be a number (inches)"):"number"!=typeof e.width&&console.warn("defineLayout `width` should be a number (inches)"):console.warn("defineLayout requires `height`"):console.warn("defineLayout requires `width`"):console.warn("defineLayout requires `name`"):console.warn("defineLayout requires `{name, width, height}`"),this.LAYOUTS[e.name]={name:e.name,_sizeW:Math.round(Number(e.width)*F),_sizeH:Math.round(Number(e.height)*F),width:Math.round(Number(e.width)*F),height:Math.round(Number(e.height)*F)}}defineSlideMaster(e){e=JSON.parse(JSON.stringify(e));if(!e.title)throw new Error("defineSlideMaster() object argument requires a `title` value. (https://gitbrent.github.io/PptxGenJS/docs/masters.html)");var t,n,r={_margin:e.margin||y,_name:e.title,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3+this.slideLayouts.length+1,_slideNumberProps:e.slideNumber||null,_slideObjects:[],background:e.background||null,bkgd:e.bkgd||null};n=r,(t=e).bkgd&&(n.bkgd=t.bkgd),t.objects&&Array.isArray(t.objects)&&0<t.objects.length&&t.objects.forEach((e,t)=>{var r=Object.keys(e)[0],a=n;x[r]&&"chart"===r?ce(a,e[r].type,e[r].data,e[r].opts):x[r]&&"image"===r?pe(a,e[r]):x[r]&&"line"===r?ue(a,b.LINE,e[r]):x[r]&&"rect"===r?ue(a,b.RECTANGLE,e[r]):x[r]&&"text"===r?fe(a,[{text:e[r].text}],e[r].options,!1):x[r]&&"placeholder"===r&&(e[r].options.placeholder=e[r].options.name,delete e[r].options.name,e[r].options._placeholderType=e[r].options.type,delete e[r].options.type,e[r].options._placeholderIdx=100+t,fe(a,[{text:e[r].text}],e[r].options,!0))}),t.slideNumber&&"object"==typeof t.slideNumber&&(n._slideNumberProps=t.slideNumber),this.slideLayouts.push(r),(e.background||e.bkgd)&&de(e.background,r),r._slideNumberProps&&!this.masterSlide._slideNumberProps&&(this.masterSlide._slideNumberProps=r._slideNumberProps)}tableToSlides(t,p={}){{var[u,f,t={},d]=[this,t,p,null!=p&&p.masterSlideName?this.slideLayouts.filter(e=>e._name===p.masterSlideName)[0]:null];let a=t||{},n=void(a.slideMargin=a.slideMargin||0===a.slideMargin?a.slideMargin:.5,a.w||u.presLayout.width),o=[],i=[],s=[],A=[],r=[],l=[.5,.5,.5,.5],c=0;if(!document.getElementById(f))throw new Error('tableToSlides: Table ID "'+f+'" does not exist!');null!=d&&d._margin?(Array.isArray(d._margin)?l=d._margin:isNaN(d._margin)||(l=[d._margin,d._margin,d._margin,d._margin]),a.slideMargin=l):null!=a&&a.slideMargin&&(Array.isArray(a.slideMargin)?l=a.slideMargin:isNaN(a.slideMargin)||(l=[a.slideMargin,a.slideMargin,a.slideMargin,a.slideMargin])),n=(a.w?M(a.w):u.presLayout.width)-M(l[1]+l[3]),a.verbose&&(console.log("[[VERBOSE MODE]]"),console.log("|-- `tableToSlides` ----------------------------------------------------|"),console.log("| tableProps.h .................................... = "+a.h),console.log("| tableProps.w .................................... = "+a.w),console.log("| pptx.presLayout.width ........................... = "+(u.presLayout.width/F).toFixed(1)),console.log("| pptx.presLayout.height .......................... = "+(u.presLayout.height/F).toFixed(1)),console.log("| emuSlideTabW .................................... = "+(n/F).toFixed(1)));let e=document.querySelectorAll(`#${f} tr:first-child th`);(e=0===e.length?document.querySelectorAll(`#${f} tr:first-child td`):e).forEach(e=>{var t=e;if(t.getAttribute("colspan"))for(let e=0;e<Number(t.getAttribute("colspan"));e++)r.push(Math.round(t.offsetWidth/Number(t.getAttribute("colspan"))));else r.push(t.offsetWidth)}),r.forEach(e=>{c+=e}),r.forEach((e,t)=>{e=Number((Number(n)*(e/c*100)/100/F).toFixed(2));let r=0;var a=document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`),a=(a&&(r=Number(a.getAttribute("data-pptx-min-width"))),document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`));a&&(r=Number(a.getAttribute("data-pptx-width"))),A.push(r>e?r:e)}),a.verbose&&console.log(`| arrColW ......................................... = [${A.join(", ")}]`),["thead","tbody","tfoot"].forEach(t=>{document.querySelectorAll(`#${f} ${t} tr`).forEach(e=>{let r=[];switch(Array.from(e.cells).forEach(a=>{var e=window.getComputedStyle(a).getPropertyValue("color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(",");let t=window.getComputedStyle(a).getPropertyValue("background-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),n=("rgba(0, 0, 0, 0)"!==window.getComputedStyle(a).getPropertyValue("background-color")&&!window.getComputedStyle(a).getPropertyValue("transparent")||(t=["255","255","255"]),{align:null,bold:!!("bold"===window.getComputedStyle(a).getPropertyValue("font-weight")||500<=Number(window.getComputedStyle(a).getPropertyValue("font-weight"))),border:null,color:ie(Number(e[0]),Number(e[1]),Number(e[2])),fill:{color:ie(Number(t[0]),Number(t[1]),Number(t[2]))},fontFace:(window.getComputedStyle(a).getPropertyValue("font-family")||"").split(",")[0].replace(/"/g,"").replace("inherit","").replace("initial","")||null,fontSize:Number(window.getComputedStyle(a).getPropertyValue("font-size").replace(/[a-z]/gi,"")),margin:null,colspan:Number(a.getAttribute("colspan"))||null,rowspan:Number(a.getAttribute("rowspan"))||null,valign:null});["left","center","right","start","end"].includes(window.getComputedStyle(a).getPropertyValue("text-align"))&&(e=window.getComputedStyle(a).getPropertyValue("text-align").replace("start","left").replace("end","right"),n.align="center"===e?"center":"left"===e?"left":"right"===e?"right":null),["top","middle","bottom"].includes(window.getComputedStyle(a).getPropertyValue("vertical-align"))&&(e=window.getComputedStyle(a).getPropertyValue("vertical-align"),n.valign="top"===e?"top":"middle"===e?"middle":"bottom"===e?"bottom":null),window.getComputedStyle(a).getPropertyValue("padding-left")&&(n.margin=[0,0,0,0],["padding-top","padding-right","padding-bottom","padding-left"].forEach((e,t)=>{n.margin[t]=Math.round(Number(window.getComputedStyle(a).getPropertyValue(e).replace(/\D/gi,"")))})),(window.getComputedStyle(a).getPropertyValue("border-top-width")||window.getComputedStyle(a).getPropertyValue("border-right-width")||window.getComputedStyle(a).getPropertyValue("border-bottom-width")||window.getComputedStyle(a).getPropertyValue("border-left-width"))&&(n.border=[null,null,null,null],["top","right","bottom","left"].forEach((e,t)=>{var r=Math.round(Number(window.getComputedStyle(a).getPropertyValue("border-"+e+"-width").replace("px",""))),e=window.getComputedStyle(a).getPropertyValue("border-"+e+"-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),e=ie(Number(e[0]),Number(e[1]),Number(e[2]));n.border[t]={pt:r,color:e}})),r.push({_type:I.tablecell,text:a.innerText,options:n})}),t){case"thead":o.push(r);break;case"tbody":i.push(r);break;case"tfoot":s.push(r);break;default:console.log("table parsing: unexpected table part: "+t)}})}),a._arrObjTabHeadRows=o||null,a.colW=A,Ae([...o,...i,...s],a,u.presLayout,d).forEach((e,t)=>{var r=u.addSlide({masterName:a.masterSlideName||null});0===t&&(a.y=a.y||l[0]),0<t&&(a.y=a.autoPageSlideStartY||a.newSlideStartY||l[0]),a.verbose&&console.log(`| opts.autoPageSlideStartY: ${a.autoPageSlideStartY} / arrInchMargins[0]: ${l[0]} => opts.y = `+a.y),r.addTable(e.rows,{x:a.x||l[3],y:a.y,w:Number(n)/F,colW:A,autoPage:!1}),a.addImage&&(a.addImage.options=a.addImage.options||{},a.addImage.image&&(a.addImage.image.path||a.addImage.image.data)?r.addImage({path:a.addImage.image.path,data:a.addImage.image.data,x:a.addImage.options.x,y:a.addImage.options.y,w:a.addImage.options.w,h:a.addImage.options.h}):console.warn("Warning: tableToSlides.addImage requires either `path` or `data`")),a.addShape&&r.addShape(a.addShape.shapeName,a.addShape.options||{}),a.addTable&&r.addTable(a.addTable.rows,a.addTable.options||{}),a.addText&&r.addText(a.addText.text,a.addText.options||{})})}}}return Fe})(JSZip);
 
 </script>
+
+<!-- PENDING QUESTIONS PANEL -->
+<div id="sb-pending-panel">
+  <div class="sbp-hd">
+    <span id="sbp-title">Sin responder</span>
+    <button class="sbp-hd-close" onclick="togglePendingPanel()">×</button>
+  </div>
+  <div class="sbp-body" id="sbp-body"></div>
+</div>
 
 <!-- AUTH OVERLAY -->
 <div id="auth-overlay">
