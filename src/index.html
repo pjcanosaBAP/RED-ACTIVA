@@ -1980,15 +1980,27 @@ function rebuildStructSelector(){
     const badge=active?'<span style="font-size:9px;background:rgba(255,255,255,.25);border-radius:3px;padding:1px 4px;margin-left:4px">ACTIVA</span>':'';
     return '<div style="border:1.5px solid;border-radius:8px;padding:8px 12px;font-size:12px;position:relative;user-select:none;transition:all .15s;'+aStyle+'">'
       +'<div onclick="switchStruct(\''+s.pais+'\','+s.anio+')" style="cursor:'+(active?'default':'pointer')+'">'
-      +'<div style="font-weight:700;font-size:13px;padding-right:28px">'+flag+' '+s.pais+' · '+s.anio+badge+'</div>'
+      +'<div style="font-weight:700;font-size:13px;padding-right:56px">'+flag+' '+s.pais+' · '+s.anio+badge+'</div>'
       +'<div style="margin-top:3px;font-size:11px;opacity:.8">'+s.nAreas+' áreas · '+s.nQ+' preguntas</div>'
       +'</div>'
+      +'<div style="position:absolute;top:7px;right:8px;display:flex;gap:3px">'
       +'<button onclick="event.stopPropagation();duplicateStruct(\''+s.pais+'\','+s.anio+')" title="Duplicar como nueva estructura" '
-      +'style="position:absolute;top:7px;right:8px;background:rgba(0,0,0,.1);border:none;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1.4">📋</button>'
+      +'style="background:rgba(0,0,0,.1);border:none;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1.4">📋</button>'
+      +(active?'':'<button onclick="event.stopPropagation();deleteStruct(\''+s.pais+'\','+s.anio+')" title="Eliminar estructura" '
+      +'style="background:rgba(200,0,0,.1);border:none;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1.4">🗑️</button>')
+      +'</div>'
       +'</div>';
   }).join('');
 }
 
+function deleteStruct(pais, anio){
+  if(cfg.pais===pais&&cfg.anio===anio){ showToast('⚠️ No podés eliminar la estructura activa — primero cambiá a otra'); return; }
+  if(!confirm('¿Eliminar '+pais+' '+anio+'?\nEsta acción no se puede deshacer.')) return;
+  localStorage.removeItem(structureKey(pais,anio));
+  _sbPushConfig();
+  showToast('🗑️ '+pais+' '+anio+' eliminado');
+  rebuildStructSelector();
+}
 function duplicateStruct(srcPais, srcAnio){
   const newPais=prompt('País para la nueva estructura:', srcPais);
   if(newPais===null) return;
