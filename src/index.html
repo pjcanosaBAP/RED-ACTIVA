@@ -2107,11 +2107,13 @@ function _showApp(user){
   const ov = document.getElementById('auth-overlay'); if(ov) ov.classList.add('hidden');
   const tb = document.getElementById('tb-user'); if(tb) tb.style.display='flex';
   const meta = user.user_metadata||{};
-  _userPais = meta.pais||null;
+  _userPais = meta.pais ? meta.pais.trim().toUpperCase() : null;
   const em = document.getElementById('tb-user-email');
   if(em) em.textContent = user.email + (_userPais ? ' · '+_userPais : '');
   _applyRole(meta.role||'readonly');
   _applyPaisRestriction();
+  // Retry after Supabase may finish loading structures
+  setTimeout(_applyPaisRestriction, 2500);
 }
 function _applyPaisRestriction(){
   if(!_userPais) return;
@@ -3157,7 +3159,7 @@ function goTab(t){
   if(idx!==undefined) document.querySelectorAll('.sb-tab')[idx].classList.add('on');
   if(t==='global') renderGlobal();
   if(t==='compare') initCompare();
-  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); }
+  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); rebuildStructSelector(); }
   if(t==='form') flushFormIfDirty();
   if(t==='analisis') initAnalisis();
   if(t==='network') renderNetworkDashboard();
