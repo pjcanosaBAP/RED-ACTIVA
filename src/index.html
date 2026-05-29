@@ -1962,6 +1962,7 @@ function rebuildStructSelector(){
     }
   }
   structs.sort((a,b)=>a.pais.localeCompare(b.pais)||b.anio-a.anio);
+  if(_userPais) structs=structs.filter(s=>s.pais===_userPais);
 
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
   const curKey=structureKey();
@@ -2020,6 +2021,7 @@ function duplicateStruct(srcPais, srcAnio){
   rebuildStructSelector();
 }
 function switchStruct(pais, anio){
+  if(_userPais&&pais!==_userPais){ showToast('⚠️ No tenés acceso a estructuras de '+pais); return; }
   if(cfg.pais===pais&&cfg.anio===anio) return; // already active
   cfg.pais=pais; cfg.anio=anio;
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
@@ -2109,6 +2111,34 @@ function _showApp(user){
   const em = document.getElementById('tb-user-email');
   if(em) em.textContent = user.email + (_userPais ? ' · '+_userPais : '');
   _applyRole(meta.role||'readonly');
+  _applyPaisRestriction();
+}
+function _applyPaisRestriction(){
+  if(!_userPais) return;
+  // Find newest structure for the restricted country
+  const matching=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k&&k.startsWith('bpl_struct_')){
+      const rest=k.slice('bpl_struct_'.length);
+      const lastUs=rest.lastIndexOf('_');
+      if(lastUs<1) continue;
+      const p=rest.slice(0,lastUs);
+      const a=Number(rest.slice(lastUs+1));
+      if(p===_userPais&&!isNaN(a)) matching.push({pais:p,anio:a});
+    }
+  }
+  if(matching.length){
+    matching.sort((a,b)=>b.anio-a.anio);
+    const best=matching[0];
+    if(cfg.pais!==best.pais||cfg.anio!==best.anio){
+      cfg.pais=best.pais; cfg.anio=best.anio;
+      localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+      loadStructure(best.pais,best.anio);
+      try{ rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas(); }catch(e){}
+    }
+  }
+  try{ rebuildDistSelect(); rebuildStructSelector(); }catch(e){}
 }
 async function doLogin(){
   const email=(document.getElementById('auth-email')||{}).value||'';
@@ -2307,10 +2337,16 @@ function removeDist(i){
   renderCfgDists(); rebuildDistSelect(); saveCfg();
 }
 function rebuildDistSelect(){
-  const sel=document.getElementById('sel-dist');
+  const sel=document.getElementById('sel-dist'); if(!sel) return;
   const cur=sel.value;
-  sel.innerHTML='<option value="">— Seleccionar —</option>'+DISTRIBUTORS.map(d=>`<option value="${d}">${d}</option>`).join('');
-  if(DISTRIBUTORS.includes(cur)) sel.value=cur;
+  let dists=[...DISTRIBUTORS];
+  if(_userPais){
+    const paisSet=new Set(saved.filter(a=>a.pais===_userPais).map(a=>a.distribuidor).filter(Boolean));
+    const allAuditDists=new Set(saved.map(a=>a.distribuidor).filter(Boolean));
+    dists=dists.filter(d=>paisSet.has(d)||!allAuditDists.has(d));
+  }
+  sel.innerHTML='<option value="">— Seleccionar —</option>'+dists.map(d=>`<option value="${d}">${d}</option>`).join('');
+  if(dists.includes(cur)) sel.value=cur;
 }
 function renderBplWeights(){ renderWeightsCfg(); } // compat shim
 
@@ -3465,6 +3501,9 @@ async function loadFromSupabase(){
         }
       }
     }
+
+    // Auto-apply country restriction if user already authenticated
+    _applyPaisRestriction();
 
     // ── Setup realtime channel ────────────────────────────────
     _setupSBRealtime();
