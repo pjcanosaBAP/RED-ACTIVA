@@ -1978,13 +1978,35 @@ function rebuildStructSelector(){
       ?'background:var(--blue);color:#fff;border-color:var(--blue);'
       :'background:#fff;color:var(--g700);border-color:var(--g200);cursor:pointer;';
     const badge=active?'<span style="font-size:9px;background:rgba(255,255,255,.25);border-radius:3px;padding:1px 4px;margin-left:4px">ACTIVA</span>':'';
-    return '<div onclick="switchStruct(\''+s.pais+'\','+s.anio+')" style="border:1.5px solid;border-radius:8px;padding:8px 12px;font-size:12px;user-select:none;transition:all .15s;'+aStyle+'">'
-      +'<div style="font-weight:700;font-size:13px">'+flag+' '+s.pais+' · '+s.anio+badge+'</div>'
+    return '<div style="border:1.5px solid;border-radius:8px;padding:8px 12px;font-size:12px;position:relative;user-select:none;transition:all .15s;'+aStyle+'">'
+      +'<div onclick="switchStruct(\''+s.pais+'\','+s.anio+')" style="cursor:'+(active?'default':'pointer')+'">'
+      +'<div style="font-weight:700;font-size:13px;padding-right:28px">'+flag+' '+s.pais+' · '+s.anio+badge+'</div>'
       +'<div style="margin-top:3px;font-size:11px;opacity:.8">'+s.nAreas+' áreas · '+s.nQ+' preguntas</div>'
+      +'</div>'
+      +'<button onclick="event.stopPropagation();duplicateStruct(\''+s.pais+'\','+s.anio+')" title="Duplicar como nueva estructura" '
+      +'style="position:absolute;top:7px;right:8px;background:rgba(0,0,0,.1);border:none;border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1.4">📋</button>'
       +'</div>';
   }).join('');
 }
 
+function duplicateStruct(srcPais, srcAnio){
+  const newPais=prompt('País para la nueva estructura:', srcPais);
+  if(newPais===null) return;
+  const np=newPais.trim().toUpperCase();
+  if(!np){ showToast('⚠️ País inválido'); return; }
+  const newAnio=parseInt(prompt('Año para la nueva estructura:', srcAnio+1));
+  if(!newAnio||isNaN(newAnio)){ showToast('⚠️ Año inválido'); return; }
+  const dstKey=structureKey(np,newAnio);
+  if(localStorage.getItem(dstKey)){
+    if(!confirm(np+' '+newAnio+' ya existe. ¿Sobreescribir?')) return;
+  }
+  const data=localStorage.getItem(structureKey(srcPais,srcAnio));
+  if(!data){ showToast('⚠️ No se encontró la estructura fuente'); return; }
+  localStorage.setItem(dstKey,data);
+  _sbPushConfig();
+  showToast('✅ '+np+' '+newAnio+' creado como copia de '+srcPais+' '+srcAnio);
+  rebuildStructSelector();
+}
 function switchStruct(pais, anio){
   if(cfg.pais===pais&&cfg.anio===anio) return; // already active
   cfg.pais=pais; cfg.anio=anio;
