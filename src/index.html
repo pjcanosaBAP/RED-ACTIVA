@@ -245,6 +245,30 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .sb-cfg-item:hover{background:rgba(255,255,255,.08);}
 .sb-cfg-item-all{border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:6px;color:var(--blue-l);}
 body.sb-mini .sb-cfg-wrap{display:none;}
+/* ── Sidebar audit list ── */
+.sb-aud-wrap{position:relative;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);}
+.sb-aud-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.65);font-size:11px;font-weight:700;cursor:pointer;
+  font-family:'Barlow',sans-serif;transition:background .15s;}
+.sb-aud-btn:hover{background:rgba(255,255,255,.12);}
+.sb-aud-badge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:auto;}
+.sb-aud-drop{position:absolute;bottom:calc(100% + 2px);left:8px;right:8px;
+  background:#1a2535;border:1px solid rgba(255,255,255,.15);border-radius:8px;
+  padding:4px;z-index:600;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.5);
+  max-height:320px;overflow-y:auto;}
+.sb-aud-drop.open{display:block;}
+.sb-aud-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:7px 11px;background:none;
+  border:none;color:rgba(255,255,255,.8);font-size:11px;border-radius:5px;
+  cursor:pointer;font-family:'Barlow',sans-serif;border-bottom:1px solid rgba(255,255,255,.04);}
+.sb-aud-item:last-child{border-bottom:none;}
+.sb-aud-item:hover{background:rgba(255,255,255,.08);}
+.sb-aud-item.active{background:rgba(21,101,192,.25);color:#fff;}
+.sb-aud-dist{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-aud-ed{font-size:9px;color:rgba(255,255,255,.4);flex-shrink:0;}
+.sb-aud-pct{font-size:10px;font-weight:800;flex-shrink:0;min-width:38px;text-align:right;}
+.sb-aud-empty{padding:14px;text-align:center;color:rgba(255,255,255,.35);font-size:11px;}
+body.sb-mini .sb-aud-wrap{display:none;}
 /* ── Pending questions panel ── */
 #sb-pending-panel{position:fixed;left:var(--sb);bottom:88px;width:320px;max-height:440px;
   background:#fff;border:1px solid var(--g200);border-radius:10px;
@@ -962,6 +986,10 @@ body.readonly .admin-only{display:none!important;}
         <div id="sb-resp-novinc" class="sb-resp-clickable" onclick="togglePendingPanel()" style="font-size:10px;color:rgba(255,255,255,.28);display:none"></div>
       </div>
     </div>
+  </div>
+  <div class="sb-aud-wrap">
+    <div class="sb-aud-drop" id="sb-aud-drop"></div>
+    <button class="sb-aud-btn" onclick="toggleSbAud()">📋 Auditorías <span class="sb-aud-badge" id="sb-aud-badge">0</span></button>
   </div>
   <div class="sb-cfg-wrap">
     <div class="sb-cfg-drop" id="sb-cfg-drop">
@@ -2216,6 +2244,41 @@ function toggleSbCfg(){
   const d=document.getElementById('sb-cfg-drop');
   if(d) d.classList.toggle('open');
 }
+function toggleSbAud(){
+  const d=document.getElementById('sb-aud-drop');
+  if(!d) return;
+  if(d.classList.contains('open')){ d.classList.remove('open'); return; }
+  _renderSbAudList();
+  d.classList.add('open');
+}
+function _renderSbAudList(){
+  const d=document.getElementById('sb-aud-drop');
+  if(!d) return;
+  const rp=document.body.dataset.rp||_userPais||'';
+  let list=[...saved];
+  if(rp) list=list.filter(a=>!a.pais||a.pais===rp);
+  list.sort((a,b)=>{
+    const pa=a.pais||'',pb=b.pais||'';
+    if(pa!==pb) return pa.localeCompare(pb);
+    const ea=a.edicion||'',eb=b.edicion||'';
+    if(ea!==eb) return eb.localeCompare(ea);
+    return (a.distribuidor||'').localeCompare(b.distribuidor||'');
+  });
+  if(!list.length){ d.innerHTML='<div class="sb-aud-empty">Sin auditorías guardadas</div>'; return; }
+  const curDist=document.getElementById('sel-dist')?document.getElementById('sel-dist').value:'';
+  const curEd=document.getElementById('sel-edicion')?document.getElementById('sel-edicion').value:'';
+  d.innerHTML=list.map(a=>{
+    const idx=saved.findIndex(x=>x.id===a.id);
+    const sc=a.score!=null?Number(a.score).toFixed(1)+'%':'—';
+    const col=a.category==='VERDE'?'#4caf50':a.category==='AMARILLO'?'#f59e0b':a.category==='ROJO'?'#ef5350':'rgba(255,255,255,.35)';
+    const isActive=(a.distribuidor===curDist&&a.edicion===curEd);
+    return `<button class="sb-aud-item${isActive?' active':''}" onclick="loadAudit(${idx});toggleSbAud()">
+      <span class="sb-aud-dist" title="${a.distribuidor||'—'}">${a.distribuidor||'—'}</span>
+      <span class="sb-aud-ed">${a.edicion||'—'}</span>
+      <span class="sb-aud-pct" style="color:${col}">${sc}</span>
+    </button>`;
+  }).join('');
+}
 function togglePendingPanel(){
   const p=document.getElementById('sb-pending-panel');
   if(!p) return;
@@ -2282,6 +2345,10 @@ document.addEventListener('click',function(e){
   if(!e.target.closest('.tb-more-wrap')) closeTbMore();
   if(!e.target.closest('.sb-cfg-wrap')){
     const d=document.getElementById('sb-cfg-drop');
+    if(d) d.classList.remove('open');
+  }
+  if(!e.target.closest('.sb-aud-wrap')){
+    const d=document.getElementById('sb-aud-drop');
     if(d) d.classList.remove('open');
   }
   if(!e.target.closest('#sb-pending-panel')&&!e.target.closest('.sb-resp-clickable')){
@@ -2898,10 +2965,12 @@ function buildCritGrid(){
 // ── ANSWER / COMMENT ──
 function setA(comp,val){
   const k=comp.replace(/\./g,'_');
-  ans[comp]=val;
-  ['si','no','na'].forEach(v=>{ const b=document.getElementById(v+'-'+k); if(b) b.classList.toggle('on',v===val); });
+  const same=ans[comp]===val;
+  if(same) delete ans[comp]; else ans[comp]=val;
+  const active=same?null:val;
+  ['si','no','na'].forEach(v=>{ const b=document.getElementById(v+'-'+k); if(b) b.classList.toggle('on',v===active); });
   const row=document.getElementById('qr-'+k);
-  if(row) row.style.background=val==='si'?'#f1f8e9':val==='no'?'#fce4ec':'#fff8e1';
+  if(row) row.style.background=active==='si'?'#f1f8e9':active==='no'?'#fce4ec':active==='na'?'#fff8e1':'';
   recalc();
 }
 function setCom(comp,val){
@@ -4698,7 +4767,8 @@ function _updateSbResp(){
 }
 function updateAudCnt(){
   document.getElementById('aud-cnt-badge').textContent=saved.length;
-  // Update autoevals count badge if it exists
+  const sbAudBadge=document.getElementById('sb-aud-badge');
+  if(sbAudBadge) sbAudBadge.textContent=saved.length;
   const aeBadge=document.getElementById('ae-cnt-badge');
   if(aeBadge) aeBadge.textContent=autoevals.length;
 }
