@@ -252,30 +252,6 @@ body.sb-mini .sb-cfg-wrap{display:none;}
 .sb-struct-sel option{background:#1a2535;color:#fff;}
 .sb-struct-sel:focus{outline:none;border-color:var(--blue-l);}
 body.sb-mini .sb-program{display:none;}
-/* ── Sidebar audit list ── */
-.sb-aud-wrap{position:relative;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);}
-.sb-aud-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
-  color:rgba(255,255,255,.65);font-size:11px;font-weight:700;cursor:pointer;
-  font-family:'Barlow',sans-serif;transition:background .15s;}
-.sb-aud-btn:hover{background:rgba(255,255,255,.12);}
-.sb-aud-badge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:auto;}
-.sb-aud-drop{position:absolute;bottom:calc(100% + 2px);left:8px;right:8px;
-  background:#1a2535;border:1px solid rgba(255,255,255,.15);border-radius:8px;
-  padding:4px;z-index:600;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.5);
-  max-height:320px;overflow-y:auto;}
-.sb-aud-drop.open{display:block;}
-.sb-aud-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;padding:7px 11px;background:none;
-  border:none;color:rgba(255,255,255,.8);font-size:11px;border-radius:5px;
-  cursor:pointer;font-family:'Barlow',sans-serif;border-bottom:1px solid rgba(255,255,255,.04);}
-.sb-aud-item:last-child{border-bottom:none;}
-.sb-aud-item:hover{background:rgba(255,255,255,.08);}
-.sb-aud-item.active{background:rgba(21,101,192,.25);color:#fff;}
-.sb-aud-dist{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sb-aud-ed{font-size:9px;color:rgba(255,255,255,.4);flex-shrink:0;}
-.sb-aud-pct{font-size:10px;font-weight:800;flex-shrink:0;min-width:38px;text-align:right;}
-.sb-aud-empty{padding:14px;text-align:center;color:rgba(255,255,255,.35);font-size:11px;}
-body.sb-mini .sb-aud-wrap{display:none;}
 /* ── Pending questions panel ── */
 #sb-pending-panel{position:fixed;left:var(--sb);bottom:88px;width:320px;max-height:440px;
   background:#fff;border:1px solid var(--g200);border-radius:10px;
@@ -996,11 +972,7 @@ body.readonly .admin-only{display:none!important;}
       </div>
     </div>
   </div>
-  <div class="sb-aud-wrap">
-    <div class="sb-aud-drop" id="sb-aud-drop"></div>
-    <button class="sb-aud-btn" onclick="toggleSbAud()">📋 Auditorías <span class="sb-aud-badge" id="sb-aud-badge">0</span></button>
-  </div>
-  <div class="sb-cfg-wrap">
+<div class="sb-cfg-wrap">
     <div class="sb-cfg-drop" id="sb-cfg-drop">
       <button class="sb-cfg-item" onclick="goConfig('cfg-sec-pesos')">⚖️ Pesos de Áreas</button>
       <button class="sb-cfg-item" onclick="goConfig('cfg-sec-pond')">📐 Ponderación</button>
@@ -2390,11 +2362,7 @@ document.addEventListener('click',function(e){
     const d=document.getElementById('sb-cfg-drop');
     if(d) d.classList.remove('open');
   }
-  if(!e.target.closest('.sb-aud-wrap')){
-    const d=document.getElementById('sb-aud-drop');
-    if(d) d.classList.remove('open');
-  }
-  if(!e.target.closest('#sb-pending-panel')&&!e.target.closest('.sb-resp-clickable')){
+if(!e.target.closest('#sb-pending-panel')&&!e.target.closest('.sb-resp-clickable')){
     const p=document.getElementById('sb-pending-panel');
     if(p) p.classList.remove('open');
   }
