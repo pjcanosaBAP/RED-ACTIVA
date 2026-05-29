@@ -1965,14 +1965,9 @@ function rebuildStructSelector(){
   if(_userPais) structs=structs.filter(s=>s.pais===_userPais);
 
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  // When user has a country restriction, derive active key from their country
-  // regardless of what cfg.pais says (avoids timing issues with global config)
-  let _activePais=cfg.pais, _activeAnio=cfg.anio;
-  if(_userPais && cfg.pais!==_userPais && structs.length){
-    _activePais=_userPais;
-    _activeAnio=structs[0].anio; // structs sorted newest first
-  }
-  const curKey=structureKey(_activePais, _activeAnio);
+  // Active key: use cfg, but fall back to first available if it doesn't exist in visible list
+  const curKey=structureKey();
+  const effectiveCurKey=structs.some(s=>s.key===curKey)?curKey:(structs.length?structs[0].key:curKey);
 
   if(structs.length===0){
     wrap.innerHTML='<div style="font-size:12px;color:var(--g400);padding:4px 0">No hay estructuras guardadas todavía. Guardá País y Año para crear la primera.</div>';
@@ -1980,7 +1975,7 @@ function rebuildStructSelector(){
   }
 
   wrap.innerHTML=structs.map(s=>{
-    const active=s.key===curKey;
+    const active=s.key===effectiveCurKey;
     const flag=flags[s.pais]||'🌍';
     const aStyle=active
       ?'background:var(--blue);color:#fff;border-color:var(--blue);'
@@ -2190,14 +2185,8 @@ function goConfig(secId){
   if(secId) setTimeout(()=>{
     const el=document.getElementById(secId);
     if(!el) return;
-    // Scroll the .main container (page scroll) to the section
-    const main=document.querySelector('.main');
-    if(main){
-      const top=el.getBoundingClientRect().top+main.scrollTop-70;
-      main.scrollTo({top,behavior:'smooth'});
-    } else {
-      el.scrollIntoView({behavior:'smooth',block:'start'});
-    }
+    const top=el.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop)-64;
+    window.scrollTo({top,behavior:'smooth'});
   }, 400);
 }
 function toggleSbCfg(){
