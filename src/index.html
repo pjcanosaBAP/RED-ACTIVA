@@ -1965,7 +1965,14 @@ function rebuildStructSelector(){
   if(_userPais) structs=structs.filter(s=>s.pais===_userPais);
 
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  const curKey=structureKey();
+  // When user has a country restriction, derive active key from their country
+  // regardless of what cfg.pais says (avoids timing issues with global config)
+  let _activePais=cfg.pais, _activeAnio=cfg.anio;
+  if(_userPais && cfg.pais!==_userPais && structs.length){
+    _activePais=_userPais;
+    _activeAnio=structs[0].anio; // structs sorted newest first
+  }
+  const curKey=structureKey(_activePais, _activeAnio);
 
   if(structs.length===0){
     wrap.innerHTML='<div style="font-size:12px;color:var(--g400);padding:4px 0">No hay estructuras guardadas todavía. Guardá País y Año para crear la primera.</div>';
@@ -2182,8 +2189,16 @@ function goConfig(secId){
   goTab('config');
   if(secId) setTimeout(()=>{
     const el=document.getElementById(secId);
-    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-  },150);
+    if(!el) return;
+    // Scroll the .main container (page scroll) to the section
+    const main=document.querySelector('.main');
+    if(main){
+      const top=el.getBoundingClientRect().top+main.scrollTop-70;
+      main.scrollTo({top,behavior:'smooth'});
+    } else {
+      el.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  }, 400);
 }
 function toggleSbCfg(){
   const d=document.getElementById('sb-cfg-drop');
