@@ -1942,7 +1942,7 @@ function rebuildStructSelector(){
   const wrap=document.getElementById('struct-selector-list');
   if(!wrap) return;
   // Scan localStorage for bpl_struct_* keys
-  const structs=[];
+  let structs=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(k&&k.startsWith('bpl_struct_')){
