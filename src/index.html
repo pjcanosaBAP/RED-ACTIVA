@@ -530,7 +530,7 @@ body.sb-mini .sb-cfg-wrap{display:none;}
 #saved-panel{display:none;padding:14px 22px 0;}
 
 /* CONFIG */
-.cfg-section{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+.cfg-section{scroll-margin-top:64px;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);
   margin-bottom:16px;overflow:hidden;}
 .cfg-hd{padding:12px 16px;background:var(--navy2);color:#fff;
   font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;
@@ -1962,10 +1962,12 @@ function rebuildStructSelector(){
     }
   }
   structs.sort((a,b)=>a.pais.localeCompare(b.pais)||b.anio-a.anio);
-  if(_userPais) structs=structs.filter(s=>s.pais===_userPais);
+  // Use body.dataset.rp as reliable source (set in _showApp, survives async boundaries)
+  const _rp = document.body.dataset.rp || _userPais || '';
+  if(_rp) structs=structs.filter(s=>s.pais===_rp);
 
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  // Active key: use cfg, but fall back to first available if it doesn't exist in visible list
+  // Active key: use cfg, fall back to first available if curKey not in visible list
   const curKey=structureKey();
   const effectiveCurKey=structs.some(s=>s.key===curKey)?curKey:(structs.length?structs[0].key:curKey);
 
@@ -2110,11 +2112,12 @@ function _showApp(user){
   const tb = document.getElementById('tb-user'); if(tb) tb.style.display='flex';
   const meta = user.user_metadata||{};
   _userPais = meta.pais ? meta.pais.trim().toUpperCase() : null;
+  // Store on body dataset as stable DOM backup (survives async boundaries)
+  document.body.dataset.rp = _userPais || '';
   const em = document.getElementById('tb-user-email');
   if(em) em.textContent = user.email + (_userPais ? ' · '+_userPais : '');
   _applyRole(meta.role||'readonly');
   _applyPaisRestriction();
-  // Retry after Supabase may finish loading structures
   setTimeout(_applyPaisRestriction, 2500);
 }
 function _applyPaisRestriction(){
@@ -2184,10 +2187,8 @@ function goConfig(secId){
   goTab('config');
   if(secId) setTimeout(()=>{
     const el=document.getElementById(secId);
-    if(!el) return;
-    const top=el.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop)-64;
-    window.scrollTo({top,behavior:'smooth'});
-  }, 400);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  }, 500);
 }
 function toggleSbCfg(){
   const d=document.getElementById('sb-cfg-drop');
@@ -2334,8 +2335,13 @@ function resetDistributors(){ DISTRIBUTORS=[...DIST_BASE]; renderCfgDists(); reb
 function renderCfgDists(){
   const w=document.getElementById('cfg-dist-list');
   if(!w) return;
-  w.innerHTML=DISTRIBUTORS.map((d,i)=>
-    `<div class="cfg-dist-tag">${d}<span class="cfg-dist-del" onclick="removeDist(${i})">✕</span></div>`).join('');
+  const rp=document.body.dataset.rp||_userPais||'';
+  const paisDists=rp?new Set(saved.filter(a=>a.pais===rp).map(a=>a.distribuidor).filter(Boolean)):null;
+  const allAuditDists=rp?new Set(saved.map(a=>a.distribuidor).filter(Boolean)):null;
+  w.innerHTML=DISTRIBUTORS.map((d,i)=>{
+    if(rp && allAuditDists.has(d) && !paisDists.has(d)) return '';
+    return `<div class="cfg-dist-tag">${d}<span class="cfg-dist-del" onclick="removeDist(${i})">✕</span></div>`;
+  }).join('');
 }
 function addDistributor(){
   const inp=document.getElementById('cfg-new-dist'); const v=inp.value.trim();
