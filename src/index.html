@@ -245,6 +245,13 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .sb-cfg-item:hover{background:rgba(255,255,255,.08);}
 .sb-cfg-item-all{border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:6px;color:var(--blue-l);}
 body.sb-mini .sb-cfg-wrap{display:none;}
+/* ── Sidebar structure selector ── */
+.sb-struct-sel{width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.85);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;
+  font-family:'Barlow',sans-serif;cursor:pointer;margin-top:4px;box-sizing:border-box;}
+.sb-struct-sel option{background:#1a2535;color:#fff;}
+.sb-struct-sel:focus{outline:none;border-color:var(--blue-l);}
+body.sb-mini .sb-program{display:none;}
 /* ── Sidebar audit list ── */
 .sb-aud-wrap{position:relative;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);}
 .sb-aud-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
@@ -961,7 +968,9 @@ body.readonly .admin-only{display:none!important;}
     </div>
     <div class="sb-program">
       <div class="sb-program-lbl">Programa · Red Activa 2.0</div>
-      <div class="sb-program-val" id="sb-prog-val">— Sin programa cargado —</div>
+      <select id="sb-struct-sel" class="sb-struct-sel" onchange="onSbStructChange()">
+        <option value="">— Sin programa —</option>
+      </select>
     </div>
   </div>
   <div class="sb-tabs">
@@ -1985,7 +1994,7 @@ function rebuildDynamicUI(){
   rebuildSidebarNav();
   rebuildDashAreaBars();
   rebuildCfgWeightRows();
-  rebuildStructSelector();
+  rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){}
 }
 
 function rebuildStructSelector(){
@@ -2054,7 +2063,7 @@ function deleteStruct(pais, anio){
   localStorage.removeItem(structureKey(pais,anio));
   _sbPushConfig();
   showToast('🗑️ '+pais+' '+anio+' eliminado');
-  rebuildStructSelector();
+  rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){}
 }
 function duplicateStruct(srcPais, srcAnio){
   const newPais=prompt('País para la nueva estructura:', srcPais);
@@ -2072,16 +2081,14 @@ function duplicateStruct(srcPais, srcAnio){
   localStorage.setItem(dstKey,data);
   _sbPushConfig();
   showToast('✅ '+np+' '+newAnio+' creado como copia de '+srcPais+' '+srcAnio);
-  rebuildStructSelector();
+  rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){}
 }
 function switchStruct(pais, anio){
   if(_userPais&&pais!==_userPais){ showToast('⚠️ No tenés acceso a estructuras de '+pais); return; }
   if(cfg.pais===pais&&cfg.anio===anio) return; // already active
   cfg.pais=pais; cfg.anio=anio;
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
-  const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  const pv=document.getElementById('sb-prog-val');
-  if(pv) pv.textContent=(flags[pais]||'🌍')+' '+pais+' · '+anio;
+  try{ rebuildSbStructSel(); }catch(e){}
   const sel=document.getElementById('sel-edicion'); if(sel) sel.value=anio;
   const inp=document.getElementById('cfg-pais'); if(inp) inp.value=pais;
   const inpa=document.getElementById('cfg-anio'); if(inpa) inpa.value=anio;
@@ -2198,10 +2205,10 @@ function _applyPaisRestriction(){
     // Always update sidebar label and selectors regardless of whether cfg changed
     try{ loadPaisAnio(); }catch(e){}
     try{ rebuildDistSelect(); }catch(e){}
-    try{ rebuildStructSelector(); }catch(e){}
+    try{ rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){} }catch(e){}
   } else {
     // No structures yet — just refresh selectors in case they exist
-    try{ rebuildDistSelect(); rebuildStructSelector(); }catch(e){}
+    try{ rebuildDistSelect(); rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){} }catch(e){}
   }
 }
 async function doLogin(){
@@ -2243,6 +2250,42 @@ function goConfig(secId){
 function toggleSbCfg(){
   const d=document.getElementById('sb-cfg-drop');
   if(d) d.classList.toggle('open');
+}
+function rebuildSbStructSel(){
+  const sel=document.getElementById('sb-struct-sel');
+  if(!sel) return;
+  const rp=document.body.dataset.rp||_userPais||'';
+  const structs=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('bpl_struct_')) continue;
+    const rest=k.slice('bpl_struct_'.length);
+    const lastUs=rest.lastIndexOf('_');
+    if(lastUs<1) continue;
+    const pais=rest.slice(0,lastUs);
+    const anio=Number(rest.slice(lastUs+1));
+    if(!pais||isNaN(anio)) continue;
+    if(rp&&pais!==rp) continue;
+    structs.push({pais,anio});
+  }
+  structs.sort((a,b)=>a.pais.localeCompare(b.pais)||b.anio-a.anio);
+  const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
+  if(!structs.length){ sel.innerHTML='<option value="">— Sin programa —</option>'; return; }
+  sel.innerHTML=structs.map(s=>{
+    const val=s.pais+'_'+s.anio;
+    const sel2=(s.pais===cfg.pais&&s.anio===cfg.anio)?' selected':'';
+    return `<option value="${val}"${sel2}>${flags[s.pais]||'🌍'} ${s.pais} ${s.anio}</option>`;
+  }).join('');
+}
+function onSbStructChange(){
+  const sel=document.getElementById('sb-struct-sel');
+  if(!sel||!sel.value) return;
+  const lastUs=sel.value.lastIndexOf('_');
+  if(lastUs<1) return;
+  const pais=sel.value.slice(0,lastUs);
+  const anio=Number(sel.value.slice(lastUs+1));
+  if(!pais||isNaN(anio)) return;
+  switchStruct(pais,anio);
 }
 function toggleSbAud(){
   const d=document.getElementById('sb-aud-drop');
@@ -3005,8 +3048,7 @@ function onEdicionChange(){
   }
   resetForm();
   const ed = document.getElementById('sel-edicion').value;
-  const pv = document.getElementById('sb-prog-val');
-  if(pv) pv.textContent = '🇺🇾 URUGUAY · ' + (ed||'—');
+  try{ rebuildSbStructSel(); }catch(e){}
   setTimeout(function(){renderCmpColumns();renderDashResumen();}, 50);
 }
 function resetForm(){
@@ -3058,13 +3100,13 @@ function computeScores(answers, weightOverride){
       const key=sh+'_'+q.bpl_num+'_'+sk;
       if(!seen[key]){
         seen[key]=true;
-        // Compute fraction for this group
-        let sumW=0, siW=0;
+        // Compute fraction for this group — denominator = all non-NA questions (answered or not)
+        let sumW=0, siW=0, hasAns=false;
         shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
           const a=answers[x.comp_num]; const cw=_compW(x);
-          if(a!=='na'&&a!==undefined){ sumW+=cw; if(a==='si') siW+=cw; }
+          if(a!=='na'){ sumW+=cw; if(a==='si') siW+=cw; if(a!==undefined) hasAns=true; }
         });
-        saScores[key]={score:sumW>0?siW/sumW:0, bplW:_bplW(q), label:q.subattr||'', answered:sumW>0};
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:_bplW(q), label:q.subattr||'', answered:hasAns};
         res.subattrs[key]={pct:sumW>0?siW/sumW:null, label:q.subattr||''};
       }
     });
@@ -3333,7 +3375,7 @@ function goTab(t){
   if(idx!==undefined) document.querySelectorAll('.sb-tab')[idx].classList.add('on');
   if(t==='global') renderGlobal();
   if(t==='compare') initCompare();
-  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); rebuildStructSelector(); }
+  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){} }
   if(t==='form') flushFormIfDirty();
   if(t==='analisis') initAnalisis();
   if(t==='network') renderNetworkDashboard();
@@ -5190,10 +5232,7 @@ function savePaisAnio(){
   cfg.pais=pais; cfg.anio=anio;
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   _sbPushConfig();
-  const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  const flag=flags[pais]||'🌍';
-  const pv=document.getElementById('sb-prog-val');
-  if(pv) pv.textContent=flag+' '+pais+' · '+anio;
+  try{ rebuildSbStructSel(); }catch(e){}
   const sel=document.getElementById('sel-edicion'); if(sel) sel.value=anio;
   // Load structure for the new pais/anio (or reset to base if none exists)
   if(!loadStructure(pais,anio)){
@@ -5212,9 +5251,7 @@ function loadPaisAnio(){
   const pais=cfg.pais||'URUGUAY'; const anio=cfg.anio||2025;
   const inp=document.getElementById('cfg-pais'); if(inp) inp.value=pais;
   const ainp=document.getElementById('cfg-anio'); if(ainp) ainp.value=anio;
-  const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
-  const pv=document.getElementById('sb-prog-val');
-  if(pv) pv.textContent=(flags[pais]||'🌍')+' '+pais+' · '+anio;
+  try{ rebuildSbStructSel(); }catch(e){}
 }
 
 // ── ESTRUCTURA POR PAÍS/AÑO ──────────────────────────────
