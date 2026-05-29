@@ -3087,7 +3087,7 @@ function computeScores(answers, weightOverride){
       const bpGroups=Object.entries(saScores).filter(([k])=>k.startsWith(sh+'_'+bk+'_'));
       let bplScoreSum=0, bplWSum=0;
       bpGroups.forEach(([,v])=>{
-        if(v.answered){ bplScoreSum+=v.score*v.bplW; bplWSum+=v.bplW; }
+        bplScoreSum+=v.score*v.bplW; bplWSum+=v.bplW;
       });
       const bplScore=bplWSum>0?bplScoreSum/bplWSum:0;
       const atW=_atW(shQs.find(q=>q.bpl_num===bk));
