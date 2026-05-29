@@ -211,19 +211,40 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .cmp-chip.cmp-none{background:var(--g100);border-color:var(--g200);color:var(--g400);}
 /* Comparison score bar above form */
 #cmp-compare-bar{background:linear-gradient(135deg,#f0f4fa,#e8edf5);border:1.5px solid var(--g200);
-  border-radius:10px;padding:12px 16px;margin-bottom:14px;display:none;}
-#cmp-compare-bar .cmp-bar-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.cmp-score-pill{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;
-  background:#fff;border:1.5px solid var(--g200);min-width:150px;}
-.cmp-score-pill .csp-lbl{font-size:10px;color:var(--g500);flex:1;line-height:1.3;}
-.cmp-score-pill .csp-val{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;}
+  border-radius:10px;padding:8px 14px;margin-bottom:10px;display:none;}
+#cmp-compare-bar .cmp-bar-hd{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;padding-bottom:8px;}
+#cmp-compare-bar.collapsed .cmp-bar-hd{padding-bottom:0;}
+#cmp-compare-bar.collapsed #cmp-bar-body{display:none;}
+.cmp-chevron{font-size:10px;color:var(--g400);flex-shrink:0;transition:transform .2s;}
+#cmp-compare-bar.collapsed .cmp-chevron{transform:rotate(-90deg);}
+#cmp-compare-bar .cmp-bar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.cmp-score-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;
+  background:#fff;border:1.5px solid var(--g200);min-width:120px;}
+.cmp-score-pill .csp-lbl{font-size:9px;color:var(--g500);flex:1;line-height:1.3;}
+.cmp-score-pill .csp-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;}
 .cmp-score-pill.csp-ev{border-color:var(--blue2);}
 .cmp-score-pill.csp-ev .csp-val{color:var(--blue2);}
 .cmp-score-pill.csp-ae{border-color:#7b1fa2;}
 .cmp-score-pill.csp-ae .csp-val{color:#7b1fa2;}
 .cmp-score-pill.csp-prev{border-color:var(--g500);}
 .cmp-score-pill.csp-prev .csp-val{color:var(--g600);}
-.cmp-bar-controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+.cmp-bar-controls{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+.sb-cfg-wrap{position:relative;padding:8px 10px;border-top:1px solid rgba(255,255,255,.08);}
+.sb-cfg-btn{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.65);font-size:11px;font-weight:700;cursor:pointer;
+  font-family:'Barlow',sans-serif;transition:background .15s;}
+.sb-cfg-btn:hover{background:rgba(255,255,255,.12);}
+.sb-cfg-drop{position:absolute;bottom:calc(100% + 2px);left:8px;right:8px;
+  background:#1a2535;border:1px solid rgba(255,255,255,.15);border-radius:8px;
+  padding:4px;z-index:600;display:none;box-shadow:0 -8px 24px rgba(0,0,0,.5);}
+.sb-cfg-drop.open{display:block;}
+.sb-cfg-item{display:block;width:100%;text-align:left;padding:7px 11px;background:none;
+  border:none;color:rgba(255,255,255,.8);font-size:11px;border-radius:5px;
+  cursor:pointer;font-family:'Barlow',sans-serif;}
+.sb-cfg-item:hover{background:rgba(255,255,255,.08);}
+.sb-cfg-item-all{border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:6px;color:var(--blue-l);}
+body.sb-mini .sb-cfg-wrap{display:none;}
 .cmp-toggle-btn{padding:4px 11px;border-radius:12px;font-size:10px;font-weight:700;cursor:pointer;
   border:1.5px solid var(--g200);background:#fff;color:var(--g500);font-family:'Barlow Condensed',sans-serif;
   letter-spacing:.3px;transition:all .15s;}
@@ -902,7 +923,6 @@ body.readonly .admin-only{display:none!important;}
     <div class="sb-tab" onclick="goTab('dash')">📊<span class="sb-tab-lbl"> Res.</span></div>
     <div class="sb-tab" onclick="goTab('global')">🌐<span class="sb-tab-lbl"> Global</span></div>
     <div class="sb-tab" onclick="goTab('compare')">📈<span class="sb-tab-lbl"> Comp.</span></div>
-    <div class="sb-tab" onclick="goTab('config')">⚙️<span class="sb-tab-lbl"> Cfg</span></div>
     <div class="sb-tab" onclick="goTab('analisis')">🎯<span class="sb-tab-lbl"> Análisis</span></div>
     <div class="sb-tab" onclick="goTab('network')">🗂️<span class="sb-tab-lbl"> Red</span></div>
   </div>
@@ -920,6 +940,17 @@ body.readonly .admin-only{display:none!important;}
         <div id="sb-resp-novinc" style="font-size:10px;color:rgba(255,255,255,.28);display:none"></div>
       </div>
     </div>
+  </div>
+  <div class="sb-cfg-wrap">
+    <div class="sb-cfg-drop" id="sb-cfg-drop">
+      <button class="sb-cfg-item" onclick="goConfig('cfg-sec-pesos')">⚖️ Pesos de Áreas</button>
+      <button class="sb-cfg-item" onclick="goConfig('cfg-sec-pond')">📐 Ponderación</button>
+      <button class="sb-cfg-item" onclick="goConfig('cfg-sec-umb')">🎯 Umbrales</button>
+      <button class="sb-cfg-item" onclick="goConfig('cfg-sec-dist')">🏭 Distribuidores</button>
+      <button class="sb-cfg-item" onclick="goConfig('cfg-sec-pais')">🌍 País y Año</button>
+      <button class="sb-cfg-item sb-cfg-item-all" onclick="goConfig(null)">⚙️ Ver toda la config</button>
+    </div>
+    <button class="sb-cfg-btn" onclick="toggleSbCfg()">⚙️ Configuración ▸</button>
   </div>
 </aside>
 
@@ -1056,19 +1087,22 @@ body.readonly .admin-only{display:none!important;}
       </div>
       <!-- COMPARISON BAR -->
       <div id="cmp-compare-bar">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div class="cmp-bar-hd" onclick="toggleCmpBar()">
+          <span class="cmp-chevron" id="cmp-chevron">▾</span>
           <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;color:var(--g600);text-transform:uppercase;letter-spacing:1px">📊 Comparación de Resultados</span>
-          <span style="font-size:10px;color:var(--g400);flex:1" id="cmp-bar-subtitle"></span>
+          <span style="font-size:10px;color:var(--g400);flex:1;margin-left:6px" id="cmp-bar-subtitle"></span>
         </div>
-        <div class="cmp-bar-row" id="cmp-bar-pills"></div>
-        <div class="cmp-bar-controls">
-          <span style="font-size:10px;color:var(--g500);font-weight:600">Mostrar columnas:</span>
-          <button class="cmp-toggle-btn on" id="cmp-btn-ae" onclick="toggleCmpAE()">🟣 Autoevaluación</button>
-          <button class="cmp-toggle-btn on" id="cmp-btn-prev" onclick="toggleCmpPrev()">⬜ Edición Anterior</button>
-          <span style="font-size:10px;color:var(--g400);margin-left:4px">Comparar con:</span>
-          <select id="cmp-ed-sel" style="font-size:10px;padding:3px 7px;border-radius:7px;border:1.5px solid var(--g200);color:var(--g600);background:#fff" onchange="onCmpEdicionChange()">
-            <option value="">— más reciente —</option>
-          </select>
+        <div id="cmp-bar-body">
+          <div class="cmp-bar-row" id="cmp-bar-pills"></div>
+          <div class="cmp-bar-controls">
+            <span style="font-size:10px;color:var(--g500);font-weight:600">Mostrar:</span>
+            <button class="cmp-toggle-btn on" id="cmp-btn-ae" onclick="toggleCmpAE()">🟣 AE</button>
+            <button class="cmp-toggle-btn on" id="cmp-btn-prev" onclick="toggleCmpPrev()">⬜ Anterior</button>
+            <span style="font-size:10px;color:var(--g400);margin-left:4px">vs edición:</span>
+            <select id="cmp-ed-sel" style="font-size:10px;padding:3px 7px;border-radius:7px;border:1.5px solid var(--g200);color:var(--g600);background:#fff" onchange="onCmpEdicionChange()">
+              <option value="">— más reciente —</option>
+            </select>
+          </div>
         </div>
       </div>
       <div id="form-sections"></div>
@@ -1394,7 +1428,7 @@ body.readonly .admin-only{display:none!important;}
   <div class="panel" id="panel-config">
     <div class="content">
       <!-- Area weights -->
-      <div class="cfg-section">
+      <div class="cfg-section" id="cfg-sec-pesos">
         <div class="cfg-hd">⚖️ Pesos de Áreas de Interés
           <button class="cfg-reset-btn" onclick="resetAreaWeights()">Restablecer defaults</button>
         </div>
@@ -1408,7 +1442,7 @@ body.readonly .admin-only{display:none!important;}
       </div>
 
       <!-- ── Configurable Weights Tree ── -->
-      <div class="cfg-section">
+      <div class="cfg-section" id="cfg-sec-pond">
         <div class="cfg-hd">📐 Ponderación Completa — Atributos · BPLs · Componentes
           <button class="cfg-reset-btn" onclick="resetWeightsCfg()">Restablecer todo</button>
         </div>
@@ -1423,7 +1457,7 @@ body.readonly .admin-only{display:none!important;}
       <div id="bpl-weights-display" style="display:none"></div>
 
       <!-- Thresholds -->
-      <div class="cfg-section">
+      <div class="cfg-section" id="cfg-sec-umb">
         <div class="cfg-hd">🎯 Umbrales de Categoría
           <button class="cfg-reset-btn" onclick="resetThresholds()">Restablecer</button>
         </div>
@@ -1439,7 +1473,7 @@ body.readonly .admin-only{display:none!important;}
       </div>
 
       <!-- Distributors -->
-      <div class="cfg-section">
+      <div class="cfg-section" id="cfg-sec-dist">
         <div class="cfg-hd">🏭 Gestión de Distribuidores
           <button class="cfg-reset-btn" onclick="resetDistributors()">Restablecer</button>
         </div>
@@ -1453,7 +1487,7 @@ body.readonly .admin-only{display:none!important;}
       </div>
 
       <!-- País y Año -->
-      <div class="cfg-section">
+      <div class="cfg-section" id="cfg-sec-pais">
         <div class="cfg-hd">🌍 País y Año del Programa</div>
         <div class="cfg-bd">
           <div class="cfg-row">
@@ -2067,8 +2101,27 @@ function closeTbMore(){
   const m=document.getElementById('tb-more-menu');
   if(m) m.classList.remove('open');
 }
+function toggleCmpBar(){
+  const bar=document.getElementById('cmp-compare-bar');
+  if(bar) bar.classList.toggle('collapsed');
+}
+function goConfig(secId){
+  goTab('config');
+  if(secId) setTimeout(()=>{
+    const el=document.getElementById(secId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  },150);
+}
+function toggleSbCfg(){
+  const d=document.getElementById('sb-cfg-drop');
+  if(d) d.classList.toggle('open');
+}
 document.addEventListener('click',function(e){
   if(!e.target.closest('.tb-more-wrap')) closeTbMore();
+  if(!e.target.closest('.sb-cfg-wrap')){
+    const d=document.getElementById('sb-cfg-drop');
+    if(d) d.classList.remove('open');
+  }
 });
 async function doLogout(){
   if(!confirm('¿Cerrar sesión?')) return;
@@ -3030,7 +3083,7 @@ function goTab(t){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-tab').forEach(x=>x.classList.remove('on'));
   document.getElementById('panel-'+t).classList.add('on');
-  const idx={'form':0,'dash':1,'global':2,'compare':3,'config':4,'analisis':5,'network':6}[t];
+  const idx={'form':0,'dash':1,'global':2,'compare':3,'analisis':4,'network':5}[t];
   if(idx!==undefined) document.querySelectorAll('.sb-tab')[idx].classList.add('on');
   if(t==='global') renderGlobal();
   if(t==='compare') initCompare();
