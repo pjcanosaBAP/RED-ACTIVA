@@ -2117,7 +2117,6 @@ function _showApp(user){
 }
 function _applyPaisRestriction(){
   if(!_userPais) return;
-  // Find newest structure for the restricted country
   const matching=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
@@ -2137,10 +2136,18 @@ function _applyPaisRestriction(){
       cfg.pais=best.pais; cfg.anio=best.anio;
       localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
       loadStructure(best.pais,best.anio);
-      try{ rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas(); }catch(e){}
+      try{ rebuildAll(); }catch(e){ console.warn('[PR] rebuildAll:',e); }
+      try{ rebuildDynamicUI(); }catch(e){}
+      try{ edInitAreas(); }catch(e){}
     }
+    // Always update sidebar label and selectors regardless of whether cfg changed
+    try{ loadPaisAnio(); }catch(e){}
+    try{ rebuildDistSelect(); }catch(e){}
+    try{ rebuildStructSelector(); }catch(e){}
+  } else {
+    // No structures yet — just refresh selectors in case they exist
+    try{ rebuildDistSelect(); rebuildStructSelector(); }catch(e){}
   }
-  try{ rebuildDistSelect(); rebuildStructSelector(); }catch(e){}
 }
 async function doLogin(){
   const email=(document.getElementById('auth-email')||{}).value||'';
@@ -3482,18 +3489,29 @@ async function loadFromSupabase(){
           remote.dists.forEach(d=>DISTRIBUTORS.push(d));
           try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
         }
-        // 3. Always apply pais/anio + structure from Supabase on startup
+        // 3. Apply pais/anio + structure — if user has a country restriction, use that
         if(remote.pais){
-          cfg.pais = remote.pais;
-          cfg.anio = remote.anio||2025;
           if(remote.thr) Object.assign(THR, remote.thr);
           if(remote.aw)  Object.assign(AW,  remote.aw);
+          // Determine effective pais/anio respecting country restriction
+          let _ePais = _userPais || remote.pais;
+          let _eAnio = remote.anio||2025;
+          if(_userPais){
+            const _anios=[];
+            for(let _j=0;_j<localStorage.length;_j++){
+              const _k=localStorage.key(_j);
+              if(_k&&_k.startsWith('bpl_struct_'+_userPais+'_')){
+                const _a=Number(_k.slice(('bpl_struct_'+_userPais+'_').length));
+                if(!isNaN(_a)) _anios.push(_a);
+              }
+            }
+            if(_anios.length) _eAnio=Math.max(..._anios);
+          }
+          cfg.pais=_ePais; cfg.anio=_eAnio;
           localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
-          // Load the structure (Q, AC, AN, AW, WCfg, NV)
-          const structLoaded = loadStructure(remote.pais, remote.anio||2025);
+          const structLoaded = loadStructure(_ePais, _eAnio);
           if(structLoaded){
             try{
-              // Rebuild everything so Netlify looks like Electron
               ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
                 const el=document.getElementById(id); if(el) el.innerHTML='';
               });
@@ -3504,7 +3522,7 @@ async function loadFromSupabase(){
       }
     }
 
-    // Auto-apply country restriction if user already authenticated
+    // Fallback: apply restriction in case auth completed before Supabase load
     _applyPaisRestriction();
 
     // ── Setup realtime channel ────────────────────────────────
