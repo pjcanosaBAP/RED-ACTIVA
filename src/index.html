@@ -3934,28 +3934,42 @@ function _deltaHTML(delta){
 
 // Build SVG gauge for a 0-1 score value
 function _buildGaugeSVG(score, color){
-  const pct=score||0;
-  const r=58, cx=78, cy=78;
-  const startAngle=-210, endAngle=30;
-  const totalDeg=240;
-  const filledDeg=totalDeg*pct;
-  function polarToXY(deg,radius){
-    const rad=(deg-90)*Math.PI/180;
-    return {x:cx+radius*Math.cos(rad), y:cy+radius*Math.sin(rad)};
-  }
-  function arcPath(startDeg, endDeg, r2){
-    const s=polarToXY(startDeg,r2), e=polarToXY(endDeg,r2);
-    const large=Math.abs(endDeg-startDeg)>180?1:0;
-    return 'M '+s.x+' '+s.y+' A '+r2+' '+r2+' 0 '+large+' 1 '+e.x+' '+e.y;
-  }
-  const bgPath=arcPath(startAngle, endAngle, r);
-  const fgPath=arcPath(startAngle, startAngle+filledDeg, r);
-  const pctTxt=(pct*100).toFixed(1)+'%';
+  const pct=Math.max(0,Math.min(1,score||0));
+  // Gauge de 240° abre hacia abajo — usar stroke-dasharray sobre un círculo
+  // para evitar clipping del viewBox
+  const r=52, cx=70, cy=70;
+  const circ=2*Math.PI*r;
+  const arcDeg=240, gapDeg=120;
+  const arcLen=circ*(arcDeg/360);   // longitud del arco visible
+  const gapLen=circ*(gapDeg/360);   // longitud del hueco inferior
+  const filled=pct*arcLen;
   const colStr=color||'#1d4ed8';
-  return '<svg width="156" height="112" viewBox="0 0 156 112" class="gauge-svg">'
-    +'<path d="'+bgPath+'" fill="none" stroke="#e5e7eb" stroke-width="12" stroke-linecap="round"/>'
-    +(pct>0?'<path d="'+fgPath+'" fill="none" stroke="'+colStr+'" stroke-width="12" stroke-linecap="round"/>':'')
-    +'<text x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" font-family="\'Barlow Condensed\',sans-serif" font-size="26" font-weight="900" fill="'+colStr+'">'+pctTxt+'</text>'
+  const pctTxt=(pct*100).toFixed(1)+'%';
+  // rotate(150): mueve el inicio del trazo al lower-left (7-8 o'clock)
+  // El trazo va clockwise → llena de lower-left hacia bottom → right → top → lower-right
+  // Pero queremos: empieza lower-left → CCW por left/top/right → termina lower-right
+  // rotate(-210) = rotate(150): inicio en lower-left, SVG circle fills CW visually
+  // → CW desde lower-left: pasa por bottom, right, top, left = raro
+  // Mejor: rotate(150) con stroke del arco en sentido que parezca natural
+  // Usamos la técnica standard: rotate de modo que el gap quede abajo
+  // Gap en centro-abajo: gap empieza en 150° desde 3-o'clock = lower-left
+  // rotate = 90 + gapDeg/2 = 90 + 60 = 150
+  const rot=90+(gapDeg/2);
+  const svgW=140, svgH=105;
+  return '<svg width="'+svgW+'" height="'+svgH+'" viewBox="0 0 '+svgW+' '+svgH+'" class="gauge-svg">'
+    // Track gris (arco completo 240°)
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="#e5e7eb" stroke-width="13"'
+    +' stroke-dasharray="'+arcLen.toFixed(2)+' '+gapLen.toFixed(2)+'"'
+    +' transform="rotate('+rot+' '+cx+' '+cy+')"/>'
+    // Arco coloreado (progreso)
+    +(pct>0
+      ? '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+colStr+'" stroke-width="13" stroke-linecap="round"'
+        +' stroke-dasharray="'+filled.toFixed(2)+' '+(circ-filled).toFixed(2)+'"'
+        +' transform="rotate('+rot+' '+cx+' '+cy+')" style="transition:stroke-dasharray .5s"/>'
+      : '')
+    // Porcentaje centrado
+    +'<text x="'+cx+'" y="'+(cy+9)+'" text-anchor="middle" dominant-baseline="middle"'
+    +' font-family="\'Barlow Condensed\',sans-serif" font-size="28" font-weight="900" fill="'+colStr+'">'+pctTxt+'</text>'
     +'</svg>';
 }
 function _buildMiniDonutSVG(score, colorHex){
