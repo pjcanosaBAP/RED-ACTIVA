@@ -6719,10 +6719,11 @@ async function generateDistPPTX(){
     });
   }
 
+  const totalPct=((sc.total||0)*100).toFixed(1);
+  const catHex={PROACTIVO:'1D9E6F',ACTIVO:'1A6DB5',REACTIVO:'C97A00',INACTIVO:'C0392B'}[cat]||'1A6DB5';
+
   // ── SLIDE 4: DASHBOARD GENERAL ──────────────────────────
   {const s=pptx.addSlide(); _bgC(s); _ttl(s,'DASHBOARD GENERAL');
-    const catHex={PROACTIVO:'1D9E6F',ACTIVO:'1A6DB5',REACTIVO:'C97A00',INACTIVO:'C0392B'}[cat]||'1A6DB5';
-    const totalPct=((sc.total||0)*100).toFixed(1);
     // Donut principal — puntaje total
     s.addChart(pptx.charts.DOUGHNUT,[{name:'Score',labels:['Score',''],values:[parseFloat(totalPct),Math.max(0,100-parseFloat(totalPct))]}],{
       x:0.28,y:1.00,w:4.10,h:3.10,
