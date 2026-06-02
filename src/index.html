@@ -1184,11 +1184,21 @@ body.readonly .admin-only{display:none!important;}
           <div class="rb-right">
             <div class="rb-sc-lbl">Puntaje Ponderado</div>
             <div class="rb-sc" id="res-sc">—</div>
-            <div style="margin-top:8px">
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
               <button onclick="generateDistPPTX()"
                 style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%"
                 title="Informe PPTX de este distribuidor">
                 📋 Informe Distribuidor
+              </button>
+              <button onclick="exportDistExcel()"
+                style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%"
+                title="Exportar Excel con detalle por área">
+                📊 Excel Distribuidor
+              </button>
+              <button onclick="openDevModalFromResult()"
+                style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%"
+                title="Cargar fortalezas y oportunidades para el informe">
+                📝 Devolución
               </button>
             </div>
           </div>
@@ -5070,8 +5080,199 @@ function renderGlobal(){
 
 // ── EXPORT ──
 
-/* exportDistExcel: focused single-distributor Excel report from Resultados panel */
+// Abre el modal Dev con el distribuidor/edición actualmente seleccionado en Resultados
+function openDevModalFromResult(){
+  const dist=(document.getElementById('sel-dist')||{}).value||'';
+  const ed=(document.getElementById('sel-edicion')||{}).value||'';
+  if(!dist||!ed){showToast('⚠️ Seleccioná un distribuidor y edición primero');return;}
+  const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===ed);
+  openDevModal(dist,ed,audit?audit.fecha||'':'');
+}
+
+/* exportDistExcel: informe Excel formateado por área para un distribuidor */
 function exportDistExcel(){
+  const dist=(document.getElementById('sel-dist')||{}).value||'';
+  const edicion=(document.getElementById('sel-edicion')||{}).value||'';
+  if(!dist||!edicion){showToast('⚠️ Seleccioná distribuidor y edición primero');return;}
+  const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===edicion);
+  if(!audit){showToast('⚠️ No hay auditoría para '+dist+' '+edicion);return;}
+  const sc=audit.scores||{};
+  const ans=audit.answers||{};
+  const com=audit.comments||{};
+  const cat=recomputeCategory(audit)||'PENDIENTE';
+  const catColors_={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030',PENDIENTE:'718096'};
+  const catHex=catColors_[cat]||'718096';
+
+  function _sHex(v){return v>=0.85?'00A854':v>=0.70?'0078C8':v>=0.50?'E67E00':'D63030';}
+  function _pct(v){return ((v||0)*100).toFixed(1)+'%';}
+  function _cell(v,opts){return Object.assign({v},opts||{});}
+
+  // Estilos reutilizables
+  const S={
+    hdr:  {font:{bold:true,color:{rgb:'FFFFFF'},sz:11},fill:{fgColor:{rgb:'0F172A'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'thin',color:{rgb:'334155'}}}},
+    area: (hex)=>({font:{bold:true,color:{rgb:'FFFFFF'},sz:12},fill:{fgColor:{rgb:hex}},alignment:{vertical:'center',wrapText:true}}),
+    bpl:  (hex)=>({font:{bold:true,color:{rgb:hex},sz:10},fill:{fgColor:{rgb:'F1F5F9'}},alignment:{wrapText:true}}),
+    q:    {font:{sz:10},alignment:{wrapText:true,vertical:'top'}},
+    si:   {font:{bold:true,color:{rgb:'00A854'},sz:10},alignment:{horizontal:'center'}},
+    no:   {font:{bold:true,color:{rgb:'D63030'},sz:10},alignment:{horizontal:'center'}},
+    na:   {font:{color:{rgb:'718096'},sz:10},alignment:{horizontal:'center'}},
+    pct:  (hex)=>({font:{bold:true,color:{rgb:hex},sz:11},alignment:{horizontal:'center'}}),
+    ttl:  {font:{bold:true,sz:14,color:{rgb:'0F172A'}},alignment:{vertical:'center'}},
+    sub:  {font:{sz:10,color:{rgb:'475569'}},alignment:{wrapText:true}},
+    cat:  (hex)=>({font:{bold:true,color:{rgb:'FFFFFF'},sz:13},fill:{fgColor:{rgb:hex}},alignment:{horizontal:'center',vertical:'center'}}),
+    even: {fill:{fgColor:{rgb:'F8FAFC'}}},
+    com:  {font:{sz:9,italic:true,color:{rgb:'475569'}},alignment:{wrapText:true,vertical:'top'}},
+  };
+
+  const wb=XLSX.utils.book_new();
+
+  // ── HOJA 1: RESUMEN EJECUTIVO ─────────────────────────────
+  {
+    const ws={};
+    let r=0;
+    function set(ri,ci,v,s){
+      const ref=XLSX.utils.encode_cell({r:ri,c:ci});
+      ws[ref]={v,t:typeof v==='number'?'n':'s',s};
+    }
+    function merge(r1,c1,r2,c2){return {s:{r:r1,c:c1},e:{r:r2,c:c2}};}
+    const merges=[];
+
+    // Título
+    set(r,0,'INFORME DE EVALUACIÓN BPL',{font:{bold:true,sz:16,color:{rgb:'0F172A'}},alignment:{horizontal:'left',vertical:'center'}});
+    merges.push(merge(r,0,r,5));
+    r++;
+    set(r,0,dist,{font:{bold:true,sz:13,color:{rgb:'0070C0'}},alignment:{wrapText:true}});
+    merges.push(merge(r,0,r,5));
+    r++;
+    set(r,0,'Edición: '+edicion,S.sub); set(r,2,'Fecha: '+(audit.fecha||'—'),S.sub); set(r,4,'Auditor: '+(audit.auditor||'—'),S.sub);
+    r+=2;
+
+    // Score + categoría
+    set(r,0,'PUNTAJE TOTAL',S.hdr); set(r,1,_pct(sc.total||0),S.pct(_sHex(sc.total||0)));
+    set(r,3,'CATEGORÍA',S.hdr); set(r,4,cat,S.cat(catHex));
+    set(r,6,'CRÍTICOS',S.hdr); set(r,7,(sc.critMet||0)+'/'+auditTotalCrits(audit),{font:{bold:true,sz:11},alignment:{horizontal:'center'}});
+    merges.push(merge(r,4,r,5));
+    r+=2;
+
+    // Tabla de áreas
+    ['ÁREA','NOMBRE','PESO','PUNTAJE','CATEGORÍA'].forEach((h,i)=>set(r,i,h,S.hdr));
+    r++;
+    SHEETS_CORE().forEach(sh=>{
+      const v=(sc.areas||{})[sh]||0;
+      const hex=(AC[sh]||'#607d8b').replace('#','');
+      set(r,0,sh,S.area(hex)); set(r,1,AN[sh]||sh,{font:{bold:true,sz:10,color:{rgb:hex}},alignment:{wrapText:true}});
+      set(r,2,((AW[sh]||0)*100).toFixed(0)+'%',{font:{sz:10},alignment:{horizontal:'center'}});
+      set(r,3,_pct(v),S.pct(_sHex(v)));
+      set(r,4,cat,{font:{bold:true,sz:9,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:catHex}},alignment:{horizontal:'center'}});
+      r++;
+    });
+    SHEETS_NV().forEach(sh=>{
+      const v=(sc.areas||{})[sh]||0;
+      const hex=(AC[sh]||'#94a3b8').replace('#','');
+      set(r,0,sh,{font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb:hex}}});
+      set(r,1,(AN[sh]||sh)+' (No Vinculante)',{font:{sz:10,italic:true},alignment:{wrapText:true}});
+      set(r,2,'—',{font:{sz:10},alignment:{horizontal:'center'}});
+      set(r,3,_pct(v),S.pct(_sHex(v)));
+      set(r,4,'NV',{font:{sz:9,color:{rgb:'718096'}},alignment:{horizontal:'center'}});
+      r++;
+    });
+    r++;
+
+    // Críticos
+    set(r,0,'CONDICIONALES CRÍTICOS',S.hdr); merges.push(merge(r,0,r,7)); r++;
+    ['COD','ÁREA','ATRIBUTO','COMP.','ESTADO'].forEach((h,i)=>set(r,i,h,S.hdr)); r++;
+    CRIT_LIST.forEach((c,ri)=>{
+      const isMet=(sc.critStatus||{})[c.tag]?.st==='met';
+      const qs=Q.filter(q=>q.critico===c.tag);
+      const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
+      const bg=ri%2===0?null:S.even;
+      set(r,0,'C'+c.tag.replace('CRITICO ',''),bg); set(r,1,qs[0]?.sheet||'',bg);
+      set(r,2,qs[0]?.bpl_name||'',{...bg,font:{sz:10},alignment:{wrapText:true}});
+      set(r,3,siQ+'/'+qs.length,{font:{bold:true,sz:10},alignment:{horizontal:'center'}});
+      set(r,4,isMet?'✓ CUMPLE':'✗ NO CUMPLE',isMet?S.si:S.no);
+      r++;
+    });
+
+    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:r,c:7}});
+    ws['!merges']=merges;
+    ws['!cols']=[{wch:8},{wch:35},{wch:8},{wch:12},{wch:18},{wch:8},{wch:8},{wch:14}];
+    ws['!rows']=Array.from({length:6},(_,i)=>i<2?{hpt:22}:{hpt:16});
+    XLSX.utils.book_append_sheet(wb,ws,'Resumen Ejecutivo');
+  }
+
+  // ── HOJAS POR ÁREA (vinculantes + NV) ──────────────────
+  SHEETS().forEach(sh=>{
+    const ws={};
+    const merges=[];
+    const isNV=!!NV[sh];
+    const aScore=(sc.areas||{})[sh]||0;
+    const aHex=(AC[sh]||'#607d8b').replace('#','');
+    let r=0;
+    function set(ri,ci,v,s){
+      const ref=XLSX.utils.encode_cell({r:ri,c:ci});
+      ws[ref]={v,t:typeof v==='number'?'n':'s',s};
+    }
+
+    // Header del área
+    set(r,0,sh+' · '+(AN[sh]||sh)+(isNV?' (No Vinculante)':''),S.area(aHex));
+    set(r,4,_pct(aScore),S.pct(_sHex(aScore)));
+    merges.push({s:{r,c:0},e:{r,c:3}});
+    r++;
+
+    // Columnas header
+    ['#','DESCRIPCIÓN','RESP.','COMENTARIO'].forEach((h,i)=>set(r,i,h,S.hdr));
+    r++;
+
+    // Preguntas agrupadas por BPL
+    const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
+    bplNums.forEach(bk=>{
+      const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
+      const bHex=_sHex(bv);
+      const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
+      // Fila de atributo
+      set(r,0,'BPL '+bk,S.bpl(aHex));
+      set(r,1,bName,S.bpl(aHex));
+      set(r,2,_pct(bv),{font:{bold:true,color:{rgb:bHex},sz:10},alignment:{horizontal:'center'}});
+      set(r,3,'',S.bpl(aHex));
+      merges.push({s:{r,c:0},e:{r,c:0}});
+      r++;
+      // Preguntas del BPL
+      Q.filter(q=>q.sheet===sh&&q.bpl_num===bk).forEach((q,qi)=>{
+        const resp=ans[q.comp_num]||'';
+        const comment=com[q.comp_num]||'';
+        const bg=qi%2===0?{}:S.even;
+        const critico=q.critico?'⚠ ':'' ;
+        set(r,0,critico+q.comp_num,{...bg,font:{sz:9,bold:!!q.critico,color:{rgb:q.critico?'D63030':'334155'}},alignment:{horizontal:'center'}});
+        set(r,1,q.question,{...bg,...S.q});
+        const rStyle=resp==='si'?S.si:resp==='no'?S.no:resp==='na'?S.na:{...bg,alignment:{horizontal:'center'}};
+        set(r,2,resp==='si'?'SI':resp==='no'?'NO':resp==='na'?'N/A':'—',rStyle);
+        set(r,3,comment,{...S.com,...bg});
+        r++;
+      });
+    });
+
+    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c:3}});
+    ws['!merges']=merges;
+    ws['!cols']=[{wch:10},{wch:65},{wch:8},{wch:45}];
+    const name=sh+(isNV?' NV':'');
+    XLSX.utils.book_append_sheet(wb,ws,name.substring(0,31));
+  });
+
+  // Descarga
+  const fname='Informe_'+dist.replace(/[^a-zA-Z0-9]/g,'_')+'_'+edicion+'.xlsx';
+  try{
+    if(window.electronAPI?.saveExcel){
+      const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+      window.electronAPI.saveExcel({buffer:Array.from(buf),filename:fname});
+    } else {
+      XLSX.writeFile(wb,fname);
+    }
+    showToast('📊 Excel generado: '+fname);
+  }catch(e){showToast('❌ Error Excel: '+e.message);}
+}
+
+/* exportDistExcel_OLD: kept for reference — replaced above */
+function _exportDistExcel_OLD(){
   const dist=(document.getElementById('sel-dist')||{}).value||'';
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   if(!dist){showToast('⚠️ Seleccioná un distribuidor primero');return;}
@@ -10005,7 +10206,6 @@ function renderSaved(){
         <button class="btn btn-xs btn-blue" onclick="loadAudit(${saved.findIndex(x=>x.id===a.id)})">📂</button>
         <button class="btn btn-xs admin-only" onclick="freezeAudit('${a.id}')" title="${a.frozen?'Descongelar — permitir recálculo':'Congelar — fijar scores actuales'}" style="background:${a.frozen?'#e3f2fd':'var(--g100)'};border:1px solid ${a.frozen?'#1565c0':'var(--g300)'};color:${a.frozen?'#1565c0':'var(--g600)'}">${a.frozen?'🔒':'🔓'}</button>
         <button class="btn btn-xs btn-red admin-only" onclick="deleteAudit('${a.id}')">🗑</button>
-        <button class="btn btn-xs admin-only" title="Devolución — cargar fortalezas y oportunidades" onclick="openDevModal('${(a.distribuidor||'').replace(/'/g,"\\'")}','${a.edicion||''}','${a.fecha||''}')" style="background:#e8f1fb;border:1px solid #a3c4ee;color:#1a6db5;font-size:10px">📋 Dev</button>
       </td>
     </tr>`;
   }).join('')}</tbody></table>`;
