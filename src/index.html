@@ -2103,7 +2103,20 @@ let WCfg=(()=>{
   }catch(e){}
   return buildWCfgDefaults();
 })();
-function saveWCfg(){ localStorage.setItem('bpl_wcfg_v1',JSON.stringify(WCfg)); recalc(); }
+let _sbPushConfigTimer=null;
+function saveWCfg(){
+  localStorage.setItem('bpl_wcfg_v1',JSON.stringify(WCfg));
+  // Actualizar el struct del pais/anio activo para que incluya WCfg
+  try{
+    const sk=structureKey();
+    const s=localStorage.getItem(sk);
+    if(s){ const d=JSON.parse(s); d.wcfg=WCfg; localStorage.setItem(sk,JSON.stringify(d)); }
+  }catch(e){}
+  // Push a Supabase con debounce (no spamear en cada cambio de peso)
+  clearTimeout(_sbPushConfigTimer);
+  _sbPushConfigTimer=setTimeout(()=>_sbPushConfig(),2000);
+  recalc();
+}
 function resetWeightsCfg(){
   if(!confirm('¿Restablecer TODOS los pesos a los valores originales del Excel?')) return;
   WCfg=buildWCfgDefaults();
