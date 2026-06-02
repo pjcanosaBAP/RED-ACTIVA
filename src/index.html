@@ -6,6 +6,7 @@
 <title>RED Activa 2.0 · BAP Partners</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -5089,13 +5090,15 @@ function openDevModalFromResult(){
   openDevModal(dist,ed,audit?audit.fecha||'':'');
 }
 
-/* exportDistExcel: informe Excel formateado por área para un distribuidor */
-function exportDistExcel(){
+/* exportDistExcel: informe Excel formateado con ExcelJS — colores, sin cuadrículas */
+async function exportDistExcel(){
+  if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún, reintentá en unos segundos');return;}
   const dist=(document.getElementById('sel-dist')||{}).value||'';
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   if(!dist||!edicion){showToast('⚠️ Seleccioná distribuidor y edición primero');return;}
   const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===edicion);
   if(!audit){showToast('⚠️ No hay auditoría para '+dist+' '+edicion);return;}
+  showToast('⏳ Generando Excel...');
   const sc=audit.scores||{};
   const ans=audit.answers||{};
   const com=audit.comments||{};
@@ -5103,244 +5106,238 @@ function exportDistExcel(){
   const catColors_={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030',PENDIENTE:'718096'};
   const catHex=catColors_[cat]||'718096';
 
-  function _sHex(v){return v>=0.85?'00A854':v>=0.70?'0078C8':v>=0.50?'E67E00':'D63030';}
-  function _pct(v){return ((v||0)*100).toFixed(1)+'%';}
-  function _cell(v,opts){return Object.assign({v},opts||{});}
+  // ── Helpers ──────────────────────────────────────────────
+  const AR=hex=>'FF'+(hex||'607d8b').replace('#','').toUpperCase();
+  const scoreARGB=v=>v>=0.85?'FF00A854':v>=0.70?'FF0078C8':v>=0.50?'FFE67E00':'FFD63030';
+  const pctStr=v=>((v||0)*100).toFixed(1)+'%';
+  const isMet_=tag=>(sc.critStatus||{})[tag]?.st==='met';
 
-  // Estilos reutilizables
-  const S={
-    hdr:  {font:{bold:true,color:{rgb:'FFFFFF'},sz:11},fill:{fgColor:{rgb:'0F172A'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'thin',color:{rgb:'334155'}}}},
-    area: (hex)=>({font:{bold:true,color:{rgb:'FFFFFF'},sz:12},fill:{fgColor:{rgb:hex}},alignment:{vertical:'center',wrapText:true}}),
-    bpl:  (hex)=>({font:{bold:true,color:{rgb:hex},sz:10},fill:{fgColor:{rgb:'F1F5F9'}},alignment:{wrapText:true}}),
-    q:    {font:{sz:10},alignment:{wrapText:true,vertical:'top'}},
-    si:   {font:{bold:true,color:{rgb:'00A854'},sz:10},alignment:{horizontal:'center'}},
-    no:   {font:{bold:true,color:{rgb:'D63030'},sz:10},alignment:{horizontal:'center'}},
-    na:   {font:{color:{rgb:'718096'},sz:10},alignment:{horizontal:'center'}},
-    pct:  (hex)=>({font:{bold:true,color:{rgb:hex},sz:11},alignment:{horizontal:'center'}}),
-    ttl:  {font:{bold:true,sz:14,color:{rgb:'0F172A'}},alignment:{vertical:'center'}},
-    sub:  {font:{sz:10,color:{rgb:'475569'}},alignment:{wrapText:true}},
-    cat:  (hex)=>({font:{bold:true,color:{rgb:'FFFFFF'},sz:13},fill:{fgColor:{rgb:hex}},alignment:{horizontal:'center',vertical:'center'}}),
-    even: {fill:{fgColor:{rgb:'F8FAFC'}}},
-    com:  {font:{sz:9,italic:true,color:{rgb:'475569'}},alignment:{wrapText:true,vertical:'top'}},
-  };
+  // Estilos base (ExcelJS)
+  const NAVY='FF0F172A', WHITE='FFFFFFFF', LGRAY='FFF8FAFC', MGRAY='FFE2E8F0';
+  const boldWhite={name:'Calibri',bold:true,color:{argb:WHITE}};
+  const noFill={type:'pattern',pattern:'none'};
+  const solidFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
+  const thinBorder=(argb='FF94A3B8')=>({style:'thin',color:{argb}});
+  const bottomBorder=argb=>({bottom:thinBorder(argb)});
+  const allBorder=()=>({top:thinBorder(),bottom:thinBorder(),left:thinBorder(),right:thinBorder()});
+  const centerMid={horizontal:'center',vertical:'middle'};
+  const leftMid={horizontal:'left',vertical:'middle'};
+  const leftTop={horizontal:'left',vertical:'top',wrapText:true};
 
-  const wb=XLSX.utils.book_new();
+  function applyStyle(cell, font, fill, alignment, border){
+    if(font) cell.font=font;
+    if(fill) cell.fill=fill;
+    if(alignment) cell.alignment=alignment;
+    if(border) cell.border=border;
+  }
 
-  // ── HOJA 1: RESUMEN EJECUTIVO ─────────────────────────────
+  // ── Workbook ──────────────────────────────────────────────
+  const wb=new ExcelJS.Workbook();
+  wb.creator='RED Activa 2.0 · BAP Partners';
+  wb.created=new Date();
+
+  // ════════════════════════════════════════════════════════════
+  // HOJA 1 — RESUMEN EJECUTIVO
+  // ════════════════════════════════════════════════════════════
   {
-    const ws={};
-    let r=0;
-    function set(ri,ci,v,s){
-      const ref=XLSX.utils.encode_cell({r:ri,c:ci});
-      ws[ref]={v,t:typeof v==='number'?'n':'s',s};
-    }
-    function merge(r1,c1,r2,c2){return {s:{r:r1,c:c1},e:{r:r2,c:c2}};}
-    const merges=[];
+    const ws=wb.addWorksheet('Resumen Ejecutivo',{
+      views:[{showGridLines:false,state:'frozen',ySplit:1}],
+      pageSetup:{fitToPage:true,fitToWidth:1}
+    });
+    ws.columns=[
+      {width:6},{width:42},{width:12},{width:14},{width:18},{width:10},{width:14}
+    ];
 
-    // Título
-    set(r,0,'INFORME DE EVALUACIÓN BPL',{font:{bold:true,sz:16,color:{rgb:'0F172A'}},alignment:{horizontal:'left',vertical:'center'}});
-    merges.push(merge(r,0,r,5));
-    r++;
-    set(r,0,dist,{font:{bold:true,sz:13,color:{rgb:'0070C0'}},alignment:{wrapText:true}});
-    merges.push(merge(r,0,r,5));
-    r++;
-    set(r,0,'Edición: '+edicion,S.sub); set(r,2,'Fecha: '+(audit.fecha||'—'),S.sub); set(r,4,'Auditor: '+(audit.auditor||'—'),S.sub);
-    r+=2;
+    // Fila 1 — Título principal
+    ws.addRow([]); ws.getRow(1).height=8; // spacer top
 
-    // Score + categoría
-    set(r,0,'PUNTAJE TOTAL',S.hdr); set(r,1,_pct(sc.total||0),S.pct(_sHex(sc.total||0)));
-    set(r,3,'CATEGORÍA',S.hdr); set(r,4,cat,S.cat(catHex));
-    set(r,6,'CRÍTICOS',S.hdr); set(r,7,(sc.critMet||0)+'/'+auditTotalCrits(audit),{font:{bold:true,sz:11},alignment:{horizontal:'center'}});
-    merges.push(merge(r,4,r,5));
-    r+=2;
+    // Fila 2 — Header brand
+    const r2=ws.addRow(['','INFORME DE EVALUACIÓN BPL · RED ACTIVA 2.0']);
+    r2.height=32;
+    ws.mergeCells('B2:G2');
+    applyStyle(r2.getCell(2),
+      {name:'Calibri',bold:true,size:14,color:{argb:'FF0070C0'}},
+      solidFill('FFF0F7FF'),
+      {horizontal:'left',vertical:'middle'},
+      bottomBorder('FF0070C0'));
 
-    // Tabla de áreas
-    ['ÁREA','NOMBRE','PESO','PUNTAJE','CATEGORÍA'].forEach((h,i)=>set(r,i,h,S.hdr));
-    r++;
-    SHEETS_CORE().forEach(sh=>{
+    // Fila 3 — Distribuidor
+    const r3=ws.addRow(['',dist]);
+    r3.height=26;
+    ws.mergeCells('B3:G3');
+    applyStyle(r3.getCell(2),
+      {name:'Calibri',bold:true,size:13,color:{argb:NAVY}},
+      noFill,{horizontal:'left',vertical:'middle'});
+
+    // Fila 4 — Edición / Fecha / Auditor
+    const r4=ws.addRow(['','Edición: '+edicion,'','Fecha: '+(audit.fecha||'—'),'','Auditor: '+(audit.auditor||'—')]);
+    r4.height=18;
+    [2,4,6].forEach(i=>applyStyle(r4.getCell(i),{name:'Calibri',size:10,color:{argb:'FF475569'}},noFill,leftMid));
+
+    ws.addRow([]).height=10; // spacer
+
+    // Fila 6 — KPIs: Score | Categoría | Críticos
+    const r6=ws.addRow(['','PUNTAJE TOTAL','',pctStr(sc.total||0),'CATEGORÍA','',cat]);
+    r6.height=34;
+    ws.mergeCells('B6:C6');
+    applyStyle(r6.getCell(2),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    applyStyle(r6.getCell(4),{name:'Calibri',bold:true,size:20,color:{argb:scoreARGB(sc.total||0)}},solidFill(LGRAY),centerMid);
+    applyStyle(r6.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    ws.mergeCells('E6:F6');
+    applyStyle(r6.getCell(7),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill(AR(catHex)),centerMid);
+
+    ws.addRow([]).height=10;
+
+    // Tabla de áreas — header
+    const rAH=ws.addRow(['','ÁREA','NOMBRE','PESO','PUNTAJE','','CATEGORÍA']);
+    rAH.height=20;
+    [2,3,4,5,7].forEach(i=>applyStyle(rAH.getCell(i),
+      {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
+      solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    ws.mergeCells(`E${rAH.number}:F${rAH.number}`);
+
+    // Filas de áreas
+    SHEETS_CORE().forEach((sh,si)=>{
       const v=(sc.areas||{})[sh]||0;
-      const hex=(AC[sh]||'#607d8b').replace('#','');
-      set(r,0,sh,S.area(hex)); set(r,1,AN[sh]||sh,{font:{bold:true,sz:10,color:{rgb:hex}},alignment:{wrapText:true}});
-      set(r,2,((AW[sh]||0)*100).toFixed(0)+'%',{font:{sz:10},alignment:{horizontal:'center'}});
-      set(r,3,_pct(v),S.pct(_sHex(v)));
-      set(r,4,cat,{font:{bold:true,sz:9,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:catHex}},alignment:{horizontal:'center'}});
-      r++;
+      const aARGB=AR(AC[sh]||'#607d8b');
+      const bg=si%2===0?LGRAY:'FFFFFFFF';
+      const rA=ws.addRow(['',sh,AN[sh]||sh,((AW[sh]||0)*100).toFixed(0)+'%',pctStr(v),'',cat]);
+      rA.height=20;
+      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
+      applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(bg),centerMid);
+      ws.mergeCells(`E${rA.number}:F${rA.number}`);
+      applyStyle(rA.getCell(7),{name:'Calibri',bold:true,size:9,color:{argb:WHITE}},solidFill(AR(catHex)),centerMid);
     });
     SHEETS_NV().forEach(sh=>{
       const v=(sc.areas||{})[sh]||0;
-      const hex=(AC[sh]||'#94a3b8').replace('#','');
-      set(r,0,sh,{font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb:hex}}});
-      set(r,1,(AN[sh]||sh)+' (No Vinculante)',{font:{sz:10,italic:true},alignment:{wrapText:true}});
-      set(r,2,'—',{font:{sz:10},alignment:{horizontal:'center'}});
-      set(r,3,_pct(v),S.pct(_sHex(v)));
-      set(r,4,'NV',{font:{sz:9,color:{rgb:'718096'}},alignment:{horizontal:'center'}});
-      r++;
+      const aARGB=AR(AC[sh]||'#94a3b8');
+      const rA=ws.addRow(['',sh,(AN[sh]||sh)+' · No Vinculante','—',pctStr(v),'','NV']);
+      rA.height=18;
+      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10,color:{argb:'FF64748B'}},solidFill('FFF1F5F9'),leftMid);
+      applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill('FFF1F5F9'),centerMid);
+      ws.mergeCells(`E${rA.number}:F${rA.number}`);
+      applyStyle(rA.getCell(7),{name:'Calibri',size:9,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
     });
-    r++;
 
-    // Críticos
-    set(r,0,'CONDICIONALES CRÍTICOS',S.hdr); merges.push(merge(r,0,r,7)); r++;
-    ['COD','ÁREA','ATRIBUTO','COMP.','ESTADO'].forEach((h,i)=>set(r,i,h,S.hdr)); r++;
-    CRIT_LIST.forEach((c,ri)=>{
-      const isMet=(sc.critStatus||{})[c.tag]?.st==='met';
+    ws.addRow([]).height=12;
+
+    // Tabla de críticos — header
+    const rCH=ws.addRow(['','COD.','ÁREA','ATRIBUTO BPL','COMP.','','ESTADO']);
+    rCH.height=20;
+    [2,3,4,5,7].forEach(i=>applyStyle(rCH.getCell(i),
+      {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
+      solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    ws.mergeCells(`E${rCH.number}:F${rCH.number}`);
+
+    CRIT_LIST.forEach((c,ci)=>{
+      const met=isMet_(c.tag);
       const qs=Q.filter(q=>q.critico===c.tag);
       const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
-      const bg=ri%2===0?null:S.even;
-      set(r,0,'C'+c.tag.replace('CRITICO ',''),bg); set(r,1,qs[0]?.sheet||'',bg);
-      set(r,2,qs[0]?.bpl_name||'',{...bg,font:{sz:10},alignment:{wrapText:true}});
-      set(r,3,siQ+'/'+qs.length,{font:{bold:true,sz:10},alignment:{horizontal:'center'}});
-      set(r,4,isMet?'✓ CUMPLE':'✗ NO CUMPLE',isMet?S.si:S.no);
-      r++;
+      const bg=ci%2===0?LGRAY:'FFFFFFFF';
+      const rC=ws.addRow(['','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',qs[0]?.bpl_name||'',siQ+'/'+qs.length,'',met?'✓ CUMPLE':'✗ NO CUMPLE']);
+      rC.height=18;
+      applyStyle(rC.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(3),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(4),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
+      applyStyle(rC.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:met?'FF00A854':'FFD63030'}},solidFill(bg),centerMid);
+      ws.mergeCells(`E${rC.number}:F${rC.number}`);
+      applyStyle(rC.getCell(7),
+        {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
+        solidFill(met?'FF00A854':'FFD63030'),centerMid);
     });
-
-    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:r,c:7}});
-    ws['!merges']=merges;
-    ws['!cols']=[{wch:8},{wch:35},{wch:8},{wch:12},{wch:18},{wch:8},{wch:8},{wch:14}];
-    ws['!rows']=Array.from({length:6},(_,i)=>i<2?{hpt:22}:{hpt:16});
-    XLSX.utils.book_append_sheet(wb,ws,'Resumen Ejecutivo');
   }
 
-  // ── HOJAS POR ÁREA (vinculantes + NV) ──────────────────
+  // ════════════════════════════════════════════════════════════
+  // HOJAS POR ÁREA
+  // ════════════════════════════════════════════════════════════
   SHEETS().forEach(sh=>{
-    const ws={};
-    const merges=[];
     const isNV=!!NV[sh];
     const aScore=(sc.areas||{})[sh]||0;
-    const aHex=(AC[sh]||'#607d8b').replace('#','');
-    let r=0;
-    function set(ri,ci,v,s){
-      const ref=XLSX.utils.encode_cell({r:ri,c:ci});
-      ws[ref]={v,t:typeof v==='number'?'n':'s',s};
-    }
+    const aARGB=AR(AC[sh]||'#607d8b');
+    const aName=(AN[sh]||sh)+(isNV?' · No Vinculante':'');
 
-    // Header del área
-    set(r,0,sh+' · '+(AN[sh]||sh)+(isNV?' (No Vinculante)':''),S.area(aHex));
-    set(r,4,_pct(aScore),S.pct(_sHex(aScore)));
-    merges.push({s:{r,c:0},e:{r,c:3}});
-    r++;
+    const ws=wb.addWorksheet(sh+(isNV?' NV':''),{
+      views:[{showGridLines:false,state:'frozen',ySplit:2}],
+    });
+    ws.columns=[
+      {width:10}, // comp_num
+      {width:70}, // pregunta
+      {width:9},  // resp
+      {width:48}, // comentario
+    ];
 
-    // Columnas header
-    ['#','DESCRIPCIÓN','RESP.','COMENTARIO'].forEach((h,i)=>set(r,i,h,S.hdr));
-    r++;
+    // Fila 1 — Header del área
+    const rH=ws.addRow([sh+' · '+aName,'','',pctStr(aScore)]);
+    rH.height=28;
+    ws.mergeCells(`A${rH.number}:C${rH.number}`);
+    applyStyle(rH.getCell(1),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),{horizontal:'left',vertical:'middle'});
+    applyStyle(rH.getCell(4),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),centerMid);
+
+    // Fila 2 — Header columnas
+    const rCols=ws.addRow(['CÓDIGO','DESCRIPCIÓN','RESP.','COMENTARIO']);
+    rCols.height=18;
+    [1,2,3,4].forEach(i=>applyStyle(rCols.getCell(i),
+      {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
+      solidFill(NAVY),centerMid));
 
     // Preguntas agrupadas por BPL
     const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
     bplNums.forEach(bk=>{
       const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
-      const bHex=_sHex(bv);
-      const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
+      const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||'BPL '+bk;
       // Fila de atributo
-      set(r,0,'BPL '+bk,S.bpl(aHex));
-      set(r,1,bName,S.bpl(aHex));
-      set(r,2,_pct(bv),{font:{bold:true,color:{rgb:bHex},sz:10},alignment:{horizontal:'center'}});
-      set(r,3,'',S.bpl(aHex));
-      merges.push({s:{r,c:0},e:{r,c:0}});
-      r++;
-      // Preguntas del BPL
+      const rBPL=ws.addRow([`BPL ${bk} · ${bName}`,'','',pctStr(bv)]);
+      rBPL.height=20;
+      ws.mergeCells(`A${rBPL.number}:C${rBPL.number}`);
+      applyStyle(rBPL.getCell(1),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),{horizontal:'left',vertical:'middle'});
+      applyStyle(rBPL.getCell(4),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(bv)}},solidFill('FFF1F5F9'),centerMid);
+
+      // Preguntas
       Q.filter(q=>q.sheet===sh&&q.bpl_num===bk).forEach((q,qi)=>{
         const resp=ans[q.comp_num]||'';
         const comment=com[q.comp_num]||'';
-        const bg=qi%2===0?{}:S.even;
-        const critico=q.critico?'⚠ ':'' ;
-        set(r,0,critico+q.comp_num,{...bg,font:{sz:9,bold:!!q.critico,color:{rgb:q.critico?'D63030':'334155'}},alignment:{horizontal:'center'}});
-        set(r,1,q.question,{...bg,...S.q});
-        const rStyle=resp==='si'?S.si:resp==='no'?S.no:resp==='na'?S.na:{...bg,alignment:{horizontal:'center'}};
-        set(r,2,resp==='si'?'SI':resp==='no'?'NO':resp==='na'?'N/A':'—',rStyle);
-        set(r,3,comment,{...S.com,...bg});
-        r++;
+        const bg=qi%2===0?'FFFFFFFF':LGRAY;
+        const rQ=ws.addRow([q.comp_num,q.question,resp==='si'?'SI':resp==='no'?'NO':resp==='na'?'N/A':'—',comment]);
+        rQ.height=resp?15:15;
+        // Código
+        applyStyle(rQ.getCell(1),
+          {name:'Calibri',bold:!!q.critico,size:9,color:{argb:q.critico?'FFD63030':'FF334155'}},
+          solidFill(bg),centerMid);
+        // Pregunta
+        applyStyle(rQ.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftTop);
+        rQ.getCell(2).alignment={horizontal:'left',vertical:'top',wrapText:true};
+        // Respuesta
+        const rColor=resp==='si'?'FF00A854':resp==='no'?'FFD63030':resp==='na'?'FF94A3B8':'FFCBD5E0';
+        const rBg=resp==='si'?'FFE8F5EE':resp==='no'?'FFFDEAEA':resp==='na'?'FFF8FAFC':bg;
+        applyStyle(rQ.getCell(3),{name:'Calibri',bold:resp==='si'||resp==='no',size:10,color:{argb:rColor}},solidFill(rBg),centerMid);
+        // Comentario
+        applyStyle(rQ.getCell(4),{name:'Calibri',italic:true,size:9,color:{argb:'FF64748B'}},solidFill(bg),{horizontal:'left',vertical:'top',wrapText:true});
       });
     });
-
-    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c:3}});
-    ws['!merges']=merges;
-    ws['!cols']=[{wch:10},{wch:65},{wch:8},{wch:45}];
-    const name=sh+(isNV?' NV':'');
-    XLSX.utils.book_append_sheet(wb,ws,name.substring(0,31));
   });
 
-  // Descarga
-  const fname='Informe_'+dist.replace(/[^a-zA-Z0-9]/g,'_')+'_'+edicion+'.xlsx';
+  // ── Descarga ─────────────────────────────────────────────
   try{
+    const fname='Informe_'+dist.replace(/[^a-zA-Z0-9]/g,'_')+'_'+edicion+'.xlsx';
+    const buffer=await wb.xlsx.writeBuffer();
     if(window.electronAPI?.saveExcel){
-      const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-      window.electronAPI.saveExcel({buffer:Array.from(buf),filename:fname});
+      window.electronAPI.saveExcel({buffer:Array.from(new Uint8Array(buffer)),filename:fname});
     } else {
-      XLSX.writeFile(wb,fname);
+      const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=fname;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     }
     showToast('📊 Excel generado: '+fname);
-  }catch(e){showToast('❌ Error Excel: '+e.message);}
+  }catch(e){showToast('❌ Error Excel: '+e.message);console.error(e);}
 }
 
-/* exportDistExcel_OLD: kept for reference — replaced above */
-function _exportDistExcel_OLD(){
-  const dist=(document.getElementById('sel-dist')||{}).value||'';
-  const edicion=(document.getElementById('sel-edicion')||{}).value||'';
-  if(!dist){showToast('⚠️ Seleccioná un distribuidor primero');return;}
-  const audits=saved.filter(function(a){return a.distribuidor===dist&&(!edicion||a.edicion===edicion);});
-  if(!audits.length){showToast('⚠️ No hay auditorías para este distribuidor');return;}
-  const wb=XLSX.utils.book_new();
-  const sorted=[].concat(audits).sort(function(a,b){return ((b.scores||{}).total||0)-((a.scores||{}).total||0);});
-
-  // 1. Resumen del distribuidor
-  const r1=[['Distribuidor','Edición','Fecha','Auditor','IFT %','PLG %','GST %','IDP %','Total %','Crit.Met.','Categoría','Respondidas']];
-  sorted.forEach(function(a){
-    const s=a.scores||{};const at=s.areas||{};
-    r1.push([a.distribuidor,a.edicion||'',a.fecha,a.auditor||'',((at.IFT||0)*100).toFixed(1)+'%',((at.PLG||0)*100).toFixed(1)+'%',((at.GST||0)*100).toFixed(1)+'%',((at.IDP||0)*100).toFixed(1)+'%',((s.total||0)*100).toFixed(1)+'%',s.critMet+'/'+CRIT_LIST.length,recomputeCategory(a)||'',s.answered+'/187']);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r1),'Resumen');
-
-  // 2. BPL Críticos
-  const r2=[['BPL Tag','BPL Nombre','Sub-Atributo','Área'].concat(sorted.map(function(a){return (a.edicion||'EV')+' ('+a.fecha+')';}))];
-  CRIT_LIST.forEach(function(c){
-    const row=[c.tag,c.bpl_name,c.subattr||'',c.sheet];
-    sorted.forEach(function(a){
-      const met=c.qs.every(function(q){return ((a.answers||{})[q])==='si';});
-      const any=c.qs.some(function(q){return ((a.answers||{})[q])!==undefined;});
-      row.push(met?'CUMPLE':any?'NO CUMPLE':'PENDIENTE');
-    });
-    r2.push(row);
-  });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r2),'BPL Críticos');
-
-  // 3. Respuestas por edición
-  const r3=[['Área','BPL','Sub-Atributo','#','Pregunta','Crítico'].concat(sorted.map(function(a){return 'EV '+(a.edicion||'');})).concat(autoevals.filter(function(ae){return ae.distribuidor===dist;}).map(function(ae){return 'AE '+(ae.edicion||'');}))];
-  Q.forEach(function(q){
-    const row=[q.sheet,q.bpl_num+' '+q.bpl_name,q.subattr||'',q.comp_num,q.question,q.critico||''];
-    sorted.forEach(function(a){row.push(({si:'SI',no:'NO',na:'N/A'})[(a.answers||{})[q.comp_num]]||'—');});
-    autoevals.filter(function(ae){return ae.distribuidor===dist;}).forEach(function(ae){row.push(({si:'SI',no:'NO',na:'N/A'})[(ae.answers||{})[q.comp_num]]||'—');});
-    r3.push(row);
-  });
-  const ws3=XLSX.utils.aoa_to_sheet(r3);
-  ws3['!cols']=[{wch:12},{wch:28},{wch:22},{wch:8},{wch:60},{wch:10}];
-  XLSX.utils.book_append_sheet(wb,ws3,'Respuestas');
-
-  // 4. Brecha EV vs AE (si hay AE)
-  const aeMatch=autoevals.find(function(ae){return ae.distribuidor===dist&&(!edicion||ae.edicion===edicion);});
-  const latestEV=sorted[0];
-  if(aeMatch&&latestEV){
-    const r4=[['Área','BPL','Sub-Atributo','#','Pregunta','Crítico','Resp. EV','Resp. AE','Coincide','Observación']];
-    Q.forEach(function(q){
-      const evAns=({si:'SI',no:'NO',na:'N/A'})[(latestEV.answers||{})[q.comp_num]]||'—';
-      const aeAns=({si:'SI',no:'NO',na:'N/A'})[(aeMatch.answers||{})[q.comp_num]]||'—';
-      if(evAns==='—'&&aeAns==='—') return;
-      const coincide=evAns===aeAns;
-      let obs='';
-      if(!coincide){
-        if(evAns==='NO'&&aeAns==='SI') obs='AE sobreestima';
-        else if(evAns==='SI'&&aeAns==='NO') obs='AE subestima';
-        else obs='Difieren';
-      }
-      r4.push([q.sheet,q.bpl_num+' '+q.bpl_name,q.subattr||'',q.comp_num,q.question,q.critico||'',evAns,aeAns,coincide?'✓':'✗',obs]);
-    });
-    const ws4=XLSX.utils.aoa_to_sheet(r4);
-    ws4['!cols']=[{wch:12},{wch:28},{wch:22},{wch:8},{wch:60},{wch:10},{wch:10},{wch:10},{wch:10},{wch:18}];
-    XLSX.utils.book_append_sheet(wb,ws4,'Brecha EV vs AE');
-  }
-
-  const fname='RedActiva2_'+dist.replace(/[^a-zA-Z0-9]/g,'_')+(edicion?'_'+edicion:'')+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
-  XLSX.writeFile(wb,fname);
-  showToast('📊 Excel exportado: '+fname);
-}
 
 function exportExcel(){
   if(!saved.length){showToast('⚠️ No hay auditorías guardadas');return;}
