@@ -930,6 +930,14 @@ body.readonly .admin-only{display:none!important;}
 .tb-role-chip{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
 .tb-role-chip.admin{background:rgba(29,78,216,.4);color:var(--blue-l);}
 .tb-role-chip.readonly{background:rgba(234,88,12,.3);color:#fdba74;}
+/* DEV MODAL */
+#dev-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;}
+#dev-modal-inner{background:#fff;border-radius:12px;padding:28px;width:min(700px,96vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.dev-section-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--g500);margin:14px 0 8px;}
+.dev-input-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.dev-num{width:22px;height:22px;border-radius:50%;background:var(--blue2);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.dev-input{flex:1;padding:7px 11px;border:1.5px solid var(--g200);border-radius:7px;font-family:'Barlow',sans-serif;font-size:13px;color:var(--g800);}
+.dev-input:focus{outline:none;border-color:var(--blue2);}
 </style>
 <div id="__snap_embed__" style="display:none" aria-hidden="true">/* __SNAP_PLACEHOLDER__ */</div>
 </head>
@@ -2384,6 +2392,9 @@ async function checkAuthSession(){
 let saved = __IS_SNAPSHOT_BROWSER ? [] : (function(){
   try{ const s=localStorage.getItem('bpl_ra2_v6'); return s?JSON.parse(s):[]; }catch(e){ return []; }
 })(); // Carga desde localStorage en Electron; vacío en snapshot browser
+let devData = (function(){ try{ const d=localStorage.getItem('ra2_devdata'); return d?JSON.parse(d):{};} catch(e){return {};} })();
+function persistDevData(){ try{ localStorage.setItem('ra2_devdata',JSON.stringify(devData)); }catch(e){} }
+function _devKey(dist,ed){ return (dist||'')+'__'+(ed||''); }
 let autoevals = __IS_SNAPSHOT_BROWSER ? [] : (function(){
   try{ const s=localStorage.getItem('bpl_ra2_autoevals'); return s?JSON.parse(s):[]; }catch(e){ return []; }
 })(); // Autoevaluaciones — mismo formato que saved[], clave bpl_ra2_autoevals
@@ -3505,6 +3516,7 @@ async function persist(){
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
         frozen:a.frozen||false,
+        devdata:a.devdata||null,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -3565,6 +3577,7 @@ async function pushAllToSupabase(){
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
         frozen:a.frozen||false,
+        devdata:a.devdata||null,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -3625,6 +3638,7 @@ async function loadFromSupabase(){
         answers:a.answers||{}, comments:a.comments||{},
         scores:a.scores||{}, weights:a.weights||{},
         frozen:a.frozen||false,
+        devdata:a.devdata||null,
         updated_at:new Date().toISOString()
       }));
       const {error} = await _sbc.from('audits').upsert(rows, {onConflict:'id'});
@@ -9987,6 +10001,7 @@ function renderSaved(){
         <button class="btn btn-xs btn-blue" onclick="loadAudit(${saved.findIndex(x=>x.id===a.id)})">📂</button>
         <button class="btn btn-xs admin-only" onclick="freezeAudit('${a.id}')" title="${a.frozen?'Descongelar — permitir recálculo':'Congelar — fijar scores actuales'}" style="background:${a.frozen?'#e3f2fd':'var(--g100)'};border:1px solid ${a.frozen?'#1565c0':'var(--g300)'};color:${a.frozen?'#1565c0':'var(--g600)'}">${a.frozen?'🔒':'🔓'}</button>
         <button class="btn btn-xs btn-red admin-only" onclick="deleteAudit('${a.id}')">🗑</button>
+        <button class="btn btn-xs admin-only" title="Devolución — cargar fortalezas y oportunidades" onclick="openDevModal('${(a.distribuidor||'').replace(/'/g,"\\'")}','${a.edicion||''}','${a.fecha||''}')" style="background:#e8f1fb;border:1px solid #a3c4ee;color:#1a6db5;font-size:10px">📋 Dev</button>
       </td>
     </tr>`;
   }).join('')}</tbody></table>`;
@@ -10129,6 +10144,98 @@ function renderSaved(){
 		<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>
 		</Relationships>`),this.slideLayouts.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.slides.forEach(e=>{this.createChartMediaRels(e,i,o)}),this.createChartMediaRels(this.masterSlide,i,o),yield Promise.all(o).then(()=>c(this,void 0,void 0,function*(){return"STREAM"===s.outputType?yield i.generateAsync({type:"nodebuffer",compression:s.compression?"DEFLATE":"STORE"}):s.outputType?yield i.generateAsync({type:s.outputType}):yield i.generateAsync({type:"blob",compression:s.compression?"DEFLATE":"STORE"})}))}))});this.LAYOUTS={LAYOUT_4x3:{name:"screen4x3",width:9144e3,height:6858e3},LAYOUT_16x9:{name:"screen16x9",width:9144e3,height:5143500},LAYOUT_16x10:{name:"screen16x10",width:9144e3,height:5715e3},LAYOUT_WIDE:{name:"custom",width:12192e3,height:6858e3}},this._author="PptxGenJS",this._company="PptxGenJS",this._revision="1",this._subject="PptxGenJS Presentation",this._title="PptxGenJS Presentation",this._presLayout={name:this.LAYOUTS[o].name,_sizeW:this.LAYOUTS[o].width,_sizeH:this.LAYOUTS[o].height,width:this.LAYOUTS[o].width,height:this.LAYOUTS[o].height},this._rtlMode=!1,this._slideLayouts=[{_margin:y,_name:t,_presLayout:this._presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3,_slideNumberProps:null,_slideObjects:[]}],this._slides=[],this._sections=[],this._masterSlide={addChart:null,addImage:null,addMedia:null,addNotes:null,addShape:null,addTable:null,addText:null,_name:null,_presLayout:this._presLayout,_rId:null,_rels:[],_relsChart:[],_relsMedia:[],_slideId:null,_slideLayout:null,_slideNum:null,_slideNumberProps:null,_slideObjects:[]}}stream(e){return c(this,void 0,void 0,function*(){return yield this.exportPresentation({compression:null==e?void 0:e.compression,outputType:"STREAM"})})}write(r){return c(this,void 0,void 0,function*(){var e="object"==typeof r&&null!=r&&r.outputType?r.outputType:r||null,t=!("object"!=typeof r||null==r||!r.compression)&&r.compression;return yield this.exportPresentation({compression:t,outputType:e})})}writeFile(a){return c(this,void 0,void 0,function*(){var e="undefined"!=typeof process&&!(null==(e=process.versions)||!e.node)&&"node"===(null==(e=process.release)?void 0:e.name),{fileName:t="Presentation.pptx",compression:r=!1}=("string"==typeof a&&(console.warn("[WARNING] writeFile(string) is deprecated - pass { fileName } instead."),a={fileName:a}),a),t=t.toLowerCase().endsWith(".pptx")?t:t+".pptx",r=yield this.exportPresentation({compression:r,outputType:e?"nodebuffer":null});return e?(e=(yield import("node:fs")).promises,e=e.writeFile,yield e(t,r)):yield this.writeFileToBrowser(t,r),t})}addSection(e){e?e.title||console.warn("addSection requires a title"):console.warn("addSection requires an argument");var t={_type:"user",_slides:[],title:e.title};e.order?this.sections.splice(e.order,0,t):this._sections.push(t)}addSlide(t){let r="string"==typeof t?t:null!=t&&t.masterName?t.masterName:"",e={_name:this.LAYOUTS[o].name,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slideNum:this.slides.length+1};r&&(n=this.slideLayouts.filter(e=>e._name===r)[0])&&(e=n);var a,n=new he({addSlide:this.addNewSlide,getSlide:this.getSlide,presLayout:this.presLayout,setSlideNum:this.setSlideNumber,slideId:this.slides.length+256,slideRId:this.slides.length+2,slideNumber:this.slides.length+1,slideLayout:e});return this._slides.push(n),null!=t&&t.sectionTitle?(a=this.sections.filter(e=>e.title===t.sectionTitle)[0])?a._slides.push(n):console.warn(`addSlide: unable to find section with title: "${t.sectionTitle}"`):this.sections&&0<this.sections.length&&(null==t||!t.sectionTitle)&&("default"===(a=this._sections[this.sections.length-1])._type?a._slides.push(n):this._sections.push({title:"Default-"+(this.sections.filter(e=>"default"===e._type).length+1),_type:"default",_slides:[n]})),n}defineLayout(e){e?e.name?e.width?e.height?"number"!=typeof e.height?console.warn("defineLayout `height` should be a number (inches)"):"number"!=typeof e.width&&console.warn("defineLayout `width` should be a number (inches)"):console.warn("defineLayout requires `height`"):console.warn("defineLayout requires `width`"):console.warn("defineLayout requires `name`"):console.warn("defineLayout requires `{name, width, height}`"),this.LAYOUTS[e.name]={name:e.name,_sizeW:Math.round(Number(e.width)*F),_sizeH:Math.round(Number(e.height)*F),width:Math.round(Number(e.width)*F),height:Math.round(Number(e.height)*F)}}defineSlideMaster(e){e=JSON.parse(JSON.stringify(e));if(!e.title)throw new Error("defineSlideMaster() object argument requires a `title` value. (https://gitbrent.github.io/PptxGenJS/docs/masters.html)");var t,n,r={_margin:e.margin||y,_name:e.title,_presLayout:this.presLayout,_rels:[],_relsChart:[],_relsMedia:[],_slide:null,_slideNum:1e3+this.slideLayouts.length+1,_slideNumberProps:e.slideNumber||null,_slideObjects:[],background:e.background||null,bkgd:e.bkgd||null};n=r,(t=e).bkgd&&(n.bkgd=t.bkgd),t.objects&&Array.isArray(t.objects)&&0<t.objects.length&&t.objects.forEach((e,t)=>{var r=Object.keys(e)[0],a=n;x[r]&&"chart"===r?ce(a,e[r].type,e[r].data,e[r].opts):x[r]&&"image"===r?pe(a,e[r]):x[r]&&"line"===r?ue(a,b.LINE,e[r]):x[r]&&"rect"===r?ue(a,b.RECTANGLE,e[r]):x[r]&&"text"===r?fe(a,[{text:e[r].text}],e[r].options,!1):x[r]&&"placeholder"===r&&(e[r].options.placeholder=e[r].options.name,delete e[r].options.name,e[r].options._placeholderType=e[r].options.type,delete e[r].options.type,e[r].options._placeholderIdx=100+t,fe(a,[{text:e[r].text}],e[r].options,!0))}),t.slideNumber&&"object"==typeof t.slideNumber&&(n._slideNumberProps=t.slideNumber),this.slideLayouts.push(r),(e.background||e.bkgd)&&de(e.background,r),r._slideNumberProps&&!this.masterSlide._slideNumberProps&&(this.masterSlide._slideNumberProps=r._slideNumberProps)}tableToSlides(t,p={}){{var[u,f,t={},d]=[this,t,p,null!=p&&p.masterSlideName?this.slideLayouts.filter(e=>e._name===p.masterSlideName)[0]:null];let a=t||{},n=void(a.slideMargin=a.slideMargin||0===a.slideMargin?a.slideMargin:.5,a.w||u.presLayout.width),o=[],i=[],s=[],A=[],r=[],l=[.5,.5,.5,.5],c=0;if(!document.getElementById(f))throw new Error('tableToSlides: Table ID "'+f+'" does not exist!');null!=d&&d._margin?(Array.isArray(d._margin)?l=d._margin:isNaN(d._margin)||(l=[d._margin,d._margin,d._margin,d._margin]),a.slideMargin=l):null!=a&&a.slideMargin&&(Array.isArray(a.slideMargin)?l=a.slideMargin:isNaN(a.slideMargin)||(l=[a.slideMargin,a.slideMargin,a.slideMargin,a.slideMargin])),n=(a.w?M(a.w):u.presLayout.width)-M(l[1]+l[3]),a.verbose&&(console.log("[[VERBOSE MODE]]"),console.log("|-- `tableToSlides` ----------------------------------------------------|"),console.log("| tableProps.h .................................... = "+a.h),console.log("| tableProps.w .................................... = "+a.w),console.log("| pptx.presLayout.width ........................... = "+(u.presLayout.width/F).toFixed(1)),console.log("| pptx.presLayout.height .......................... = "+(u.presLayout.height/F).toFixed(1)),console.log("| emuSlideTabW .................................... = "+(n/F).toFixed(1)));let e=document.querySelectorAll(`#${f} tr:first-child th`);(e=0===e.length?document.querySelectorAll(`#${f} tr:first-child td`):e).forEach(e=>{var t=e;if(t.getAttribute("colspan"))for(let e=0;e<Number(t.getAttribute("colspan"));e++)r.push(Math.round(t.offsetWidth/Number(t.getAttribute("colspan"))));else r.push(t.offsetWidth)}),r.forEach(e=>{c+=e}),r.forEach((e,t)=>{e=Number((Number(n)*(e/c*100)/100/F).toFixed(2));let r=0;var a=document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`),a=(a&&(r=Number(a.getAttribute("data-pptx-min-width"))),document.querySelector(`#${f} thead tr:first-child th:nth-child(${t+1})`));a&&(r=Number(a.getAttribute("data-pptx-width"))),A.push(r>e?r:e)}),a.verbose&&console.log(`| arrColW ......................................... = [${A.join(", ")}]`),["thead","tbody","tfoot"].forEach(t=>{document.querySelectorAll(`#${f} ${t} tr`).forEach(e=>{let r=[];switch(Array.from(e.cells).forEach(a=>{var e=window.getComputedStyle(a).getPropertyValue("color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(",");let t=window.getComputedStyle(a).getPropertyValue("background-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),n=("rgba(0, 0, 0, 0)"!==window.getComputedStyle(a).getPropertyValue("background-color")&&!window.getComputedStyle(a).getPropertyValue("transparent")||(t=["255","255","255"]),{align:null,bold:!!("bold"===window.getComputedStyle(a).getPropertyValue("font-weight")||500<=Number(window.getComputedStyle(a).getPropertyValue("font-weight"))),border:null,color:ie(Number(e[0]),Number(e[1]),Number(e[2])),fill:{color:ie(Number(t[0]),Number(t[1]),Number(t[2]))},fontFace:(window.getComputedStyle(a).getPropertyValue("font-family")||"").split(",")[0].replace(/"/g,"").replace("inherit","").replace("initial","")||null,fontSize:Number(window.getComputedStyle(a).getPropertyValue("font-size").replace(/[a-z]/gi,"")),margin:null,colspan:Number(a.getAttribute("colspan"))||null,rowspan:Number(a.getAttribute("rowspan"))||null,valign:null});["left","center","right","start","end"].includes(window.getComputedStyle(a).getPropertyValue("text-align"))&&(e=window.getComputedStyle(a).getPropertyValue("text-align").replace("start","left").replace("end","right"),n.align="center"===e?"center":"left"===e?"left":"right"===e?"right":null),["top","middle","bottom"].includes(window.getComputedStyle(a).getPropertyValue("vertical-align"))&&(e=window.getComputedStyle(a).getPropertyValue("vertical-align"),n.valign="top"===e?"top":"middle"===e?"middle":"bottom"===e?"bottom":null),window.getComputedStyle(a).getPropertyValue("padding-left")&&(n.margin=[0,0,0,0],["padding-top","padding-right","padding-bottom","padding-left"].forEach((e,t)=>{n.margin[t]=Math.round(Number(window.getComputedStyle(a).getPropertyValue(e).replace(/\D/gi,"")))})),(window.getComputedStyle(a).getPropertyValue("border-top-width")||window.getComputedStyle(a).getPropertyValue("border-right-width")||window.getComputedStyle(a).getPropertyValue("border-bottom-width")||window.getComputedStyle(a).getPropertyValue("border-left-width"))&&(n.border=[null,null,null,null],["top","right","bottom","left"].forEach((e,t)=>{var r=Math.round(Number(window.getComputedStyle(a).getPropertyValue("border-"+e+"-width").replace("px",""))),e=window.getComputedStyle(a).getPropertyValue("border-"+e+"-color").replace(/\s+/gi,"").replace("rgba(","").replace("rgb(","").replace(")","").split(","),e=ie(Number(e[0]),Number(e[1]),Number(e[2]));n.border[t]={pt:r,color:e}})),r.push({_type:I.tablecell,text:a.innerText,options:n})}),t){case"thead":o.push(r);break;case"tbody":i.push(r);break;case"tfoot":s.push(r);break;default:console.log("table parsing: unexpected table part: "+t)}})}),a._arrObjTabHeadRows=o||null,a.colW=A,Ae([...o,...i,...s],a,u.presLayout,d).forEach((e,t)=>{var r=u.addSlide({masterName:a.masterSlideName||null});0===t&&(a.y=a.y||l[0]),0<t&&(a.y=a.autoPageSlideStartY||a.newSlideStartY||l[0]),a.verbose&&console.log(`| opts.autoPageSlideStartY: ${a.autoPageSlideStartY} / arrInchMargins[0]: ${l[0]} => opts.y = `+a.y),r.addTable(e.rows,{x:a.x||l[3],y:a.y,w:Number(n)/F,colW:A,autoPage:!1}),a.addImage&&(a.addImage.options=a.addImage.options||{},a.addImage.image&&(a.addImage.image.path||a.addImage.image.data)?r.addImage({path:a.addImage.image.path,data:a.addImage.image.data,x:a.addImage.options.x,y:a.addImage.options.y,w:a.addImage.options.w,h:a.addImage.options.h}):console.warn("Warning: tableToSlides.addImage requires either `path` or `data`")),a.addShape&&r.addShape(a.addShape.shapeName,a.addShape.options||{}),a.addTable&&r.addTable(a.addTable.rows,a.addTable.options||{}),a.addText&&r.addText(a.addText.text,a.addText.options||{})})}}}return Fe})(JSZip);
 
+// ═══════════════════════════════════════════════════════════════════
+// DEVOLUCIÓN — modal + PPT
+// ═══════════════════════════════════════════════════════════════════
+function openDevModal(dist, ed, fecha){
+  const m=document.getElementById('dev-modal');
+  if(!m) return;
+  const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===ed);
+  const d=(audit&&audit.devdata)||devData[_devKey(dist,ed)]||{fortalezas:['','','',''],debilidades:['','','','']};
+  document.getElementById('dev-modal-title').textContent='Devolución — '+dist+' '+ed;
+  document.getElementById('dev-dist-hidden').value=dist;
+  document.getElementById('dev-ed-hidden').value=ed;
+  document.getElementById('dev-fecha-hidden').value=fecha||'';
+  for(let i=0;i<4;i++){
+    const fi=document.getElementById('dev-f'+i); if(fi) fi.value=(d.fortalezas||[])[i]||'';
+    const di=document.getElementById('dev-d'+i); if(di) di.value=(d.debilidades||[])[i]||'';
+  }
+  m.style.display='flex';
+}
+function closeDevModal(){ const m=document.getElementById('dev-modal'); if(m) m.style.display='none'; }
+function saveDevModalData(){
+  const dist=document.getElementById('dev-dist-hidden').value;
+  const ed=document.getElementById('dev-ed-hidden').value;
+  const dd={
+    fortalezas:[0,1,2,3].map(i=>(document.getElementById('dev-f'+i)||{}).value||''),
+    debilidades:[0,1,2,3].map(i=>(document.getElementById('dev-d'+i)||{}).value||'')
+  };
+  const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===ed);
+  if(audit){ audit.devdata=dd; persist(); }
+  devData[_devKey(dist,ed)]=dd; persistDevData();
+  showToast('💾 Devolución guardada');
+}
+async function generateDevolucionPPTX(){
+  saveDevModalData();
+  const dist=document.getElementById('dev-dist-hidden').value;
+  const ed=document.getElementById('dev-ed-hidden').value;
+  const fechaRaw=document.getElementById('dev-fecha-hidden').value||'';
+  const key=_devKey(dist,ed);
+  const audit=saved.find(a=>a.distribuidor===dist&&a.edicion===ed);
+  const dd=(audit&&audit.devdata)||devData[key]||{fortalezas:['','','',''],debilidades:['','','','']};
+  if(typeof PptxGenJS==='undefined'){showToast('⚠️ PptxGenJS no disponible');return;}
+  const pptx=new PptxGenJS();
+  pptx.layout='LAYOUT_WIDE';
+  const W=13.33,H=7.5;
+  function _fechaDev(f){if(!f)return '';const p=f.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f;}
+  function _bgP(s){
+    if(typeof IMG_BG!=='undefined') s.addImage({data:IMG_BG,x:0,y:0,w:W,h:H});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:-0.36,y:-0.36,w:2.97,h:2.10});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:10.52,y:0.21,w:2.58,h:0.64});
+    if(typeof IMG_DECO!=='undefined'){s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});s.addImage({data:IMG_DECO,x:-0.54,y:1.89,w:1.38,h:1.28});}
+  }
+  function _bgC(s){
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:9.20,y:0.08,w:1.22,h:0.80});
+    if(typeof IMG_ARCOR!=='undefined')  s.addImage({data:IMG_ARCOR, x:10.58,y:0.16,w:2.50,h:0.62});
+    if(typeof IMG_DECO!=='undefined') s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});
+    if(typeof IMG_DECO2!=='undefined'){s.addImage({data:IMG_DECO2,x:0,y:6.87,w:6.67,h:0.63});s.addImage({data:IMG_DECO2,x:6.67,y:6.87,w:6.67,h:0.63});}
+  }
+  function _divider(s){
+    s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:0.92,w:W-0.90,h:0.02,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
+  }
+  // Portada
+  const s1=pptx.addSlide(); _bgP(s1);
+  if(typeof IMG_LOGO_SM!=='undefined') s1.addImage({data:IMG_LOGO_SM,x:-0.26,y:2.76,w:0.61,h:0.59});
+  if(typeof IMG_BAP_SM!=='undefined') s1.addImage({data:IMG_BAP_SM,x:5.98,y:5.63,w:1.24,h:0.83});
+  s1.addText('DEVOLUCIÓN EVALUACIÓN '+ed,{x:1.38,y:2.06,w:10.10,h:0.91,fontFace:'Fira Sans',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle'});
+  s1.addText(dist,{x:2.18,y:3.28,w:8.83,h:1.45,fontFace:'Fira Sans',fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+  if(fechaRaw) s1.addText(_fechaDev(fechaRaw),{x:4.56,y:4.62,w:3.89,h:0.64,fontFace:'Fira Sans',fontSize:28,bold:true,color:'1F2937',align:'center',valign:'middle'});
+  // Fortalezas
+  const fC=[{bg:'1F3864',bd:'2F5496',tx:'FFFFFF'},{bg:'2E4F83',bd:'8DA9DB',tx:'FFFFFF'},{bg:'9DC3E6',bd:'B3C6E7',tx:'1F2937'},{bg:'BDD7EE',bd:'B3C6E7',tx:'1F2937'}];
+  const s2=pptx.addSlide(); _bgC(s2);
+  s2.addText('FORTALEZAS',{x:0.45,y:0.12,w:9.0,h:0.78,fontFace:'Fira Sans',fontSize:48,bold:true,color:'0070C0',valign:'middle'}); _divider(s2);
+  dd.fortalezas.forEach((txt,i)=>{const c=fC[i],y=1.45+i*1.38;
+    s2.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
+    s2.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
+    if(txt) s2.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
+  });
+  // Oportunidades
+  const oC=[{bg:'7B2D00',bd:'B45309',tx:'FFFFFF'},{bg:'9A3412',bd:'F97316',tx:'FFFFFF'},{bg:'FED7AA',bd:'FDBA74',tx:'1F2937'},{bg:'FEF3C7',bd:'FCD34D',tx:'1F2937'}];
+  const s3=pptx.addSlide(); _bgC(s3);
+  s3.addText('OPORTUNIDADES',{x:0.45,y:0.12,w:9.0,h:0.78,fontFace:'Fira Sans',fontSize:48,bold:true,color:'0070C0',valign:'middle'}); _divider(s3);
+  dd.debilidades.forEach((txt,i)=>{const c=oC[i],y=1.45+i*1.38;
+    s3.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
+    s3.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'9A3412'},line:{color:'9A3412',width:0}});
+    if(txt) s3.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
+  });
+  // Cierre
+  const sC=pptx.addSlide(); _bgP(sC);
+  if(typeof IMG_PHOTO!=='undefined') sC.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
+  sC.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:'Fira Sans',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+  await pptx.writeFile({fileName:'Dev - EV'+ed+' - '+dist+'.pptx'});
+  showToast('✅ PPT Devolución generada');
+}
+
 </script>
 
 <!-- PENDING QUESTIONS PANEL -->
@@ -10161,5 +10268,34 @@ function renderSaved(){
     <div class="auth-err" id="auth-err"></div>
   </div>
 </div>
+
+<!-- DEV MODAL -->
+<div id="dev-modal">
+  <div id="dev-modal-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div id="dev-modal-title" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:#0f172a"></div>
+      <button onclick="closeDevModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#9ca3af">✕</button>
+    </div>
+    <input type="hidden" id="dev-dist-hidden">
+    <input type="hidden" id="dev-ed-hidden">
+    <input type="hidden" id="dev-fecha-hidden">
+    <div class="dev-section-title" style="color:#1565c0">💪 Fortalezas</div>
+    <div class="dev-input-row"><span class="dev-num">1</span><input class="dev-input" id="dev-f0" type="text" placeholder="Fortaleza 1…"></div>
+    <div class="dev-input-row"><span class="dev-num">2</span><input class="dev-input" id="dev-f1" type="text" placeholder="Fortaleza 2…"></div>
+    <div class="dev-input-row"><span class="dev-num">3</span><input class="dev-input" id="dev-f2" type="text" placeholder="Fortaleza 3…"></div>
+    <div class="dev-input-row"><span class="dev-num">4</span><input class="dev-input" id="dev-f3" type="text" placeholder="Fortaleza 4…"></div>
+    <div class="dev-section-title" style="color:#c2410c;margin-top:18px">🔧 Oportunidades de Mejora</div>
+    <div class="dev-input-row"><span class="dev-num" style="background:#c2410c">1</span><input class="dev-input" id="dev-d0" type="text" placeholder="Oportunidad 1…"></div>
+    <div class="dev-input-row"><span class="dev-num" style="background:#c2410c">2</span><input class="dev-input" id="dev-d1" type="text" placeholder="Oportunidad 2…"></div>
+    <div class="dev-input-row"><span class="dev-num" style="background:#c2410c">3</span><input class="dev-input" id="dev-d2" type="text" placeholder="Oportunidad 3…"></div>
+    <div class="dev-input-row"><span class="dev-num" style="background:#c2410c">4</span><input class="dev-input" id="dev-d3" type="text" placeholder="Oportunidad 4…"></div>
+    <div style="display:flex;gap:10px;margin-top:22px;justify-content:flex-end">
+      <button class="btn btn-out btn-sm" onclick="closeDevModal()">Cancelar</button>
+      <button class="btn btn-blue btn-sm" onclick="saveDevModalData()">💾 Guardar</button>
+      <button class="btn btn-sm" onclick="generateDevolucionPPTX()" style="background:#0070C0;color:#fff;border:none">📊 Generar PPT</button>
+    </div>
+  </div>
+</div>
+<script src="_dev_imgs.js" defer></script>
 </body>
 </html>
