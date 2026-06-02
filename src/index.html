@@ -6722,122 +6722,127 @@ async function generateDistPPTX(){
   const totalPct=((sc.total||0)*100).toFixed(1);
   const catHex={PROACTIVO:'1D9E6F',ACTIVO:'1A6DB5',REACTIVO:'C97A00',INACTIVO:'C0392B'}[cat]||'1A6DB5';
 
+  // Colores del app para la matriz (idénticos al dashboard)
+  const MX_CAT_C={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030'};
+  const MX_CODE_C={PR:'00A854',AC:'0078C8',RE:'E67E00',IN:'D63030'};
+  const MX_CODE_L={PR:'PRO',AC:'ACT',RE:'REA',IN:'INA'};
+  const MX_LIGHT={PR:'D4F0E2',AC:'D4E8F5',RE:'FDE8C8',IN:'FAD7D7'};
+
   // ── SLIDE 4: DASHBOARD GENERAL ──────────────────────────
   {const s=pptx.addSlide(); _bgC(s); _ttl(s,'DASHBOARD GENERAL');
-    // Donut principal — puntaje total
+    // Donut principal — puntaje total (sin título, % grande dentro)
     s.addChart(pptx.charts.DOUGHNUT,[{name:'Score',labels:['Score',''],values:[parseFloat(totalPct),Math.max(0,100-parseFloat(totalPct))]}],{
-      x:0.28,y:1.00,w:4.10,h:3.10,
-      chartColors:[catHex,'E8EDF3'],dataNoEffects:true,
-      showLegend:false,showValue:false,holeSize:65,showTitle:false,
+      x:0.28,y:1.00,w:4.10,h:3.00,chartColors:[catHex,'E8EDF3'],
+      dataNoEffects:true,showLegend:false,showValue:false,holeSize:65,showTitle:false,
     });
-    // Número dentro del donut
-    s.addText(totalPct+'%',{x:0.78,y:2.10,w:3.10,h:0.90,fontFace:'Calibri',fontSize:36,bold:true,color:catHex,align:'center',valign:'middle'});
-    // Categoría en rectángulo redondeado
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:4.22,w:3.65,h:0.55,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.10});
-    s.addText(cat,{x:0.50,y:4.22,w:3.65,h:0.55,fontFace:'Calibri',fontSize:15,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(totalPct+'%',{x:0.68,y:2.05,w:3.30,h:1.00,fontFace:'Calibri',fontSize:52,bold:true,color:catHex,align:'center',valign:'middle'});
+    // Categoría rounded rect
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:4.12,w:3.65,h:0.55,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.10});
+    s.addText(cat,{x:0.50,y:4.12,w:3.65,h:0.55,fontFace:'Calibri',fontSize:16,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     // Deltas
-    let _dy=4.90;
+    let _dy=4.80;
     const prevAudit=saved.filter(a=>a.distribuidor===dist&&a.edicion!==ed).sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''))[0];
     if(prevAudit&&prevAudit.scores){
       const delta=((sc.total||0)-(prevAudit.scores.total||0))*100;
-      const dColor=delta>=0?'1D9E6F':'C0392B';
-      s.addText((delta>=0?'▲ +':'▼ ')+delta.toFixed(1)+'%  vs Edición '+prevAudit.edicion,{x:0.35,y:_dy,w:3.95,h:0.30,fontFace:'Calibri',fontSize:11,bold:true,color:dColor,align:'center',valign:'middle'});
-      _dy+=0.34;
+      s.addText((delta>=0?'▲ +':'▼ ')+delta.toFixed(1)+'%  vs Ed. '+prevAudit.edicion,{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:delta>=0?'1D9E6F':'C0392B',align:'center',valign:'middle'});
+      _dy+=0.32;
     }
     const curAE=autoevals.find(a=>a.distribuidor===dist&&a.edicion===ed);
     if(curAE&&curAE.scores){
       const deltaAE=((sc.total||0)-(curAE.scores.total||0))*100;
-      const dColor=deltaAE>=0?'7C3AED':'C97A00';
-      s.addText((deltaAE>=0?'▲ +':'▼ ')+deltaAE.toFixed(1)+'%  vs Autoevaluación',{x:0.35,y:_dy,w:3.95,h:0.30,fontFace:'Calibri',fontSize:11,bold:true,color:dColor,align:'center',valign:'middle'});
-      _dy+=0.34;
+      s.addText((deltaAE>=0?'▲ +':'▼ ')+deltaAE.toFixed(1)+'%  vs Autoevaluación',{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:deltaAE>=0?'7C3AED':'C97A00',align:'center',valign:'middle'});
+      _dy+=0.32;
     }
-    // Caja Críticos — bien destacada
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:_dy+0.05,w:3.65,h:0.50,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1.5},rectRadius:0.08});
-    s.addText('🔑  Críticos: '+(sc.critMet||0)+' / '+tc,{x:0.50,y:_dy+0.05,w:3.65,h:0.50,fontFace:'Calibri',fontSize:13,bold:true,color:'92400E',align:'center',valign:'middle'});
-    // Divider vertical
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:_dy+0.06,w:3.65,h:0.46,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1.5},rectRadius:0.08});
+    s.addText('Críticos: '+(sc.critMet||0)+' / '+tc,{x:0.50,y:_dy+0.06,w:3.65,h:0.46,fontFace:'Calibri',fontSize:13,bold:true,color:'92400E',align:'center',valign:'middle'});
+    // Divider
     s.addShape(pptx.shapes.RECTANGLE,{x:4.55,y:1.00,w:0.02,h:5.70,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
-    // 2×2 donuts por área con número dentro
+    // 2×2 donuts por área — sin título de chart, nombre y % como texto overlay
     const coreSheets=SHEETS_CORE();
-    [{x:4.75,y:0.95},{x:8.95,y:0.95},{x:4.75,y:3.78},{x:8.95,y:3.78}].forEach((pos,i)=>{
+    [{x:4.72,y:0.95},{x:8.90,y:0.95},{x:4.72,y:3.80},{x:8.90,y:3.80}].forEach((pos,i)=>{
       if(!coreSheets[i]) return;
       const sh=coreSheets[i]; const v=(sc.areas||{})[sh]||0;
       const pct100=Math.round(v*1000)/10;
       const aColor=(AC[sh]||'#607d8b').replace('#','');
       s.addChart(pptx.charts.DOUGHNUT,[{name:sh,labels:[sh,''],values:[pct100,Math.max(0,100-pct100)]}],{
-        x:pos.x,y:pos.y,w:4.00,h:2.76,
-        chartColors:[aColor,'E8EDF3'],dataNoEffects:true,
-        showLegend:false,showValue:false,holeSize:62,
-        showTitle:true,title:sh+' · '+(AN[sh]||sh),
-        titleColor:'243D5E',titleFontSize:11,titleFontBold:true,
+        x:pos.x,y:pos.y,w:3.90,h:2.58,chartColors:[aColor,'E8EDF3'],
+        dataNoEffects:true,showLegend:false,showValue:false,holeSize:62,showTitle:false,
       });
-      // Número dentro del donut
-      s.addText(pct100+'%',{x:pos.x+1.10,y:pos.y+1.25,w:1.80,h:0.60,fontFace:'Calibri',fontSize:22,bold:true,color:aColor,align:'center',valign:'middle'});
+      // % grande dentro del donut
+      s.addText(pct100+'%',{x:pos.x+0.80,y:pos.y+0.85,w:2.30,h:0.80,fontFace:'Calibri',fontSize:30,bold:true,color:aColor,align:'center',valign:'middle'});
+      // Nombre del área debajo del gráfico, en negrita
+      s.addText(sh+' · '+(AN[sh]||sh),{x:pos.x,y:pos.y+2.58,w:3.90,h:0.30,fontFace:'Calibri',fontSize:10,bold:true,color:'243D5E',align:'center',valign:'middle'});
     });
   }
 
-  // ── SLIDE 5: DETALLE POR ÁREA ───────────────────────────
+  // ── SLIDE 5: DETALLE POR ÁREA — grid 2×2 ───────────────
   {const s=pptx.addSlide(); _bgC(s); _ttl(s,'DETALLE POR ÁREA');
     const coreSheets=SHEETS_CORE();
-    const half=Math.ceil(coreSheets.length/2);
-    // Centrar las dos columnas en el slide (disponible: 0.45 a 12.40 = 11.95in)
-    const colW=5.75; const gap=0.45;
-    const totalColW=colW*2+gap;
-    const startX=(12.85-totalColW)/2;
-    function _renderAreaCol2(sheets,sx){
-      let curY=1.10; const YMAX=6.55;
-      sheets.forEach(sh=>{
-        if(curY>YMAX) return;
-        const aScore=(sc.areas||{})[sh]||0;
-        const aColor=(AC[sh]||'#607d8b').replace('#','');
-        s.addShape(pptx.shapes.RECTANGLE,{x:sx,y:curY,w:colW,h:0.34,fill:{color:aColor},line:{color:aColor,width:0}});
-        s.addText(sh+' · '+(AN[sh]||sh),{x:sx+0.10,y:curY,w:colW-1.50,h:0.34,fontFace:'Calibri',fontSize:12,bold:true,color:'FFFFFF',valign:'middle'});
-        s.addText((aScore*100).toFixed(1)+'%',{x:sx+colW-1.40,y:curY,w:1.30,h:0.34,fontFace:'Calibri',fontSize:12,bold:true,color:'FFFFFF',align:'right',valign:'middle'});
-        curY+=0.38;
-        const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
-        bplNums.forEach(bk=>{
-          if(curY>YMAX) return;
-          const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
-          const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
-          s.addShape(pptx.shapes.RECTANGLE,{x:sx+0.06,y:curY,w:colW-0.06,h:0.28,fill:{color:'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
-          s.addText(bName,{x:sx+0.14,y:curY,w:colW-1.60,h:0.28,fontFace:'Calibri',fontSize:10,color:'3D5573',valign:'middle'});
-          s.addText((bv*100).toFixed(0)+'%',{x:sx+colW-1.40,y:curY,w:1.30,h:0.28,fontFace:'Calibri',fontSize:10,bold:true,color:_sC(bv),align:'right',valign:'middle'});
-          curY+=0.30;
-        });
-        curY+=0.08;
+    // Grid 2×2: los 4 cuadros centrados en el slide
+    const colW=5.80; const colGap=0.45;
+    const rowGap=0.20;
+    const gX=(13.33-(colW*2+colGap))/2; // centra horizontalmente
+    const cols=[gX, gX+colW+colGap];
+    const rows=[1.10, 3.90];            // fila 1 y fila 2
+    const CELL_H=2.65;
+    coreSheets.forEach((sh,i)=>{
+      const col=i%2; const row=Math.floor(i/2);
+      if(row>=rows.length) return;
+      const sx=cols[col]; const sy=rows[row]; const YMAX=sy+CELL_H;
+      const aScore=(sc.areas||{})[sh]||0;
+      const aColor=(AC[sh]||'#607d8b').replace('#','');
+      // Header de área
+      s.addShape(pptx.shapes.RECTANGLE,{x:sx,y:sy,w:colW,h:0.32,fill:{color:aColor},line:{color:aColor,width:0}});
+      s.addText(sh+' · '+(AN[sh]||sh),{x:sx+0.10,y:sy,w:colW-1.45,h:0.32,fontFace:'Calibri',fontSize:11,bold:true,color:'FFFFFF',valign:'middle'});
+      s.addText((aScore*100).toFixed(1)+'%',{x:sx+colW-1.40,y:sy,w:1.30,h:0.32,fontFace:'Calibri',fontSize:11,bold:true,color:'FFFFFF',align:'right',valign:'middle'});
+      let curY=sy+0.34;
+      const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
+      bplNums.forEach(bk=>{
+        if(curY+0.26>YMAX) return;
+        const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
+        const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
+        s.addShape(pptx.shapes.RECTANGLE,{x:sx+0.04,y:curY,w:colW-0.04,h:0.26,fill:{color:'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
+        s.addText(bName,{x:sx+0.12,y:curY,w:colW-1.55,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'3D5573',valign:'middle'});
+        s.addText((bv*100).toFixed(0)+'%',{x:sx+colW-1.40,y:curY,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:_sC(bv),align:'right',valign:'middle'});
+        curY+=0.27;
       });
-    }
-    _renderAreaCol2(coreSheets.slice(0,half), startX);
-    _renderAreaCol2(coreSheets.slice(half), startX+colW+gap);
+    });
   }
 
   // ── SLIDE 6: ÁREA NO VINCULANTE (si existe) ─────────────
   const nvSheets=SHEETS_NV();
   if(nvSheets.length>0){
     const s=pptx.addSlide(); _bgC(s); _ttl(s,'ÁREA NO VINCULANTE');
-    s.addText('Informativas — no inciden en el resultado global',{x:0.45,y:0.95,w:9.0,h:0.26,fontFace:'Calibri',fontSize:12,color:'7A90A8',valign:'middle'});
-    // Columnas: ATRIBUTO | TOTAL | SI ✓ | NO ✗ | %
-    const NV_X=0.45, NV_W=11.70;
+    s.addText('Informativas — no inciden en el resultado global',{x:0.80,y:0.95,w:9.0,h:0.26,fontFace:'Calibri',fontSize:12,color:'7A90A8',valign:'middle'});
+    // Columnas centradas: ATRIBUTO | TOTAL | SI ✓ | NO ✗ | % CUMPL.
     const nvCols=[
-      {l:'ATRIBUTO',   x:0.45, w:4.80},
-      {l:'TOTAL',      x:5.30, w:1.20},
-      {l:'SI ✓',       x:6.55, w:1.30},
-      {l:'NO ✗',       x:7.90, w:1.30},
-      {l:'% CUMPL.',   x:9.25, w:2.90},
+      {l:'ATRIBUTO',   x:0.80, w:4.80},
+      {l:'TOTAL',      x:5.65, w:1.20},
+      {l:'SI ✓',       x:6.90, w:1.30},
+      {l:'NO ✗',       x:8.25, w:1.30},
+      {l:'% CUMPL.',   x:9.60, w:2.80},
     ];
+    const NV_X=0.80; const NV_W=11.60;
     let ty=1.30;
     nvSheets.forEach(sh=>{
       const aScore=(sc.areas||{})[sh]||0;
       const aColor=(AC[sh]||'#607d8b').replace('#','');
-      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.36,fill:{color:aColor},line:{color:aColor,width:0}});
-      s.addText((AN[sh]||sh)+': '+(aScore*100).toFixed(1)+'%',{x:NV_X+0.15,y:ty,w:NV_W-0.30,h:0.36,fontFace:'Calibri',fontSize:14,bold:true,color:'FFFFFF',valign:'middle'});
-      ty+=0.40;
-      // Header
+      // Título área destacado
+      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.40,fill:{color:aColor},line:{color:aColor,width:0}});
+      s.addText((AN[sh]||sh),{x:NV_X+0.15,y:ty,w:NV_W-3.20,h:0.40,fontFace:'Calibri',fontSize:15,bold:true,color:'FFFFFF',valign:'middle'});
+      // % alcance destacado a la derecha del header
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.06});
+      s.addText('Alcance: '+(aScore*100).toFixed(1)+'%',{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fontFace:'Calibri',fontSize:12,bold:true,color:aColor,align:'center',valign:'middle'});
+      ty+=0.44;
+      // Header columnas
       nvCols.forEach(c=>{
-        s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.28,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-        s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.28,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+        s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+        s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
       });
-      ty+=0.30;
+      ty+=0.28;
+      // Filas + acumuladores para totales
       const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
+      let sumTotal=0,sumSi=0,sumNo=0;
       bplNums.forEach((bk,ri)=>{
         const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
         const aqs=Q.filter(q=>q.sheet===sh&&q.bpl_num===bk);
@@ -6845,105 +6850,110 @@ async function generateDistPPTX(){
         const siC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='si').length;
         const noC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='no').length;
         const answered=siC+noC; const bpct=answered>0?Math.round(siC/answered*100):0;
+        sumTotal+=total; sumSi+=siC; sumNo+=noC;
+        s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.26,fill:{color:ri%2===0?'F8FAFC':'FFFFFF'},line:{color:'E8EDF3',width:0.5}});
+        s.addText(bName,{x:NV_X+0.10,y:ty,w:4.65,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'3D5573',valign:'middle'});
+        s.addText(String(total),{x:5.65,y:ty,w:1.20,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'243D5E',align:'center',valign:'middle'});
+        s.addText(String(siC),{x:6.90,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
+        s.addText(String(noC),{x:8.25,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
         const pctColor=_sC(answered>0?siC/answered:0);
-        const bg=ri%2===0?'F8FAFC':'FFFFFF';
-        s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.28,fill:{color:bg},line:{color:'E8EDF3',width:0.5}});
-        s.addText(bName,{x:0.55,y:ty,w:4.70,h:0.28,fontFace:'Calibri',fontSize:10,color:'3D5573',valign:'middle'});
-        s.addText(String(total),{x:5.30,y:ty,w:1.20,h:0.28,fontFace:'Calibri',fontSize:10,color:'243D5E',align:'center',valign:'middle'});
-        s.addText(String(siC), {x:6.55,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:10,color:'1D9E6F',bold:true,align:'center',valign:'middle'});
-        s.addText(String(noC), {x:7.90,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:10,color:'C0392B',bold:true,align:'center',valign:'middle'});
-        // % destacado
-        s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.30,y:ty+0.03,w:2.80,h:0.22,fill:{color:pctColor},line:{color:pctColor,width:0},rectRadius:0.05});
-        s.addText(bpct+'%',{x:9.30,y:ty+0.03,w:2.80,h:0.22,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-        ty+=0.30;
+        s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.65,y:ty+0.03,w:2.70,h:0.20,fill:{color:pctColor},line:{color:pctColor,width:0},rectRadius:0.05});
+        s.addText(bpct+'%',{x:9.65,y:ty+0.03,w:2.70,h:0.20,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+        ty+=0.27;
       });
-      ty+=0.22;
+      // Fila totales
+      const sumAnswered=sumSi+sumNo; const sumPct=sumAnswered>0?Math.round(sumSi/sumAnswered*100):0;
+      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.28,fill:{color:'E8EDF3'},line:{color:'D1DAE6',width:0.5}});
+      s.addText('TOTAL',{x:NV_X+0.10,y:ty,w:4.65,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',valign:'middle'});
+      s.addText(String(sumTotal),{x:5.65,y:ty,w:1.20,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
+      s.addText(String(sumSi),{x:6.90,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
+      s.addText(String(sumNo),{x:8.25,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
+      const sumPctColor=_sC(sumAnswered>0?sumSi/sumAnswered:0);
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.65,y:ty+0.04,w:2.70,h:0.20,fill:{color:sumPctColor},line:{color:sumPctColor,width:0},rectRadius:0.05});
+      s.addText(sumPct+'%',{x:9.65,y:ty+0.04,w:2.70,h:0.20,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      ty+=0.38;
     });
   }
 
   // ── SLIDE 7: CONDICIONALES CRÍTICOS ─────────────────────
   {const s=pptx.addSlide(); _bgC(s); _ttl(s,'CONDICIONALES CRÍTICOS');
     const critStatus=sc.critStatus||{};
-    // FIX: critStatus values son {st:'met'|'unmet', pct:N} — no strings
     const _isMet=tag=>(critStatus[tag]?.st||critStatus[tag])==='met';
     const metC=CRIT_LIST.filter(c=>_isMet(c.tag)).length;
-    const unmetC=CRIT_LIST.filter(c=>!_isMet(c.tag)&&critStatus[c.tag]!==undefined).length;
+    const unmetC=CRIT_LIST.filter(c=>critStatus[c.tag]!==undefined&&!_isMet(c.tag)).length;
 
-    // Izquierda: cajas CUMPLEN / NO CUMPLEN apiladas
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.45,y:1.08,w:2.65,h:1.00,fill:{color:'1D9E6F'},line:{color:'1D9E6F',width:0},rectRadius:0.10});
-    s.addText('✓',{x:0.45,y:1.08,w:2.65,h:0.44,fontFace:'Calibri',fontSize:28,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(metC+' CUMPLEN',{x:0.45,y:1.52,w:2.65,h:0.56,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.45,y:2.22,w:2.65,h:1.00,fill:{color:'C0392B'},line:{color:'C0392B',width:0},rectRadius:0.10});
-    s.addText('✗',{x:0.45,y:2.22,w:2.65,h:0.44,fontFace:'Calibri',fontSize:28,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(unmetC+' INCUMPLEN',{x:0.45,y:2.66,w:2.65,h:0.56,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    // Izquierda: CUMPLEN / NO CUMPLEN centradas en columna izquierda (x=0.45, w=2.60)
+    const LX=0.55; const LW=2.50;
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:1.08,w:LW,h:1.10,fill:{color:'00A854'},line:{color:'00A854',width:0},rectRadius:0.12});
+    s.addText('✓',{x:LX,y:1.08,w:LW,h:0.55,fontFace:'Calibri',fontSize:30,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(metC+' CUMPLEN',{x:LX,y:1.63,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:2.28,w:LW,h:1.10,fill:{color:'D63030'},line:{color:'D63030',width:0},rectRadius:0.12});
+    s.addText('✗',{x:LX,y:2.28,w:LW,h:0.55,fontFace:'Calibri',fontSize:30,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(unmetC+' INCUMPLEN',{x:LX,y:2.83,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
 
-    // Derecha: tabla de críticos
-    const tcX=3.28; const tcW=9.45;
-    const tcols2=[{l:'COD.',w:0.62,x:tcX},{l:'ÁREA',w:0.76,x:tcX+0.62},{l:'BPL CRÍTICO',w:3.80,x:tcX+1.38},{l:'COMP.',w:1.00,x:tcX+5.18},{l:'ESTADO',w:3.30,x:tcX+6.18}];
+    // Derecha: tabla — todos los críticos sin corte
+    const tcX=3.28; const tcW=9.90;
+    const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:4.10,x:tcX+1.30},{l:'COMP.',w:1.00,x:tcX+5.40},{l:'ESTADO',w:3.40,x:tcX+6.40}];
     let ty=1.08;
     tcols2.forEach(c=>{
-      s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.28,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-      s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.28,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+      s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:'Calibri',fontSize:8.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     });
-    ty+=0.30;
+    ty+=0.28;
     CRIT_LIST.forEach((crit,ri)=>{
-      if(ty>4.00) return;
       const tag=crit.tag; const isMet=_isMet(tag);
       const qs=Q.filter(q=>q.critico===tag);
       const siQ=qs.filter(q=>(curAudit.answers||{})[q.comp_num]==='si').length;
       const bName=qs[0]?.bpl_name||'—'; const sh=qs[0]?.sheet||'—';
       const bg=ri%2===0?'F8FAFC':'FFFFFF';
-      s.addShape(pptx.shapes.RECTANGLE,{x:tcX,y:ty,w:tcW,h:0.26,fill:{color:bg},line:{color:'E8EDF3',width:0.5}});
-      s.addText('C'+tag.replace('CRITICO ',''),{x:tcX,y:ty,w:0.62,h:0.26,fontFace:'Calibri',fontSize:8,bold:true,color:'243D5E',align:'center',valign:'middle'});
-      s.addText(sh,{x:tcX+0.62,y:ty,w:0.76,h:0.26,fontFace:'Calibri',fontSize:8,color:'3D5573',align:'center',valign:'middle'});
-      s.addText(bName,{x:tcX+1.38,y:ty,w:3.80,h:0.26,fontFace:'Calibri',fontSize:8,color:'3D5573',valign:'middle'});
-      s.addText(siQ+'/'+qs.length,{x:tcX+5.18,y:ty,w:1.00,h:0.26,fontFace:'Calibri',fontSize:8,bold:true,color:isMet?'1D9E6F':'C0392B',align:'center',valign:'middle'});
-      s.addShape(pptx.shapes.RECTANGLE,{x:tcX+6.22,y:ty+0.03,w:3.18,h:0.20,fill:{color:isMet?'1D9E6F':'C0392B'},line:{color:isMet?'1D9E6F':'C0392B',width:0}});
-      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:tcX+6.22,y:ty+0.03,w:3.18,h:0.20,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-      ty+=0.27;
+      s.addShape(pptx.shapes.RECTANGLE,{x:tcX,y:ty,w:tcW,h:0.24,fill:{color:bg},line:{color:'E8EDF3',width:0.5}});
+      s.addText('C'+tag.replace('CRITICO ',''),{x:tcX,y:ty,w:0.58,h:0.24,fontFace:'Calibri',fontSize:8,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
+      s.addText(sh,{x:tcX+0.58,y:ty,w:0.72,h:0.24,fontFace:'Calibri',fontSize:8,color:'3D5573',align:'center',valign:'middle'});
+      s.addText(bName,{x:tcX+1.30,y:ty,w:4.10,h:0.24,fontFace:'Calibri',fontSize:8,color:'3D5573',valign:'middle'});
+      s.addText(siQ+'/'+qs.length,{x:tcX+5.40,y:ty,w:1.00,h:0.24,fontFace:'Calibri',fontSize:8,bold:true,color:isMet?'00A854':'D63030',align:'center',valign:'middle'});
+      s.addShape(pptx.shapes.RECTANGLE,{x:tcX+6.44,y:ty+0.02,w:3.30,h:0.20,fill:{color:isMet?'00A854':'D63030'},line:{color:isMet?'00A854':'D63030',width:0}});
+      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:tcX+6.44,y:ty+0.02,w:3.30,h:0.20,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      ty+=0.25;
     });
 
-    // ── Matriz BPL Críticos (misma que el dashboard) ─────
-    const mxY=4.15;
+    // ── Matriz BPL Críticos — compacta, colores del app ──
+    const mxY=ty+0.18;
     const mx=(curAudit.weights&&curAudit.weights.matrixCfg)||MATRIX_CFG;
     const total100=(sc.total||0)*100;
     const sRow=total100>=THR.pro?0:total100>=THR.act?1:total100>=50?2:3;
     let bCol=mx.bands.length-1;
     if((sc.critMet||0)<tc){for(let i=0;i<mx.bands.length-1;i++){if(mx.bands[i].max!==null&&(sc.critMet||0)<=mx.bands[i].max){bCol=i;break;}}}
     const mCatRows=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
-    const mCatColors=['1D9E6F','1A6DB5','C97A00','C0392B'];
-    const mCodeMap={PR:'1D9E6F',AC:'1A6DB5',RE:'C97A00',IN:'C0392B'};
-    const mCodeLabel={PR:'PRO',AC:'ACT',RE:'REA',IN:'INA'};
-    // Título
-    s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:mxY,w:12.40,h:0.28,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('Matriz de Condicionales · BPL Críticos',{x:0.55,y:mxY,w:12.20,h:0.28,fontFace:'Calibri',fontSize:10,bold:true,color:'FFFFFF',valign:'middle'});
-    const mRowH=0.38; const mScoreW=1.40;
-    const mBandW=(12.40-mScoreW)/Math.max(mx.bands.length,1);
+    const mW=12.40; const mX=0.45;
+    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY,w:mW,h:0.24,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('Matriz de Condicionales · BPL Críticos — Posición actual: Score '+totalPct+'%  Críticos '+(sc.critMet||0)+'/'+tc,{x:mX+0.10,y:mxY,w:mW-0.20,h:0.24,fontFace:'Calibri',fontSize:8.5,bold:true,color:'FFFFFF',valign:'middle'});
+    const mRowH=0.30; const mScoreW=1.30;
+    const mBandW=(mW-mScoreW)/Math.max(mx.bands.length,1);
     // Header bandas
-    s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:mxY+0.30,w:mScoreW,h:0.30,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
-    s.addText('Score / Críticos',{x:0.45,y:mxY+0.30,w:mScoreW,h:0.30,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY+0.26,w:mScoreW,h:0.26,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
+    s.addText('Score / Crit.',{x:mX,y:mxY+0.26,w:mScoreW,h:0.26,fontFace:'Calibri',fontSize:7.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     mx.bands.forEach((b,bi)=>{
-      const bx=0.45+mScoreW+bi*mBandW; const isAB=bi===bCol;
-      s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:mxY+0.30,w:mBandW,h:0.30,fill:{color:isAB?'1565C0':'2F5496'},line:{color:isAB?'1565C0':'2F5496',width:0}});
-      s.addText(b.label,{x:bx,y:mxY+0.30,w:mBandW,h:0.30,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      const bx=mX+mScoreW+bi*mBandW; const isAB=bi===bCol;
+      s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:mxY+0.26,w:mBandW,h:0.26,fill:{color:isAB?'1565C0':'2F5496'},line:{color:isAB?'1565C0':'2F5496',width:0}});
+      s.addText(b.label,{x:bx,y:mxY+0.26,w:mBandW,h:0.26,fontFace:'Calibri',fontSize:7.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     });
-    // Filas categorías
+    // Filas
     mCatRows.forEach((cr,ri)=>{
-      const ry=mxY+0.62+ri*mRowH; const isAR=ri===sRow;
-      s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:ry,w:mScoreW,h:mRowH,fill:{color:isAR?mCatColors[ri]+'44':'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
-      s.addText(cr,{x:0.50,y:ry,w:mScoreW-0.08,h:mRowH*0.54,fontFace:'Calibri',fontSize:8,bold:isAR,color:mCatColors[ri],valign:'bottom'});
-      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',{x:0.50,y:ry+mRowH*0.54,w:mScoreW-0.08,h:mRowH*0.44,fontFace:'Calibri',fontSize:7,color:'7A90A8',valign:'top'});
+      const ry=mxY+0.54+ri*mRowH; const isAR=ri===sRow;
+      const catC=Object.values(MX_CAT_C)[ri];
+      s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:ry,w:mScoreW,h:mRowH,fill:{color:isAR?catC+'33':'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
+      s.addText(cr.substring(0,5),{x:mX+0.04,y:ry,w:mScoreW-0.08,h:mRowH*0.52,fontFace:'Calibri',fontSize:7.5,bold:isAR,color:catC,valign:'bottom'});
+      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',{x:mX+0.04,y:ry+mRowH*0.52,w:mScoreW-0.08,h:mRowH*0.46,fontFace:'Calibri',fontSize:6.5,color:'7A90A8',valign:'top'});
       mx.bands.forEach((b,bi)=>{
-        const bx=0.45+mScoreW+bi*mBandW;
+        const bx=mX+mScoreW+bi*mBandW;
         const code=(mx.cells[ri]||[])[bi]||'IN';
-        const bg=mCodeMap[code]||'C0392B';
+        const codeC=MX_CODE_C[code]||'D63030';
+        const lightC=MX_LIGHT[code]||'FAD7D7';
         const isActive=ri===sRow&&bi===bCol;
-        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,fill:{color:isActive?bg:bg+'22'},line:{color:isActive?bg:'E8EDF3',width:isActive?1.5:0.5}});
-        s.addText(mCodeLabel[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,fontFace:'Calibri',fontSize:9,bold:isActive,color:isActive?'FFFFFF':bg,align:'center',valign:'middle'});
+        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,fill:{color:isActive?codeC:lightC},line:{color:isActive?codeC:'E8EDF3',width:isActive?1.5:0.5}});
+        s.addText(MX_CODE_L[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,fontFace:'Calibri',fontSize:8.5,bold:isActive,color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
       });
     });
-    // Indicador posición actual
-    s.addText('● Posición actual: Score '+totalPct+'% — Críticos '+(sc.critMet||0)+'/'+tc,{x:0.45,y:mxY+0.62+mCatRows.length*mRowH+0.06,w:12.40,h:0.22,fontFace:'Calibri',fontSize:9,color:'243D5E',italic:true,align:'center',valign:'middle'});
   }
 
   // ── SLIDE 8: CIERRE ─────────────────────────────────────
