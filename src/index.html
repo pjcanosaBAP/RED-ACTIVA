@@ -6868,9 +6868,7 @@ async function generateDistPPTX(){
       s.addText(String(sumTotal),{x:5.65,y:ty,w:1.20,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
       s.addText(String(sumSi),{x:6.90,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
       s.addText(String(sumNo),{x:8.25,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
-      const sumPctColor=_sC(sumAnswered>0?sumSi/sumAnswered:0);
-      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.65,y:ty+0.04,w:2.70,h:0.20,fill:{color:sumPctColor},line:{color:sumPctColor,width:0},rectRadius:0.05});
-      s.addText(sumPct+'%',{x:9.65,y:ty+0.04,w:2.70,h:0.20,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      // % total omitido intencional
       ty+=0.38;
     });
   }
@@ -6882,8 +6880,9 @@ async function generateDistPPTX(){
     const metC=CRIT_LIST.filter(c=>_isMet(c.tag)).length;
     const unmetC=CRIT_LIST.filter(c=>critStatus[c.tag]!==undefined&&!_isMet(c.tag)).length;
 
-    // Izquierda: CUMPLEN / NO CUMPLEN centradas en columna izquierda (x=0.45, w=2.60)
-    const LX=0.55; const LW=2.50;
+    // Izquierda: CUMPLEN / NO CUMPLEN — centradas en el margen izquierdo (0.45 a tcX=3.28)
+    const tcX=3.28; const tcW=9.90;
+    const LW=2.60; const LX=0.45+(tcX-0.45-LW)/2; // centrado horizontal en el margen
     s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:1.08,w:LW,h:1.10,fill:{color:'00A854'},line:{color:'00A854',width:0},rectRadius:0.12});
     s.addText('✓',{x:LX,y:1.08,w:LW,h:0.55,fontFace:'Calibri',fontSize:30,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     s.addText(metC+' CUMPLEN',{x:LX,y:1.63,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
@@ -6892,7 +6891,6 @@ async function generateDistPPTX(){
     s.addText(unmetC+' INCUMPLEN',{x:LX,y:2.83,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
 
     // Derecha: tabla — todos los críticos sin corte
-    const tcX=3.28; const tcW=9.90;
     const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:4.10,x:tcX+1.30},{l:'COMP.',w:1.00,x:tcX+5.40},{l:'ESTADO',w:3.40,x:tcX+6.40}];
     let ty=1.08;
     tcols2.forEach(c=>{
@@ -6924,7 +6922,7 @@ async function generateDistPPTX(){
     let bCol=mx.bands.length-1;
     if((sc.critMet||0)<tc){for(let i=0;i<mx.bands.length-1;i++){if(mx.bands[i].max!==null&&(sc.critMet||0)<=mx.bands[i].max){bCol=i;break;}}}
     const mCatRows=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
-    const mW=12.40; const mX=0.45;
+    const mW=tcW; const mX=tcX; // mismo ancho que la tabla de críticos
     s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY,w:mW,h:0.24,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
     s.addText('Matriz de Condicionales · BPL Críticos — Posición actual: Score '+totalPct+'%  Críticos '+(sc.critMet||0)+'/'+tc,{x:mX+0.10,y:mxY,w:mW-0.20,h:0.24,fontFace:'Calibri',fontSize:8.5,bold:true,color:'FFFFFF',valign:'middle'});
     const mRowH=0.30; const mScoreW=1.30;
