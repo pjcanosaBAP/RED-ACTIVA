@@ -6880,15 +6880,20 @@ async function generateDistPPTX(){
     const metC=CRIT_LIST.filter(c=>_isMet(c.tag)).length;
     const unmetC=CRIT_LIST.filter(c=>critStatus[c.tag]!==undefined&&!_isMet(c.tag)).length;
 
-    // Izquierda: CUMPLEN / NO CUMPLEN — centradas en el margen izquierdo (0.45 a tcX=3.28)
+    // Layout: margen izq = 0.45 a 3.20 | tabla derecha = 3.28 a fin
     const tcX=3.28; const tcW=9.90;
-    const LW=2.60; const LX=0.45+(tcX-0.45-LW)/2; // centrado horizontal en el margen
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:1.08,w:LW,h:1.10,fill:{color:'00A854'},line:{color:'00A854',width:0},rectRadius:0.12});
-    s.addText('✓',{x:LX,y:1.08,w:LW,h:0.55,fontFace:'Calibri',fontSize:30,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(metC+' CUMPLEN',{x:LX,y:1.63,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:2.28,w:LW,h:1.10,fill:{color:'D63030'},line:{color:'D63030',width:0},rectRadius:0.12});
-    s.addText('✗',{x:LX,y:2.28,w:LW,h:0.55,fontFace:'Calibri',fontSize:30,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(unmetC+' INCUMPLEN',{x:LX,y:2.83,w:LW,h:0.55,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    // Cajas CUMPLEN/NO CUMPLEN — centradas horizontal y verticalmente en el margen izq
+    // Espacio vertical aprox: y=1.08 a y=4.50 (tabla + matriz) → centro ≈ 2.79
+    const LW=2.60; const LX=0.45+(tcX-0.45-LW)/2; // centrado horizontal
+    const LH=1.20; const LGap=0.40;
+    const LTotalH=LH*2+LGap;
+    const LY=1.08+(3.42-LTotalH)/2; // centrado vertical en el margen (~3.42in disponibles)
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:LY,w:LW,h:LH,fill:{color:'00A854'},line:{color:'00A854',width:0},rectRadius:0.12});
+    s.addText('✓',{x:LX,y:LY,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(metC+' CUMPLEN',{x:LX,y:LY+LH*0.50,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:LY+LH+LGap,w:LW,h:LH,fill:{color:'D63030'},line:{color:'D63030',width:0},rectRadius:0.12});
+    s.addText('✗',{x:LX,y:LY+LH+LGap,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(unmetC+' INCUMPLEN',{x:LX,y:LY+LH+LGap+LH*0.50,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
 
     // Derecha: tabla — todos los críticos sin corte
     const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:4.10,x:tcX+1.30},{l:'COMP.',w:1.00,x:tcX+5.40},{l:'ESTADO',w:3.40,x:tcX+6.40}];
@@ -6914,42 +6919,53 @@ async function generateDistPPTX(){
       ty+=0.25;
     });
 
-    // ── Matriz BPL Críticos — compacta, colores del app ──
-    const mxY=ty+0.18;
+    // ── Matriz BPL Críticos ──────────────────────────────
+    const mxY=ty+0.20;
     const mx=(curAudit.weights&&curAudit.weights.matrixCfg)||MATRIX_CFG;
     const total100=(sc.total||0)*100;
     const sRow=total100>=THR.pro?0:total100>=THR.act?1:total100>=50?2:3;
     let bCol=mx.bands.length-1;
     if((sc.critMet||0)<tc){for(let i=0;i<mx.bands.length-1;i++){if(mx.bands[i].max!==null&&(sc.critMet||0)<=mx.bands[i].max){bCol=i;break;}}}
     const mCatRows=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
-    const mW=tcW; const mX=tcX; // mismo ancho que la tabla de críticos
-    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY,w:mW,h:0.24,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('Matriz de Condicionales · BPL Críticos — Posición actual: Score '+totalPct+'%  Críticos '+(sc.critMet||0)+'/'+tc,{x:mX+0.10,y:mxY,w:mW-0.20,h:0.24,fontFace:'Calibri',fontSize:8.5,bold:true,color:'FFFFFF',valign:'middle'});
-    const mRowH=0.30; const mScoreW=1.30;
+    const mCatColors_=['00A854','0078C8','E67E00','D63030'];
+    const mW=tcW; const mX=tcX;
+    // Título
+    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY,w:mW,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('Matriz de Condicionales · BPL Críticos   —   Score: '+totalPct+'%   Críticos: '+(sc.critMet||0)+'/'+tc,
+      {x:mX+0.12,y:mxY,w:mW-0.24,h:0.26,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',valign:'middle'});
+    const mRowH=0.34; const mScoreW=1.55;
     const mBandW=(mW-mScoreW)/Math.max(mx.bands.length,1);
-    // Header bandas
-    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY+0.26,w:mScoreW,h:0.26,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
-    s.addText('Score / Crit.',{x:mX,y:mxY+0.26,w:mScoreW,h:0.26,fontFace:'Calibri',fontSize:7.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    // Header bandas (Score / Críticos | banda1 | banda2 ...)
+    s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY+0.28,w:mScoreW,h:0.28,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
+    s.addText('Score / Críticos',{x:mX,y:mxY+0.28,w:mScoreW,h:0.28,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     mx.bands.forEach((b,bi)=>{
       const bx=mX+mScoreW+bi*mBandW; const isAB=bi===bCol;
-      s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:mxY+0.26,w:mBandW,h:0.26,fill:{color:isAB?'1565C0':'2F5496'},line:{color:isAB?'1565C0':'2F5496',width:0}});
-      s.addText(b.label,{x:bx,y:mxY+0.26,w:mBandW,h:0.26,fontFace:'Calibri',fontSize:7.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:mxY+0.28,w:mBandW,h:0.28,fill:{color:isAB?'1565C0':'2F5496'},line:{color:isAB?'1565C0':'2F5496',width:0}});
+      s.addText(b.label,{x:bx,y:mxY+0.28,w:mBandW,h:0.28,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     });
-    // Filas
+    // Filas de categorías — fondo blanco, solo resaltar la activa
     mCatRows.forEach((cr,ri)=>{
-      const ry=mxY+0.54+ri*mRowH; const isAR=ri===sRow;
-      const catC=Object.values(MX_CAT_C)[ri];
-      s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:ry,w:mScoreW,h:mRowH,fill:{color:isAR?catC+'33':'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
-      s.addText(cr.substring(0,5),{x:mX+0.04,y:ry,w:mScoreW-0.08,h:mRowH*0.52,fontFace:'Calibri',fontSize:7.5,bold:isAR,color:catC,valign:'bottom'});
-      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',{x:mX+0.04,y:ry+mRowH*0.52,w:mScoreW-0.08,h:mRowH*0.46,fontFace:'Calibri',fontSize:6.5,color:'7A90A8',valign:'top'});
+      const ry=mxY+0.58+ri*mRowH;
+      const catC=mCatColors_[ri];
+      const isActiveRow=ri===sRow;
+      // Columna score: fondo blanco, texto en color de categoría
+      s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:ry,w:mScoreW,h:mRowH,fill:{color:'FFFFFF'},line:{color:'E8EDF3',width:0.5}});
+      s.addText(cr,{x:mX+0.06,y:ry,w:mScoreW-0.12,h:mRowH*0.58,fontFace:'Calibri',fontSize:9,bold:true,color:catC,valign:'bottom'});
+      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',
+        {x:mX+0.06,y:ry+mRowH*0.58,w:mScoreW-0.12,h:mRowH*0.40,fontFace:'Calibri',fontSize:7.5,color:'7A90A8',valign:'top'});
+      // Celdas de banda
       mx.bands.forEach((b,bi)=>{
         const bx=mX+mScoreW+bi*mBandW;
         const code=(mx.cells[ri]||[])[bi]||'IN';
         const codeC=MX_CODE_C[code]||'D63030';
-        const lightC=MX_LIGHT[code]||'FAD7D7';
         const isActive=ri===sRow&&bi===bCol;
-        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,fill:{color:isActive?codeC:lightC},line:{color:isActive?codeC:'E8EDF3',width:isActive?1.5:0.5}});
-        s.addText(MX_CODE_L[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,fontFace:'Calibri',fontSize:8.5,bold:isActive,color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
+        // Fondo blanco siempre; solo la celda activa se rellena con color
+        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,
+          fill:{color:isActive?codeC:'FFFFFF'},
+          line:{color:isActive?codeC:'E8EDF3',width:isActive?2:0.5}});
+        s.addText(MX_CODE_L[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,
+          fontFace:'Calibri',fontSize:isActive?10:9,bold:true,
+          color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
       });
     });
   }
