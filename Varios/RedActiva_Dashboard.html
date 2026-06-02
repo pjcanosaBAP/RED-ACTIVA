@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RED ACTIVA — Dashboard BPL</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #f0f4f8;
+    --bg2: #ffffff;
+    --bg3: #e8edf3;
+    --card: #ffffff;
+    --border: #d1dae6;
+    --accent: #e86820;
+    --accent-dark: #c45510;
+    --navy: #1a2e4a;
+    --navy2: #243d5e;
+    --navy3: #2f5080;
+    --accent2: #2f7dc8;
+    --accent3: #1d9e6f;
+    --danger: #d93025;
+    --warn: #e8920a;
+    --text: #1a2e4a;
+    --text2: #3d5573;
+    --text3: #7a90a8;
+    --proactivo: #1d9e6f;
+    --activo: #2f7dc8;
+    --reactivo: #e8920a;
+    --inactivo: #d93025;
+    --header-h: 72px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--navy);
+    border-bottom: 3px solid var(--accent);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-h);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(26,46,74,0.3);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+.header-center {
+    flex: 1;
+    text-align: center;
+  }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #ffffff;
+  }
+  .header-title span { color: var(--accent); }
+  .header-subtitle {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* País badge */
+  .pais-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .pais-badge .flag { font-size: 16px; }
+  .pais-badge .pais-label { font-size: 10px; color: rgba(255,255,255,0.4); display: block; }
+
+  .upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--accent);
+    border: none;
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: background 0.2s;
+  }
+  .upload-btn:hover { background: var(--accent-dark); }
+  .upload-btn svg { width: 14px; height: 14px; flex-shrink:0; }
+  #fileInput { display: none; }
+
+  .data-badge {
+    font-size: 11px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: rgba(255,255,255,0.4);
+  }
+  .data-badge.loaded { border-color: var(--accent3); color: #5dd4a8; }
+
+  /* ── NAV TABS ── */
+  .nav-tabs {
+    background: var(--navy2);
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+    padding: 0 28px;
+    display: flex;
+    gap: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .nav-tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 13px 18px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.5);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .nav-tab:hover { color: rgba(255,255,255,0.8); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── MAIN ── */
+  .main { padding: 22px 28px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── KPI ROW ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(26,46,74,0.07);
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--kpi-color, var(--accent));
+  }
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+  .kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--kpi-color, var(--text));
+    line-height: 1;
+  }
+  .kpi-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  /* ── GRIDS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-bottom: 14px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 4px rgba(26,46,74,0.07);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--bg3);
+  }
+  .card-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--navy2);
+  }
+  .card-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .badge-warn { background: #fff3e0; color: #c97a00; border: 1px solid #f5c060; }
+  .badge-ok   { background: #e8f7f2; color: #1d9e6f; border: 1px solid #9dd9c0; }
+  .badge-danger { background: #fdecea; color: #c0392b; border: 1px solid #f5a9a3; }
+  .badge-info  { background: #e8f1fb; color: #1a6db5; border: 1px solid #a3c4ee; }
+
+  /* ── CHARTS ── */
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-wrap canvas { max-width: 100%; }
+
+  /* ── FILTERS ── */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(26,46,74,0.05);
+  }
+  .filter-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    font-weight: 600;
+  }
+  .filter-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+
+  /* ── TABLES ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    background: var(--bg3);
+  }
+  th:hover { color: var(--accent); }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--bg3);
+    color: var(--text2);
+    white-space: nowrap;
+  }
+  tr:hover td { background: #f0f6ff; }
+  .score-cell { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600; }
+
+  /* ── CATEGORY BADGES ── */
+  .cat-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+  .cat-PROACTIVO { background: #e8f7f2; color: #1d9e6f; border-color: #9dd9c0; }
+  .cat-ACTIVO    { background: #e8f1fb; color: #1a6db5; border-color: #a3c4ee; }
+  .cat-REACTIVO  { background: #fff3e0; color: #c97a00; border-color: #f5c060; }
+  .cat-INACTIVO  { background: #fdecea; color: #c0392b; border-color: #f5a9a3; }
+
+  /* ── RANKING ── */
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--bg3);
+  }
+  .rank-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text3);
+    width: 26px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .rank-1 { color: var(--accent); }
+  .rank-2 { color: #7a90a8; }
+  .rank-3 { color: #a07d4a; }
+  .rank-name { flex: 1; font-size: 12px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-score { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 600; }
+
+  /* ── AREA CARDS ── */
+  .area-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .area-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(26,46,74,0.07);
+    position: relative;
+    overflow: hidden;
+  }
+  .area-card::before {
+    content:'';
+    position:absolute;
+    top:0;left:0;right:0;
+    height:3px;
+    background: var(--area-color, var(--accent));
+  }
+  .area-card-name { font-size: 11px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text3); margin-bottom:8px; font-weight:600; }
+  .area-card-score { font-family:'Barlow Condensed',sans-serif; font-size:40px; font-weight:700; line-height:1; margin-bottom:6px; }
+
+  /* ── CRITICOS LIST ── */
+  .critico-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--bg3);
+  }
+  .critico-name { flex: 1; font-size: 12px; color: var(--text2); }
+  .critico-pct { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; width:44px; text-align:right; }
+  .critico-bar { flex: 1.5; height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+  .critico-fill { height:100%; border-radius:3px; }
+  .critico-count { font-size:11px; color:var(--text3); width:46px; text-align:right; }
+
+  /* ── UPLOAD OVERLAY ── */
+  .upload-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26,46,74,0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    backdrop-filter: blur(6px);
+  }
+  .upload-box {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 52px 72px;
+    text-align: center;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(26,46,74,0.35);
+  }
+  .upload-box-logos { display:flex; align-items:center; justify-content:center; gap:24px; margin-bottom:28px; }
+  .upload-box-logos img { height:40px; object-fit:contain; }
+  .upload-box-divider { width:1px; height:36px; background:var(--border); }
+  .upload-box h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--navy);
+    margin-bottom: 8px;
+  }
+  .upload-box p { color: var(--text3); font-size: 13px; margin-bottom: 24px; line-height:1.6; }
+  .upload-primary-btn {
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 6px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .upload-primary-btn:hover { background: var(--accent-dark); }
+  .upload-hint { margin-top:16px; font-size:11px; color:var(--text3); }
+  .upload-icon { font-size:48px; margin-bottom:16px; }
+
+  /* ── STATS BOX ── */
+  .stat-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 0; border-bottom:1px solid var(--bg3);
+  }
+  .stat-key { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text3); font-weight:600; }
+  .stat-val { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:600; color:var(--navy); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:var(--bg3); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- UPLOAD OVERLAY (initial) -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-box" id="dropZone">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;letter-spacing:3px;color:#1a2e4a;margin-bottom:4px">
+      RED <span style="color:#e86820">ACTIVA</span>
+    </div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#7a90a8;margin-bottom:24px">Dashboard BPL · Arcor</div>
+    <div style="font-size:48px;margin-bottom:16px">📊</div>
+    <h2>Cargá el archivo para comenzar</h2>
+    <p>El país se detecta automáticamente del nombre del archivo.<br>
+    Ej: <strong>_CH_</strong> → 🇨🇱 Chile &nbsp;·&nbsp; <strong>_AR_</strong> → 🇦🇷 Argentina</p>
+    <button class="upload-primary-btn" onclick="document.getElementById('fileInputOverlay').click()">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      CARGAR ARCHIVO XLSX
+    </button>
+    <input type="file" id="fileInputOverlay" accept=".xlsx,.xls" style="display:none">
+    <p style="margin-top:14px;font-size:11px;color:#7a90a8">Formato: .xlsx · Hojas: Resumen, BPL Críticos, Respuestas Detalle, Estadísticos</p>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="brand-pill">
+      <span class="brand-ra">RED<span class="brand-accent"> ACTIVA</span></span>
+      <span class="brand-sep">|</span>
+      <span class="brand-bap">BPL Dashboard</span>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="header-subtitle" id="headerSubtitle">Auditorías de Buenas Prácticas Logísticas · Arcor</div>
+  </div>
+  <div class="header-right">
+    <div class="pais-badge" id="paisBadge" style="display:none">
+      <span class="flag" id="paisFlag">🌎</span>
+      <div>
+        <span class="pais-label">País</span>
+        <span id="paisNombre" style="font-size:14px;font-weight:700">—</span>
+      </div>
+    </div>
+    <span class="data-badge" id="dataBadge">Sin datos</span>
+    <label class="upload-btn" for="fileInput">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      Actualizar
+    </label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav-tabs">
+  <div class="nav-tab active" data-tab="resumen">Resumen Red</div>
+  <div class="nav-tab" data-tab="areas">Por Área</div>
+  <div class="nav-tab" data-tab="bpl">Por BPL</div>
+  <div class="nav-tab" data-tab="criticos">Críticos</div>
+  <div class="nav-tab" data-tab="distribuidores">Distribuidores</div>
+  <div class="nav-tab" data-tab="analisis">Análisis Especial</div>
+</nav>
+
+<main class="main">
+
+  <!-- RESUMEN RED -->
+  <div class="panel active" id="tab-resumen">
+    <div class="kpi-row" id="kpiRow"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Distribución por Categoría</span>
+          <span class="card-badge badge-info" id="totalDistBadge">— distribuidores</span>
+        </div>
+        <div class="chart-wrap" style="height:220px"><canvas id="chartCategorias"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Score promedio por Área</span>
+        </div>
+        <div class="chart-wrap" style="height:220px"><canvas id="chartAreas"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Top 5 Distribuidores</span>
+          <span class="card-badge badge-ok">Mejor Desempeño</span>
+        </div>
+        <div id="top5List"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Bottom 5 Distribuidores</span>
+          <span class="card-badge badge-danger">Requieren Atención</span>
+        </div>
+        <div id="bottom5List"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Score Total por Distribuidor</span></div>
+      <div class="chart-wrap" style="height:320px"><canvas id="chartDistribuidores"></canvas></div>
+    </div>
+  </div>
+
+  <!-- AREAS -->
+  <div class="panel" id="tab-areas">
+    <div class="area-cards" id="areaCards"></div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Score por Área — por Distribuidor</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="filter-label">Área:</span>
+          <select class="filter-select" id="areaFilter" onchange="renderAreaDetail()">
+            <option value="all">Todas</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:340px"><canvas id="chartAreaDist"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-header"><span class="card-title">Tabla — Score por Área por Distribuidor</span></div>
+      <div class="table-wrap"><table id="tableAreas"></table></div>
+    </div>
+  </div>
+
+  <!-- BPL -->
+  <div class="panel" id="tab-bpl">
+    <div class="filter-bar">
+      <span class="filter-label">Área:</span>
+      <select class="filter-select" id="bplAreaFilter" onchange="renderBPLPanel()">
+        <option value="all">Todas</option>
+        <option value="Infraestructura">Infraestructura</option>
+        <option value="Procesos Logísticos">Procesos Logísticos</option>
+        <option value="Gestión">Gestión</option>
+        <option value="Integridad del Producto">Integridad del Producto</option>
+      </select>
+      <span class="filter-label" style="margin-left:8px">Distribuidor:</span>
+      <select class="filter-select" id="bplDistFilter" onchange="renderBPLPanel()">
+        <option value="all">Todos</option>
+      </select>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header">
+        <span class="card-title">Score por BPL</span>
+        <span class="card-badge badge-info" id="bplCount">— BPLs</span>
+      </div>
+      <div class="chart-wrap" style="height:380px"><canvas id="chartBPL"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Tabla Detalle por BPL</span></div>
+      <div class="table-wrap"><table id="tableBPL"></table></div>
+    </div>
+  </div>
+
+  <!-- CRITICOS -->
+  <div class="panel" id="tab-criticos">
+    <div class="kpi-row" id="kpiCriticos" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">% NO CUMPLE por Crítico</span>
+          <span class="card-badge badge-danger">Incumplimientos</span>
+        </div>
+        <div id="criticosList"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Distribución Críticos por Distribuidor</span></div>
+        <div class="chart-wrap" style="height:300px"><canvas id="chartCriticos"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-header">
+        <span class="card-title">Detalle Críticos por Distribuidor</span>
+        <span class="card-badge badge-warn">Sólo con Incumplimientos</span>
+      </div>
+      <div class="table-wrap"><table id="tableCriticos"></table></div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUIDORES -->
+  <div class="panel" id="tab-distribuidores">
+    <div class="filter-bar">
+      <span class="filter-label">Categoría:</span>
+      <select class="filter-select" id="distCatFilter" onchange="renderDistPanel()">
+        <option value="all">Todas</option>
+        <option value="PROACTIVO">PROACTIVO</option>
+        <option value="ACTIVO">ACTIVO</option>
+        <option value="REACTIVO">REACTIVO</option>
+        <option value="INACTIVO">INACTIVO</option>
+      </select>
+      <span class="filter-label" style="margin-left:8px">Ordenar por:</span>
+      <select class="filter-select" id="distSortFilter" onchange="renderDistPanel()">
+        <option value="total">Total %</option>
+        <option value="ift">IFT %</option>
+        <option value="plg">PLG %</option>
+        <option value="gst">GST %</option>
+        <option value="idp">IDP %</option>
+      </select>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><span class="card-title">Scores IFT / PLG / GST / IDP por Distribuidor</span></div>
+      <div class="chart-wrap" style="height:340px"><canvas id="chartDistAreas"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Tabla Completa de Distribuidores</span></div>
+      <div class="table-wrap"><table id="tableDistribuidores"></table></div>
+    </div>
+  </div>
+
+  <!-- ANALISIS -->
+  <div class="panel" id="tab-analisis">
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Dispersión: IFT vs GST</span></div>
+        <div class="chart-wrap" style="height:260px"><canvas id="chartScatter"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Radar — Promedio por Área</span></div>
+        <div class="chart-wrap" style="height:260px"><canvas id="chartRadar"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header">
+        <span class="card-title">BPLs con Mayor Brecha de Mejora</span>
+        <span class="card-badge badge-danger">Focos de Mejora</span>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chartBrecha"></canvas></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Distribuidores bajo 70%</span>
+          <span class="card-badge badge-danger" id="bajo70Badge">0</span>
+        </div>
+        <div id="bajo70List"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Estadísticos Generales</span></div>
+        <div id="statsBox"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ===== GLOBALS =====
+let G = { resumen:[], detalle:[], criticos:[], bplSub:[], stats:[], loaded:false };
+let charts = {};
+
+// Chart.js light theme defaults
+Chart.defaults.color = '#7a90a8';
+Chart.defaults.borderColor = '#d1dae6';
+Chart.defaults.backgroundColor = 'rgba(0,0,0,0.02)';
+
+// ===== PAÍS DETECTION =====
+const PAISES = {
+  'AR': { nombre: 'Argentina', flag: '🇦🇷' },
+  'CL': { nombre: 'Chile',     flag: '🇨🇱' },
+  'CH': { nombre: 'Chile',     flag: '🇨🇱' },
+  'BR': { nombre: 'Brasil',    flag: '🇧🇷' },
+  'UY': { nombre: 'Uruguay',   flag: '🇺🇾' },
+  'PY': { nombre: 'Paraguay',  flag: '🇵🇾' },
+  'BO': { nombre: 'Bolivia',   flag: '🇧🇴' },
+  'PE': { nombre: 'Perú',      flag: '🇵🇪' },
+  'CO': { nombre: 'Colombia',  flag: '🇨🇴' },
+  'EC': { nombre: 'Ecuador',   flag: '🇪🇨' },
+  'MX': { nombre: 'México',    flag: '🇲🇽' },
+  'VE': { nombre: 'Venezuela', flag: '🇻🇪' },
+};
+
+function detectPais(filename) {
+  const upper = filename.toUpperCase();
+  // Match patterns like _CH_, _AR_, _BRL_, etc.
+  for (const [code, info] of Object.entries(PAISES)) {
+    const patterns = [
+      new RegExp(`_${code}_`),
+      new RegExp(`_${code}\\.`),
+      new RegExp(`[^A-Z]${code}[^A-Z]`),
+      new RegExp(`${code}[_\\-\\s]`),
+    ];
+    for (const re of patterns) {
+      if (re.test(upper)) return { code, ...info };
+    }
+  }
+  return null;
+}
+
+function showPais(pais) {
+  if (!pais) return;
+  document.getElementById('paisBadge').style.display = 'flex';
+  document.getElementById('paisFlag').textContent = pais.flag;
+  document.getElementById('paisNombre').textContent = pais.nombre;
+  document.getElementById('headerSubtitle').textContent =
+    `Auditorías BPL · ${pais.nombre}`;
+}
+
+// ===== ÁREA ORDER (fijo siempre) =====
+const AREA_ORDER = ['Infraestructura', 'Procesos Logísticos', 'Gestión', 'Integridad del Producto'];
+const AREA_COLORS_MAP = {
+  'Infraestructura':       '#2f7dc8',
+  'Procesos Logísticos':   '#1d9e6f',
+  'Gestión':               '#e86820',
+  'Integridad del Producto':'#8b5cf6'
+};
+function sortedAreas(areaSet) {
+  return AREA_ORDER.filter(a => areaSet.has(a));
+}
+
+// ===== UTILS =====
+function destroyChart(id) { if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+function scoreColor(v) {
+  if (v >= 90) return '#1d9e6f';
+  if (v >= 75) return '#2f7dc8';
+  if (v >= 60) return '#e8920a';
+  return '#d93025';
+}
+function catColor(cat) {
+  return {PROACTIVO:'#1d9e6f',ACTIVO:'#2f7dc8',REACTIVO:'#e8920a',INACTIVO:'#d93025'}[cat]||'#7a90a8';
+}
+
+// Chart.js defaults for light theme
+Chart.defaults.color = '#7a90a8';
+Chart.defaults.borderColor = '#d1dae6';
+
+// ===== EXCEL PARSING =====
+function parseExcel(file) {
+  // Detect country from filename
+  const pais = detectPais(file.name);
+  showPais(pais);
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      processWorkbook(wb, file.name);
+    } catch(err) { alert('Error al leer: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function sheetToArr(wb, name) {
+  const ws = wb.Sheets[name];
+  if (!ws) return [];
+  return XLSX.utils.sheet_to_json(ws, {defval:null});
+}
+
+function p2f(s) {
+  if (s===null||s===undefined) return null;
+  const n = parseFloat(String(s).replace('%','').replace(',','.').trim());
+  return isNaN(n) ? null : n;
+}
+
+function processWorkbook(wb, filename) {
+  G.resumen  = sheetToArr(wb,'Resumen');
+  G.detalle  = sheetToArr(wb,'Respuestas Detalle');
+  G.criticos = sheetToArr(wb,'BPL Críticos');
+  G.bplSub   = sheetToArr(wb,'Subtotales BPL');
+  G.stats    = sheetToArr(wb,'Estadísticos');
+  G.loaded   = true;
+
+  G.resumen.forEach(r => {
+    ['IFT %','PLG %','GST %','IDP %','Total %'].forEach(c => { r[c] = p2f(r[c]); });
+    if (r['Fecha'] && typeof r['Fecha']==='number') {
+      const d = XLSX.SSF.parse_date_code(r['Fecha']);
+      r['Fecha'] = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    }
+  });
+
+  document.getElementById('uploadOverlay').style.display = 'none';
+  document.getElementById('dataBadge').className = 'data-badge loaded';
+  document.getElementById('dataBadge').textContent = `${G.resumen.length} distribuidores`;
+
+  // Populate filters
+  const dists = [...new Set(G.resumen.map(r=>r['Distribuidor']))].sort();
+  const bplDistSel = document.getElementById('bplDistFilter');
+  bplDistSel.innerHTML = '<option value="all">Todos</option>';
+  dists.forEach(d => { bplDistSel.innerHTML += `<option value="${d}">${d}</option>`; });
+
+  const areas = [...new Set(G.detalle.map(r=>r['Área']).filter(Boolean))].sort();
+  const areaFilter = document.getElementById('areaFilter');
+  areaFilter.innerHTML = '<option value="all">Todas</option>';
+  areas.forEach(a => { areaFilter.innerHTML += `<option value="${a}">${a}</option>`; });
+
+  renderAll();
+}
+
+// ===== COMPUTE =====
+function getDetalleScores(filters={}) {
+  let d = G.detalle.filter(r => r['Respuesta']==='SI'||r['Respuesta']==='NO');
+  if (filters.dist && filters.dist!=='all') d = d.filter(r=>r['Distribuidor']===filters.dist);
+  if (filters.area && filters.area!=='all') d = d.filter(r=>r['Área']===filters.area);
+  return d;
+}
+
+function normalizeBPL(k) {
+  // Normalize BPL key: "7 " and "7 ALMACENAMIENTO..." -> use longest version
+  return String(k).trim();
+}
+function scoreBy(data, key) {
+  const g={};
+  data.forEach(r => {
+    let k=r[key]; if(!k) return;
+    if(key==='BPL') {
+      k=String(k).trim();
+      if(!k) return;
+    }
+    if(!g[k]) g[k]={si:0,no:0,label:k};
+    // prefer the longer label
+    if(key==='BPL' && k.length > g[k].label.length) g[k].label=k;
+    if(r['Respuesta']==='SI') g[k].si++; else g[k].no++;
+  });
+  // For BPL: merge entries with same numeric prefix
+  if(key==='BPL') {
+    const merged={};
+    Object.entries(g).forEach(([k,v])=>{
+      const num=parseInt(k);
+      if(!isNaN(num)) {
+        if(!merged[num]) merged[num]={si:0,no:0,label:k};
+        merged[num].si+=v.si;
+        merged[num].no+=v.no;
+        // keep the longer/more descriptive label
+        if(k.trim().length > merged[num].label.trim().length) merged[num].label=k;
+      } else {
+        merged[k]={si:v.si,no:v.no,label:k};
+      }
+    });
+    const res={};
+    Object.entries(merged).forEach(([,v])=>{
+      res[v.label]=Math.round(v.si/(v.si+v.no)*100*10)/10;
+    });
+    return res;
+  }
+  const res={};
+  Object.entries(g).forEach(([k,v]) => { res[k]=Math.round(v.si/(v.si+v.no)*100*10)/10; });
+  return res;
+}
+
+// ===== RENDER ALL =====
+function renderAll(){
+  renderResumen(); renderAreaPanel(); renderBPLPanel();
+  renderCriticosPanel(); renderDistPanel(); renderAnalisis();
+}
+
+// ===== RESUMEN =====
+function renderResumen(){
+  const r=G.resumen; if(!r.length) return;
+  const totals=r.map(x=>x['Total %']).filter(v=>v!==null);
+  const avg=x=>(x.reduce((a,b)=>a+b,0)/x.length).toFixed(1);
+  const cats={};
+  r.forEach(x=>{cats[x['Categoría']]=(cats[x['Categoría']]||0)+1;});
+
+  const detalleValid=getDetalleScores();
+  const areaScores=scoreBy(detalleValid,'Área');
+
+  // KPIs
+  const kpiData=[
+    {label:'Distribuidores',value:r.length,sub:'auditados',color:'var(--accent2)'},
+    {label:'Promedio Red',value:avg(totals)+'%',sub:'score total',color:scoreColor(parseFloat(avg(totals)))},
+    {label:'Mínimo',value:Math.min(...totals).toFixed(1)+'%',sub:'score más bajo',color:'var(--danger)'},
+    {label:'Máximo',value:Math.max(...totals).toFixed(1)+'%',sub:'score más alto',color:'var(--accent3)'},
+    {label:'Proactivo + Activo',value:(cats['PROACTIVO']||0)+(cats['ACTIVO']||0),sub:'distribuidores',color:'var(--accent3)'},
+    {label:'Reactivo + Inactivo',value:(cats['REACTIVO']||0)+(cats['INACTIVO']||0),sub:'requieren atención',color:'var(--danger)'},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpiData.map(k=>`
+    <div class="kpi" style="--kpi-color:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+  document.getElementById('totalDistBadge').textContent=`${r.length} distribuidores`;
+
+  // Chart Categorías
+  destroyChart('chartCategorias');
+  const catLabels=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
+  const catColors=['#1d9e6f','#2f7dc8','#e8920a','#d93025'];
+  charts['chartCategorias']=new Chart(document.getElementById('chartCategorias'),{
+    type:'doughnut',
+    data:{labels:catLabels,datasets:[{data:catLabels.map(c=>cats[c]||0),
+      backgroundColor:catColors.map(c=>c+'33'),borderColor:catColors,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'right',labels:{font:{size:12},padding:12}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw} distribuidores`}},
+        datalabels:{
+          color:'#1a2e4a',
+          font:{weight:'bold',size:14,family:"'Barlow Condensed',sans-serif"},
+          formatter:(value)=>value>0?value:'',
+          anchor:'center',align:'center'
+        }
+      }
+    },
+    plugins:[{
+      id:'datalabels-inline',
+      afterDatasetsDraw(chart){
+        const {ctx,data}=chart;
+        chart.getDatasetMeta(0).data.forEach((arc,i)=>{
+          const val=data.datasets[0].data[i];
+          if(val===0) return;
+          const {x,y}=arc.tooltipPosition();
+          ctx.save();
+          ctx.font="bold 14px 'Barlow Condensed',sans-serif";
+          ctx.fillStyle='#fff';
+          ctx.textAlign='center';
+          ctx.textBaseline='middle';
+          ctx.fillText(val,x,y);
+          ctx.restore();
+        });
+      }
+    }]
+  });
+
+  // Chart Áreas
+  destroyChart('chartAreas');
+  const areaLabels=Object.keys(areaScores).sort();
+  const areaVals=areaLabels.map(a=>areaScores[a]);
+  const AREA_COLORS=AREA_COLORS_MAP;
+  charts['chartAreas']=new Chart(document.getElementById('chartAreas'),{
+    type:'bar',
+    data:{labels:areaLabels,datasets:[{data:areaVals,
+      backgroundColor:areaLabels.map(a=>(AREA_COLORS[a]||'#7a90a8')+'33'),
+      borderColor:areaLabels.map(a=>AREA_COLORS[a]||'#7a90a8'),
+      borderWidth:2,borderRadius:5}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}},
+              y:{grid:{display:false}}},
+      plugins:{legend:{display:false}}}
+  });
+
+  // Top/Bottom 5
+  const sorted=[...r].sort((a,b)=>b['Total %']-a['Total %']);
+  document.getElementById('top5List').innerHTML=sorted.slice(0,5).map((d,i)=>`
+    <div class="ranking-item">
+      <span class="rank-num rank-${i+1}">${i+1}</span>
+      <span class="rank-name">${d['Distribuidor']}</span>
+      <span class="cat-badge cat-${d['Categoría']}">${d['Categoría']}</span>
+      <span class="rank-score" style="color:${scoreColor(d['Total %'])}">${d['Total %']}%</span>
+    </div>`).join('');
+  document.getElementById('bottom5List').innerHTML=[...sorted].reverse().slice(0,5).map((d,i)=>`
+    <div class="ranking-item">
+      <span class="rank-num" style="color:var(--danger)">${sorted.length-i}</span>
+      <span class="rank-name">${d['Distribuidor']}</span>
+      <span class="cat-badge cat-${d['Categoría']}">${d['Categoría']}</span>
+      <span class="rank-score" style="color:${scoreColor(d['Total %'])}">${d['Total %']}%</span>
+    </div>`).join('');
+
+  // Chart distribuidores
+  destroyChart('chartDistribuidores');
+  const ds=[...r].sort((a,b)=>b['Total %']-a['Total %']);
+  charts['chartDistribuidores']=new Chart(document.getElementById('chartDistribuidores'),{
+    type:'bar',
+    data:{
+      labels:ds.map(d=>d['Distribuidor'].length>24?d['Distribuidor'].substring(0,22)+'..':d['Distribuidor']),
+      datasets:[{label:'Total %',data:ds.map(d=>d['Total %']),
+        backgroundColor:ds.map(d=>catColor(d['Categoría'])+'44'),
+        borderColor:ds.map(d=>catColor(d['Categoría'])),
+        borderWidth:1.5,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{ticks:{font:{size:10},maxRotation:45},grid:{display:false}},
+              y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw}%`}}}}
+  });
+}
+
+// ===== AREAS =====
+function renderAreaPanel(){
+  const detalleValid=getDetalleScores();
+  const areaScores=scoreBy(detalleValid,'Área');
+  const areas=sortedAreas(new Set(Object.keys(areaScores)));
+  const AREA_COLORS=AREA_COLORS_MAP;
+
+  document.getElementById('areaCards').innerHTML=areas.map(a=>{
+    const score=areaScores[a]; const color=AREA_COLORS[a]||'#7a90a8';
+    return `<div class="area-card" style="--area-color:${color}">
+      <div class="area-card-name">${a}</div>
+      <div class="area-card-score" style="color:${color}">${score}%</div>
+      <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px">
+        <div style="height:100%;width:${score}%;background:${color};border-radius:3px"></div>
+      </div>
+    </div>`;
+  }).join('');
+  renderAreaDetail(); renderAreaTable();
+}
+
+function renderAreaDetail(){
+  const filterArea=document.getElementById('areaFilter').value;
+  const detalleValid=getDetalleScores();
+  const dists=[...new Set(G.resumen.map(r=>r['Distribuidor']))];
+  const areaSet=new Set(detalleValid.map(r=>r['Área']).filter(Boolean));
+  const areas=filterArea==='all'?sortedAreas(areaSet):[filterArea];
+  const PALETTE=['#2f7dc8','#1d9e6f','#e86820','#8b5cf6'];
+  const datasets=areas.map((area,i)=>{
+    const color=PALETTE[i%PALETTE.length];
+    return {label:area,data:dists.map(dist=>{
+      const d=detalleValid.filter(r=>r['Distribuidor']===dist&&r['Área']===area);
+      if(!d.length) return null;
+      return Math.round(d.filter(r=>r['Respuesta']==='SI').length/d.length*1000)/10;
+    }),backgroundColor:color+'44',borderColor:color,borderWidth:1.5,borderRadius:2};
+  });
+  destroyChart('chartAreaDist');
+  charts['chartAreaDist']=new Chart(document.getElementById('chartAreaDist'),{
+    type:'bar',
+    data:{labels:dists.map(d=>d.length>20?d.substring(0,18)+'..':d),datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{ticks:{font:{size:9},maxRotation:45},grid:{display:false}},
+              y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}}},
+      plugins:{legend:{labels:{font:{size:11}}}}}
+  });
+}
+
+function renderAreaTable(){
+  const detalleValid=getDetalleScores();
+  const areas=sortedAreas(new Set(detalleValid.map(r=>r['Área']).filter(Boolean)));
+  const dists=[...new Set(G.resumen.map(r=>r['Distribuidor']))];
+  const totalByDist={};
+  G.resumen.forEach(r=>{totalByDist[r['Distribuidor']]=r['Total %'];});
+  let html=`<thead><tr><th>Distribuidor</th><th>Total %</th>${areas.map(a=>`<th>${a}</th>`).join('')}<th>Categoría</th></tr></thead><tbody>`;
+  [...dists].sort((a,b)=>(totalByDist[b]||0)-(totalByDist[a]||0)).forEach(dist=>{
+    const cat=(G.resumen.find(r=>r['Distribuidor']===dist)||{})['Categoría']||'';
+    html+=`<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${dist}</td>
+      <td class="score-cell" style="color:${scoreColor(totalByDist[dist]||0)}">${totalByDist[dist]||'—'}%</td>
+      ${areas.map(area=>{
+        const d=detalleValid.filter(r=>r['Distribuidor']===dist&&r['Área']===area);
+        if(!d.length) return '<td style="color:var(--text3)">—</td>';
+        const sc=Math.round(d.filter(r=>r['Respuesta']==='SI').length/d.length*1000)/10;
+        return `<td class="score-cell" style="color:${scoreColor(sc)}">${sc}%</td>`;
+      }).join('')}
+      <td><span class="cat-badge cat-${cat}">${cat}</span></td></tr>`;
+  });
+  html+='</tbody>';
+  document.getElementById('tableAreas').innerHTML=html;
+}
+
+// ===== BPL =====
+function renderBPLPanel(){
+  const filterArea=document.getElementById('bplAreaFilter').value;
+  const filterDist=document.getElementById('bplDistFilter').value;
+  const detalleValid=getDetalleScores({dist:filterDist,area:filterArea});
+  const bplScores=scoreBy(detalleValid,'BPL');
+  const bplAreaMap={};
+  G.detalle.forEach(r=>{if(r['BPL']&&r['Área']) bplAreaMap[r['BPL']]=r['Área'];});
+
+  let bplEntries=Object.entries(bplScores).filter(([k])=>k.trim()).sort((a,b)=>parseInt(a[0])-parseInt(b[0]));
+  document.getElementById('bplCount').textContent=bplEntries.length+' BPLs';
+
+  const AREA_COLORS=AREA_COLORS_MAP;
+  const colors=bplEntries.map(([k])=>AREA_COLORS[bplAreaMap[k]]||'#7a90a8');
+
+  destroyChart('chartBPL');
+  charts['chartBPL']=new Chart(document.getElementById('chartBPL'),{
+    type:'bar',
+    data:{labels:bplEntries.map(([k])=>k.length>30?k.substring(0,28)+'..':k),
+      datasets:[{data:bplEntries.map(([,v])=>v),
+        backgroundColor:colors.map(c=>c+'44'),borderColor:colors,borderWidth:1.5,borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}},y:{grid:{display:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw}%`}}}}
+  });
+
+  let html=`<thead><tr><th>Nº</th><th>BPL</th><th>Área</th><th>Score %</th><th>SI</th><th>NO</th><th>Total</th></tr></thead><tbody>`;
+  bplEntries.forEach(([bpl,score])=>{
+    const d=detalleValid.filter(r=>r['BPL']===bpl);
+    const si=d.filter(r=>r['Respuesta']==='SI').length;
+    const no=d.filter(r=>r['Respuesta']==='NO').length;
+    const area=bplAreaMap[bpl]||'—';
+    html+=`<tr><td style="color:var(--text3)">${parseInt(bpl)||'—'}</td><td>${bpl}</td>
+      <td style="color:${AREA_COLORS[area]||'var(--text3)'};font-size:11px;font-weight:600">${area}</td>
+      <td class="score-cell" style="color:${scoreColor(score)}">${score}%</td>
+      <td style="color:var(--accent3)">${si}</td><td style="color:var(--danger)">${no}</td>
+      <td style="color:var(--text3)">${si+no}</td></tr>`;
+  });
+  html+='</tbody>';
+  document.getElementById('tableBPL').innerHTML=html;
+}
+
+// ===== CRITICOS =====
+function renderCriticosPanel(){
+  const crit=G.criticos; if(!crit.length) return;
+  const critCols=Object.keys(crit[0]).filter(k=>k.startsWith('CRITICO'));
+  const totalRows=crit.length;
+  const totalNoCumple=crit.reduce((acc,r)=>acc+critCols.filter(c=>r[c]==='NO CUMPLE').length,0);
+  const distConFallos=crit.filter(r=>critCols.some(c=>r[c]==='NO CUMPLE')).length;
+
+  document.getElementById('kpiCriticos').innerHTML=`
+    <div class="kpi" style="--kpi-color:var(--danger)"><div class="kpi-label">Total NO CUMPLE</div><div class="kpi-value">${totalNoCumple}</div><div class="kpi-sub">incumplimientos</div></div>
+    <div class="kpi" style="--kpi-color:var(--warn)"><div class="kpi-label">Dist. con Fallos</div><div class="kpi-value">${distConFallos}</div><div class="kpi-sub">${Math.round(distConFallos/totalRows*100)}% del total</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent2)"><div class="kpi-label">Prom. Fallos/Dist</div><div class="kpi-value">${(totalNoCumple/totalRows).toFixed(1)}</div><div class="kpi-sub">promedio</div></div>
+    <div class="kpi" style="--kpi-color:var(--accent3)"><div class="kpi-label">Sin Incumplimientos</div><div class="kpi-value">${totalRows-distConFallos}</div><div class="kpi-sub">críticos OK</div></div>`;
+
+  // Sort críticos numerically (CRITICO 1, 2, ... 12)
+  const critStats=critCols.map(col=>{
+    const nc=crit.filter(r=>r[col]==='NO CUMPLE').length;
+    const num=parseInt(col.replace('CRITICO ',''));
+    return {name:col,nc,pct:Math.round(nc/totalRows*100),num};
+  }).sort((a,b)=>a.num-b.num);
+
+  document.getElementById('criticosList').innerHTML=critStats.map(c=>{
+    const color=c.pct>=60?'#d93025':c.pct>=30?'#e8920a':'#1d9e6f';
+    return `<div class="critico-row">
+      <span class="critico-name">${c.name.replace('CRITICO ','C').replace(/ - /,' ')}</span>
+      <div class="critico-bar"><div class="critico-fill" style="width:${c.pct}%;background:${color}"></div></div>
+      <span class="critico-pct" style="color:${color}">${c.pct}%</span>
+      <span class="critico-count">${c.nc}/${totalRows}</span></div>`;
+  }).join('');
+
+  destroyChart('chartCriticos');
+  charts['chartCriticos']=new Chart(document.getElementById('chartCriticos'),{
+    type:'bar',
+    data:{labels:critStats.map(c=>c.name.replace('CRITICO ','C').replace(/ - .*/,'')),
+      datasets:[
+        {label:'NO CUMPLE',data:critStats.map(c=>c.nc),backgroundColor:'#d9302533',borderColor:'#d93025',borderWidth:1.5,borderRadius:3},
+        {label:'CUMPLE',data:critStats.map(c=>totalRows-c.nc),backgroundColor:'#1d9e6f33',borderColor:'#1d9e6f',borderWidth:1.5,borderRadius:3}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{stacked:true,ticks:{font:{size:10}},grid:{display:false}},y:{stacked:true,grid:{color:'#e8edf3'}}},
+      plugins:{legend:{labels:{font:{size:11}}}}}
+  });
+
+  const withFails=crit.map(r=>({...r,
+    totalNC:critCols.filter(c=>r[c]==='NO CUMPLE').length,
+    fallos:critCols.filter(c=>r[c]==='NO CUMPLE').map(c=>c.replace('CRITICO ','C').replace(/ - .*/,''))
+  })).filter(r=>r.totalNC>0).sort((a,b)=>b.totalNC-a.totalNC);
+
+  let html=`<thead><tr><th>Distribuidor</th><th>Categoría</th><th>Fallos</th><th>Críticos NO CUMPLE</th></tr></thead><tbody>`;
+  withFails.forEach(r=>{
+    const cat=r['Categoría']||'—';
+    html+=`<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${r['Distribuidor']}</td>
+      <td><span class="cat-badge cat-${cat}">${cat}</span></td>
+      <td class="score-cell" style="color:var(--danger)">${r.totalNC}/12</td>
+      <td style="color:var(--warn);font-size:11px">${r.fallos.join(', ')}</td></tr>`;
+  });
+  document.getElementById('tableCriticos').innerHTML=html+'</tbody>';
+}
+
+// ===== DISTRIBUIDORES =====
+function renderDistPanel(){
+  const filterCat=document.getElementById('distCatFilter').value;
+  const sortBy=document.getElementById('distSortFilter').value;
+  const sortMap={total:'Total %',ift:'IFT %',plg:'PLG %',gst:'GST %',idp:'IDP %'};
+  let dists=[...G.resumen];
+  if(filterCat!=='all') dists=dists.filter(r=>r['Categoría']===filterCat);
+  dists.sort((a,b)=>(b[sortMap[sortBy]]||0)-(a[sortMap[sortBy]]||0));
+
+  const PALETTE=['#2f7dc8','#1d9e6f','#e86820','#8b5cf6'];
+  const areas=['IFT %','PLG %','GST %','IDP %'];
+  destroyChart('chartDistAreas');
+  charts['chartDistAreas']=new Chart(document.getElementById('chartDistAreas'),{
+    type:'bar',
+    data:{labels:dists.map(d=>d['Distribuidor'].length>22?d['Distribuidor'].substring(0,20)+'..':d['Distribuidor']),
+      datasets:areas.map((a,i)=>({label:a.replace(' %',''),data:dists.map(d=>d[a]),
+        backgroundColor:PALETTE[i]+'44',borderColor:PALETTE[i],borderWidth:1,borderRadius:2}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{ticks:{font:{size:9},maxRotation:45},grid:{display:false}},
+              y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}}},
+      plugins:{legend:{labels:{font:{size:11}}}}}
+  });
+
+  let html=`<thead><tr><th>#</th><th>Distribuidor</th><th>Total %</th><th>IFT %</th><th>PLG %</th><th>GST %</th><th>IDP %</th><th>Críticos</th><th>Categoría</th></tr></thead><tbody>`;
+  dists.forEach((d,i)=>{
+    html+=`<tr><td style="color:var(--text3)">${i+1}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${d['Distribuidor']}</td>
+      <td class="score-cell" style="color:${scoreColor(d['Total %']||0)}">${d['Total %']||'—'}%</td>
+      <td style="color:${scoreColor(d['IFT %']||0)}">${d['IFT %']||'—'}%</td>
+      <td style="color:${scoreColor(d['PLG %']||0)}">${d['PLG %']||'—'}%</td>
+      <td style="color:${scoreColor(d['GST %']||0)}">${d['GST %']||'—'}%</td>
+      <td style="color:${scoreColor(d['IDP %']||0)}">${d['IDP %']||'—'}%</td>
+      <td>${d['Crit.']||'—'}</td>
+      <td><span class="cat-badge cat-${d['Categoría']}">${d['Categoría']}</span></td></tr>`;
+  });
+  document.getElementById('tableDistribuidores').innerHTML=html+'</tbody>';
+}
+
+// ===== ANALISIS =====
+function renderAnalisis(){
+  const r=G.resumen; if(!r.length) return;
+  const detalleValid=getDetalleScores();
+  const areaScores=scoreBy(detalleValid,'Área');
+
+  // Scatter - promedio por distribuidor (IFT% vs GST%)
+  destroyChart('chartScatter');
+  // Compute per-distribuidor averages from detalle
+  const distIFT={}, distGST={};
+  const dv=getDetalleScores();
+  dv.forEach(row=>{
+    const dist=row['Distribuidor'], area=row['Área'];
+    if(!dist) return;
+    if(area==='Infraestructura'){
+      if(!distIFT[dist]) distIFT[dist]={si:0,tot:0};
+      distIFT[dist].si+=(row['Respuesta']==='SI'?1:0);
+      distIFT[dist].tot++;
+    }
+    if(area==='Gestión'){
+      if(!distGST[dist]) distGST[dist]={si:0,tot:0};
+      distGST[dist].si+=(row['Respuesta']==='SI'?1:0);
+      distGST[dist].tot++;
+    }
+  });
+  const scatterData=r.filter(d=>distIFT[d['Distribuidor']]&&distGST[d['Distribuidor']]).map(d=>{
+    const ift=Math.round(distIFT[d['Distribuidor']].si/distIFT[d['Distribuidor']].tot*1000)/10;
+    const gst=Math.round(distGST[d['Distribuidor']].si/distGST[d['Distribuidor']].tot*1000)/10;
+    return {x:ift,y:gst,label:d['Distribuidor'],cat:d['Categoría']};
+  });
+  const iftMin=Math.max(0,Math.min(...scatterData.map(d=>d.x))-5);
+  const iftMax=Math.min(100,Math.max(...scatterData.map(d=>d.x))+5);
+  const gstMin=Math.max(0,Math.min(...scatterData.map(d=>d.y))-5);
+  const gstMax=Math.min(100,Math.max(...scatterData.map(d=>d.y))+5);
+  charts['chartScatter']=new Chart(document.getElementById('chartScatter'),{
+    type:'scatter',
+    data:{datasets:[{
+      data:scatterData,
+      backgroundColor:scatterData.map(d=>catColor(d.cat)+'bb'),
+      borderColor:scatterData.map(d=>catColor(d.cat)),
+      pointRadius:7,borderWidth:1.5
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{
+        x:{min:iftMin,max:iftMax,title:{display:true,text:'Infraestructura %',color:'#7a90a8'},ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}},
+        y:{min:gstMin,max:gstMax,title:{display:true,text:'Gestión %',color:'#7a90a8'},ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}}
+      },
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:ctx=>[ctx.raw.label.length>30?ctx.raw.label.substring(0,28)+'..':ctx.raw.label,
+                    `Infraestructura: ${ctx.raw.x}%  |  Gestión: ${ctx.raw.y}%`]
+      }}}
+    }
+  });
+
+  // Radar
+  const radarLabels=sortedAreas(new Set(Object.keys(areaScores)));
+  destroyChart('chartRadar');
+  charts['chartRadar']=new Chart(document.getElementById('chartRadar'),{
+    type:'radar',
+    data:{labels:radarLabels,datasets:[{label:'Promedio Red',data:radarLabels.map(a=>areaScores[a]),
+      backgroundColor:'rgba(232,104,32,0.15)',borderColor:'#e86820',borderWidth:2,
+      pointBackgroundColor:'#e86820',pointRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{r:{min:0,max:100,ticks:{backdropColor:'transparent',stepSize:25},
+        grid:{color:'#d1dae6'},pointLabels:{color:'#3d5573',font:{size:12}}}},
+      plugins:{legend:{labels:{font:{size:11}}}}}
+  });
+
+  // Brecha
+  const bplScores=scoreBy(detalleValid,'BPL');
+  const bottom10=Object.entries(bplScores).filter(([k])=>k.trim()).sort((a,b)=>a[1]-b[1]).slice(0,10);
+  destroyChart('chartBrecha');
+  charts['chartBrecha']=new Chart(document.getElementById('chartBrecha'),{
+    type:'bar',
+    data:{labels:bottom10.map(([k])=>k.length>30?k.substring(0,28)+'..':k),
+      datasets:[
+        {label:'Score actual',data:bottom10.map(([,v])=>v),backgroundColor:bottom10.map(([,v])=>scoreColor(v)+'55'),borderColor:bottom10.map(([,v])=>scoreColor(v)),borderWidth:1.5,borderRadius:3},
+        {label:'Brecha al 100%',data:bottom10.map(([,v])=>100-v),backgroundColor:'#d9302520',borderColor:'#d9302555',borderWidth:1,borderRadius:3}
+      ]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{stacked:true,min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}},
+              y:{stacked:true,grid:{display:false}}},
+      plugins:{legend:{labels:{font:{size:11}}}}}
+  });
+
+  // Bajo 70%
+  const bajo70=[...r].filter(d=>d['Total %']<70).sort((a,b)=>a['Total %']-b['Total %']);
+  document.getElementById('bajo70Badge').textContent=bajo70.length;
+  document.getElementById('bajo70List').innerHTML=bajo70.length?bajo70.map(d=>`
+    <div class="ranking-item">
+      <span class="rank-name">${d['Distribuidor']}</span>
+      <span class="cat-badge cat-${d['Categoría']}">${d['Categoría']}</span>
+      <span class="rank-score" style="color:${scoreColor(d['Total %'])}">${d['Total %']}%</span>
+    </div>`).join(''):'<div style="color:var(--accent3);text-align:center;padding:20px;font-weight:600">✓ Ningún distribuidor bajo 70%</div>';
+
+  // Stats
+  const st=G.stats;
+  if(st.length){
+    document.getElementById('statsBox').innerHTML=st.map(s=>`
+      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid var(--border)">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">EDICIÓN ${s['Edición']}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[['N Auditorías',s['N auditorías']],['Media',s['Media %']],['Mediana',s['Mediana %']],['Mínimo',s['Mínimo %']],['Máximo',s['Máximo %']],['Desv.Est.',s['Desv.Est. %']]].map(([k,v])=>`
+            <div class="stat-row"><span class="stat-key">${k}</span><span class="stat-val">${v||'—'}</span></div>`).join('')}
+        </div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+          ${[['PROACTIVO','#1d9e6f',s['PROACTIVO']],['ACTIVO','#2f7dc8',s['ACTIVO']],['REACTIVO','#e8920a',s['REACTIVO']],['INACTIVO','#d93025',s['INACTIVO']]].map(([k,c,v])=>`
+            <div style="display:flex;align-items:center;gap:5px;background:var(--card);padding:4px 10px;border-radius:4px;border:1px solid var(--border)">
+              <span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block"></span>
+              <span style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">${k}</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:${c}">${v}</span>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+}
+
+// ===== TABS =====
+document.querySelectorAll('.nav-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== FILE INPUTS =====
+function handleFile(file){
+  if(!file) return;
+  if(!file.name.match(/\.xlsx?$/i)){alert('Por favor seleccioná un archivo .xlsx');return;}
+  parseExcel(file);
+}
+['fileInput','fileInputOverlay'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('change',e=>{
+    if(e.target.files[0]){ handleFile(e.target.files[0]); el.value=''; }
+  });
+});
+
+const dropZone=document.getElementById('dropZone');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.style.borderColor='#e86820';});
+dropZone.addEventListener('dragleave',()=>{dropZone.style.borderColor='';});
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.style.borderColor='';handleFile(e.dataTransfer.files[0]);});
+</script>
+</body>
+</html>
