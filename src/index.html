@@ -6656,6 +6656,7 @@ async function generateDistPPTX(){
   })();
   if(!curAudit){ showToast('⚠️ Cargá una auditoría primero'); return; }
   showToast('⏳ Generando informe de '+curAudit.distribuidor+'...');
+  try {
 
   const dist = curAudit.distribuidor;
   const ed   = curAudit.edicion;
@@ -6952,20 +6953,21 @@ async function generateDistPPTX(){
 
   // Save
   const fileName='Informe - EV'+ed+' - '+dist.substring(0,50)+'.pptx';
-  try{
-    if(window.electronAPI?.savePptxDirect){
-      const ab=await pptx.write({outputType:'arraybuffer'});
-      const u8=Array.from(new Uint8Array(ab));
-      const res=await window.electronAPI.savePptxDirect(u8,fileName);
-      if(res?.success) showToast('✅ Informe guardado: '+res.filePath.split('\\').pop());
-      else showToast('⚠️ Guardado cancelado');
-    }else{
-      await pptx.writeFile({fileName});
-      showToast('✅ Descargando: '+fileName);
-    }
+  if(window.electronAPI?.savePptxDirect){
+    const ab=await pptx.write({outputType:'arraybuffer'});
+    const u8=Array.from(new Uint8Array(ab));
+    const res=await window.electronAPI.savePptxDirect(u8,fileName);
+    if(res?.success) showToast('✅ Informe guardado: '+res.filePath.split('\\').pop());
+    else showToast('⚠️ Guardado cancelado');
+  }else{
+    await pptx.writeFile({fileName});
+    showToast('✅ Descargando: '+fileName);
+  }
+
   }catch(e){
     console.error('PPTX informe error:',e);
-    showToast('❌ Error PPTX: '+(e.message||String(e)));
+    showToast('❌ Error: '+(e.message||String(e)));
+    alert('Error generando informe:\n'+e.message+'\n\n'+String(e.stack||'').substring(0,300));
   }
 }
 
