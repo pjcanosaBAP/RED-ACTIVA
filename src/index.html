@@ -5145,7 +5145,7 @@ async function exportDistExcel(){
       pageSetup:{fitToPage:true,fitToWidth:1}
     });
     ws.columns=[
-      {width:6},{width:42},{width:12},{width:14},{width:18},{width:10},{width:14}
+      {width:2},{width:38},{width:8},{width:10},{width:14},{width:12}
     ];
 
     // Fila 1 — Título principal
@@ -5188,64 +5188,61 @@ async function exportDistExcel(){
 
     ws.addRow([]).height=10;
 
-    // Tabla de áreas — header
-    const rAH=ws.addRow(['','ÁREA','NOMBRE','PESO','PUNTAJE','','CATEGORÍA']);
+    // Tabla de áreas — header: NOMBRE | ÁREA | PESO | ADHERENCIA | PUNTAJE
+    const rAH=ws.addRow(['','NOMBRE','ÁREA','PESO','ADHERENCIA','PUNTAJE']);
     rAH.height=20;
-    [2,3,4,5,7].forEach(i=>applyStyle(rAH.getCell(i),
+    [2,3,4,5,6].forEach(i=>applyStyle(rAH.getCell(i),
       {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
       solidFill(NAVY),centerMid,bottomBorder('FF475569')));
-    ws.mergeCells(`E${rAH.number}:F${rAH.number}`);
 
-    // Filas de áreas
+    // Filas de áreas — sin columna categoría, con adherencia = peso × puntaje
     SHEETS_CORE().forEach((sh,si)=>{
       const v=(sc.areas||{})[sh]||0;
+      const w=AW[sh]||0;
+      const adh=v*w; // adherencia = puntaje × peso
       const aARGB=AR(AC[sh]||'#607d8b');
       const bg=si%2===0?LGRAY:'FFFFFFFF';
-      const rA=ws.addRow(['',sh,AN[sh]||sh,((AW[sh]||0)*100).toFixed(0)+'%',pctStr(v),'',cat]);
+      const rA=ws.addRow(['',AN[sh]||sh,sh,(w*100).toFixed(0)+'%',pctStr(adh),pctStr(v)]);
       rA.height=20;
-      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),centerMid);
-      applyStyle(rA.getCell(3),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
+      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),leftMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
       applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
-      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(bg),centerMid);
-      ws.mergeCells(`E${rA.number}:F${rA.number}`);
-      applyStyle(rA.getCell(7),{name:'Calibri',bold:true,size:9,color:{argb:WHITE}},solidFill(AR(catHex)),centerMid);
+      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(adh)}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(bg),centerMid);
     });
     SHEETS_NV().forEach(sh=>{
       const v=(sc.areas||{})[sh]||0;
       const aARGB=AR(AC[sh]||'#94a3b8');
-      const rA=ws.addRow(['',sh,(AN[sh]||sh)+' · No Vinculante','—',pctStr(v),'','NV']);
+      const rA=ws.addRow(['',(AN[sh]||sh)+' · No Vinculante',sh,'—','—',pctStr(v)]);
       rA.height=18;
-      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),centerMid);
-      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10,color:{argb:'FF64748B'}},solidFill('FFF1F5F9'),leftMid);
+      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),leftMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
       applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
-      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill('FFF1F5F9'),centerMid);
-      ws.mergeCells(`E${rA.number}:F${rA.number}`);
-      applyStyle(rA.getCell(7),{name:'Calibri',size:9,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(5),{name:'Calibri',size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill('FFF1F5F9'),centerMid);
     });
 
     ws.addRow([]).height=12;
 
-    // Tabla de críticos — header
-    const rCH=ws.addRow(['','COD.','ÁREA','ATRIBUTO BPL','COMP.','','ESTADO']);
+    // Tabla de críticos — header: ATRIBUTO BPL | COD. | ÁREA | COMP. | ESTADO
+    const rCH=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO']);
     rCH.height=20;
-    [2,3,4,5,7].forEach(i=>applyStyle(rCH.getCell(i),
+    [2,3,4,5,6].forEach(i=>applyStyle(rCH.getCell(i),
       {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
       solidFill(NAVY),centerMid,bottomBorder('FF475569')));
-    ws.mergeCells(`E${rCH.number}:F${rCH.number}`);
 
     CRIT_LIST.forEach((c,ci)=>{
       const met=isMet_(c.tag);
       const qs=Q.filter(q=>q.critico===c.tag);
       const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
       const bg=ci%2===0?LGRAY:'FFFFFFFF';
-      const rC=ws.addRow(['','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',qs[0]?.bpl_name||'',siQ+'/'+qs.length,'',met?'✓ CUMPLE':'✗ NO CUMPLE']);
+      const rC=ws.addRow(['',qs[0]?.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE']);
       rC.height=18;
-      applyStyle(rC.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(3),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(4),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
+      applyStyle(rC.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
+      applyStyle(rC.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
       applyStyle(rC.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:met?'FF00A854':'FFD63030'}},solidFill(bg),centerMid);
-      ws.mergeCells(`E${rC.number}:F${rC.number}`);
-      applyStyle(rC.getCell(7),
+      applyStyle(rC.getCell(6),
         {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
         solidFill(met?'FF00A854':'FFD63030'),centerMid);
     });
