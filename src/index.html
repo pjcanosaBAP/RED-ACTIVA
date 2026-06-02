@@ -448,10 +448,17 @@ body.sb-mini #sb-pending-panel{display:none!important;}
 .sn-tab.sn-disabled{opacity:.4;pointer-events:none;}
 
 /* ═══ GAUGE (SVG score ring) ═══ */
-.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0;}
 .gauge-svg{filter:drop-shadow(0 2px 6px rgba(0,0,0,.1));}
 .gauge-score{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:var(--navy);}
 .gauge-label{font-size:10px;color:var(--g400);letter-spacing:1px;text-transform:uppercase;}
+.gauge-cat-badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#fff;margin-top:2px;}
+/* mini donuts grid */
+.area-donuts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;}
+.area-donut-cell{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.area-donut-lbl{font-size:10px;font-weight:700;letter-spacing:.5px;}
+.area-donut-name{font-size:9px;color:var(--g400);text-align:center;line-height:1.2;}
+.score-pos-wrap{display:flex;gap:16px;align-items:center;}
 
 /* ═══ HEATMAP ═══ */
 .heatmap-wrap{overflow-x:auto;}
@@ -3928,8 +3935,8 @@ function _deltaHTML(delta){
 // Build SVG gauge for a 0-1 score value
 function _buildGaugeSVG(score, color){
   const pct=score||0;
-  const r=52, cx=70, cy=70;
-  const startAngle=-210, endAngle=30; // 240 degree arc
+  const r=58, cx=78, cy=78;
+  const startAngle=-210, endAngle=30;
   const totalDeg=240;
   const filledDeg=totalDeg*pct;
   function polarToXY(deg,radius){
@@ -3945,10 +3952,27 @@ function _buildGaugeSVG(score, color){
   const fgPath=arcPath(startAngle, startAngle+filledDeg, r);
   const pctTxt=(pct*100).toFixed(1)+'%';
   const colStr=color||'#1d4ed8';
-  return '<svg width="140" height="100" viewBox="0 0 140 100" class="gauge-svg">'
-    +'<path d="'+bgPath+'" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>'
-    +(pct>0?'<path d="'+fgPath+'" fill="none" stroke="'+colStr+'" stroke-width="10" stroke-linecap="round"/>':'')
-    +'<text x="'+cx+'" y="'+(cy+8)+'" text-anchor="middle" font-family="\'Barlow Condensed\',sans-serif" font-size="20" font-weight="900" fill="'+colStr+'">'+pctTxt+'</text>'
+  return '<svg width="156" height="112" viewBox="0 0 156 112" class="gauge-svg">'
+    +'<path d="'+bgPath+'" fill="none" stroke="#e5e7eb" stroke-width="12" stroke-linecap="round"/>'
+    +(pct>0?'<path d="'+fgPath+'" fill="none" stroke="'+colStr+'" stroke-width="12" stroke-linecap="round"/>':'')
+    +'<text x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" font-family="\'Barlow Condensed\',sans-serif" font-size="26" font-weight="900" fill="'+colStr+'">'+pctTxt+'</text>'
+    +'</svg>';
+}
+function _buildMiniDonutSVG(score, colorHex){
+  const pct=Math.max(0,Math.min(1,score||0));
+  const r=26, cx=32, cy=32, sw=6;
+  const circ=2*Math.PI*r;
+  const filled=pct*circ;
+  const offset=circ*0.25; // start from top
+  const col=colorHex||'#1d4ed8';
+  const txt=(pct*100).toFixed(0)+'%';
+  return '<svg width="64" height="64" viewBox="0 0 64 64">'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="#e5e7eb" stroke-width="'+sw+'"/>'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+sw+'"'
+    +' stroke-dasharray="'+filled.toFixed(2)+' '+circ.toFixed(2)+'"'
+    +' stroke-dashoffset="'+offset.toFixed(2)+'" stroke-linecap="round"/>'
+    +'<text x="'+cx+'" y="'+cx+'" text-anchor="middle" dominant-baseline="middle"'
+    +' font-family="\'Barlow Condensed\',sans-serif" font-size="13" font-weight="900" fill="'+col+'">'+txt+'</text>'
     +'</svg>';
 }
 
@@ -3961,34 +3985,56 @@ function renderDashResumen(){
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   const audit=dist&&edicion?saved.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;}):null;
 
-  // Gauge
+  // Gauge + área donuts
   const gaugeWrap=document.getElementById('dash-gauge-wrap');
   if(gaugeWrap){
     if(audit&&audit.scores){
       const sc=audit.scores.total||0;
       const cat=recomputeCategory(audit)||'PENDIENTE';
       const col=_catColor(cat);
-      gaugeWrap.innerHTML='<div class="gauge-wrap">'+_buildGaugeSVG(sc,col)+'<div class="gauge-label">'+cat+'</div></div>';
+      const catColors={PROACTIVO:'#00a854',ACTIVO:'#0078c8',REACTIVO:'#e67e00',INACTIVO:'#d63030',PENDIENTE:'#718096'};
+      const catBg=catColors[cat]||'#718096';
+
+      // Category distance msg
+      const sc100=sc*100;
+      let distMsg='';
+      if(cat==='PROACTIVO') distMsg='🏆 Categoría máxima';
+      else if(cat==='ACTIVO'||cat==='PENDIENTE'&&sc100>=THR.rea){ const n=THR.pro-sc100; distMsg='Faltan <b>'+n.toFixed(1)+'%</b> para PROACTIVO'; }
+      else if(cat==='REACTIVO'){ const n=THR.act-sc100; distMsg='Faltan <b>'+n.toFixed(1)+'%</b> para ACTIVO'; }
+      else { const n=THR.rea-sc100; distMsg='Faltan <b>'+n.toFixed(1)+'%</b> para REACTIVO'; }
+
+      // Area mini donuts (solo áreas core)
+      const coreAreas=SHEETS_CORE();
+      let donutsHTML='';
+      coreAreas.forEach(function(sh){
+        const v=(audit.scores.areas||{})[sh]||0;
+        const aCol=AC[sh]||'#607d8b';
+        donutsHTML+='<div class="area-donut-cell">'
+          +_buildMiniDonutSVG(v,aCol)
+          +'<div class="area-donut-lbl" style="color:'+aCol+'">'+sh+'</div>'
+          +'<div class="area-donut-name">'+(AN[sh]||sh)+'</div>'
+          +'</div>';
+      });
+
+      gaugeWrap.innerHTML=
+        '<div class="score-pos-wrap">'
+          // Izquierda: gauge + badge categoría + distancia
+          +'<div class="gauge-wrap" style="min-width:156px">'
+            +_buildGaugeSVG(sc,col)
+            +'<span class="gauge-cat-badge" style="background:'+catBg+'">'+cat+'</span>'
+            +(distMsg?'<div style="font-size:10px;color:var(--g500);text-align:center;margin-top:4px">'+distMsg+'</div>':'')
+          +'</div>'
+          // Derecha: grid 2x2 de donuts por área
+          +'<div class="area-donuts-grid">'+donutsHTML+'</div>'
+        +'</div>';
     } else {
       gaugeWrap.innerHTML='<div class="gauge-wrap"><div class="gauge-label" style="padding:20px 0">Cargá una auditoría</div></div>';
     }
   }
 
-  // Category distance
+  // Cat dist ya está integrado arriba — limpiar el div separado si existe
   const catDist=document.getElementById('dash-cat-dist');
-  if(catDist&&audit&&audit.scores){
-    const sc=audit.scores.total*100;
-    const cat=recomputeCategory(audit)||'PENDIENTE';
-    let msg='', nextCat='', needed=0;
-    if(cat==='PROACTIVO'){ msg='🏆 Categoría máxima alcanzada'; }
-    else if(cat==='ACTIVO'||cat==='PENDIENTE'&&sc>=THR.rea){ nextCat='PROACTIVO'; needed=THR.pro-sc; }
-    else if(cat==='REACTIVO'){ nextCat='ACTIVO'; needed=THR.act-sc; }
-    else if(cat==='INACTIVO'||sc<THR.rea){ nextCat='REACTIVO'; needed=THR.rea-sc; }
-    if(nextCat&&needed>0){
-      msg='Faltan <span class="cat-dist-pct">'+needed.toFixed(1)+'%</span> para <strong>'+nextCat+'</strong>';
-    }
-    catDist.innerHTML=msg?'<div class="cat-dist-bar"><div class="cat-dist-msg">'+msg+'</div></div>':'';
-  }
+  if(catDist) catDist.innerHTML='';
 
   // Top areas strengths / opportunities
   const topWrap=document.getElementById('dash-top-areas');
