@@ -912,11 +912,17 @@ body.hist-open .content{ margin-right:420px; transition:margin-right .3s; }
 }
 /* ═══ AUTH ═══ */
 #auth-overlay{position:fixed;inset:0;background:var(--navy);z-index:9999;
-  display:flex;align-items:center;justify-content:center;}
+  display:flex;align-items:center;justify-content:center;
+  background-image:radial-gradient(ellipse at 60% 40%, #1e3a5f 0%, var(--navy) 70%);}
 #auth-overlay.hidden{display:none;}
 .auth-box{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:14px;
-  padding:36px 40px;width:360px;box-shadow:0 24px 48px rgba(0,0,0,.5);}
-.auth-logo{text-align:center;margin-bottom:24px;}
+  padding:32px 40px 36px;width:380px;box-shadow:0 24px 64px rgba(0,0,0,.6);}
+.auth-logo{text-align:center;margin-bottom:22px;}
+.auth-logos-row{display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08);}
+.auth-logo-bap{height:38px;width:auto;object-fit:contain;opacity:.95;}
+.auth-logo-divider{width:1px;height:32px;background:rgba(255,255,255,.2);}
+.auth-logo-arcor{height:28px;width:auto;object-fit:contain;opacity:.90;}
 .auth-logo-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#fff;letter-spacing:1px;}
 .auth-logo-sub{font-size:10px;color:var(--blue-l);letter-spacing:2px;text-transform:uppercase;margin-top:3px;}
 .auth-field{margin-bottom:14px;}
@@ -10502,9 +10508,15 @@ async function generateDevolucionPPTX(){
 <!-- AUTH OVERLAY -->
 <div id="auth-overlay">
   <div class="auth-box">
+    <!-- Logos BAP + ARCOR -->
+    <div class="auth-logos-row">
+      <img id="auth-img-bap" class="auth-logo-bap" alt="BAP Partners">
+      <div class="auth-logo-divider"></div>
+      <img id="auth-img-arcor" class="auth-logo-arcor" alt="ARCOR">
+    </div>
     <div class="auth-logo">
       <div class="auth-logo-title">RED ACTIVA 2.0</div>
-      <div class="auth-logo-sub">BAP Partners</div>
+      <div class="auth-logo-sub">Auditoría BPL · BAP Partners</div>
     </div>
     <div class="auth-field">
       <label>Email</label>
@@ -10549,5 +10561,13 @@ async function generateDevolucionPPTX(){
   </div>
 </div>
 <script src="_dev_imgs.js" defer></script>
+<script defer>
+window.addEventListener('load',function(){
+  const bap=document.getElementById('auth-img-bap');
+  const arc=document.getElementById('auth-img-arcor');
+  if(bap&&typeof IMG_BAP_SM!=='undefined') bap.src=IMG_BAP_SM;
+  if(arc&&typeof IMG_ARCOR!=='undefined')  arc.src=IMG_ARCOR;
+});
+</script>
 </body>
 </html>
