@@ -3565,6 +3565,57 @@ async function persist(){
     }
   } catch(e){ console.warn('[SB] persist error:', e); }
 }
+// ── SUPABASE: bajar config remota y aplicar localmente ───────────────────────
+async function _sbApplyRemoteConfig(){
+  if(!_sbc) return false;
+  try{
+    const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
+    if(!cfgRow || !cfgRow.data) return false;
+    const remote = cfgRow.data;
+    // Escribir todas las estructuras en localStorage
+    if(remote.structures && typeof remote.structures === 'object'){
+      Object.entries(remote.structures).forEach(([key, val])=>{
+        localStorage.setItem(key, JSON.stringify(val));
+      });
+    }
+    // Distribuidores
+    if(remote.dists && remote.dists.length > 0){
+      DISTRIBUTORS.length = 0;
+      remote.dists.forEach(d=>DISTRIBUTORS.push(d));
+      try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+    }
+    // Umbrales y pesos
+    if(remote.thr) Object.assign(THR, remote.thr);
+    // Cargar estructura activa del país/año actual
+    const _ePais = _userPais || cfg.pais || remote.pais;
+    let _eAnio = cfg.anio || remote.anio || 2025;
+    if(_userPais){
+      const _anios=[];
+      for(let _j=0;_j<localStorage.length;_j++){
+        const _k=localStorage.key(_j);
+        if(_k&&_k.startsWith('bpl_struct_'+_userPais+'_')){
+          const _a=Number(_k.slice(('bpl_struct_'+_userPais+'_').length));
+          if(!isNaN(_a)) _anios.push(_a);
+        }
+      }
+      if(_anios.length) _eAnio=Math.max(..._anios);
+    }
+    cfg.pais=_ePais; cfg.anio=_eAnio;
+    localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
+    const structLoaded = loadStructure(_ePais, _eAnio);
+    if(structLoaded){
+      try{
+        ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
+          const el=document.getElementById(id); if(el) el.innerHTML='';
+        });
+        rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas();
+        rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){}
+      }catch(e){ console.warn('[SB] rebuild after config pull:', e); }
+    }
+    return true;
+  }catch(e){ console.warn('[SB] _sbApplyRemoteConfig error:', e); return false; }
+}
+
 // ── SUPABASE: push full config + structures ───────────────────────────────────
 async function _sbPushConfig(){
   if(!_sbc || !_sbOnline) return;
@@ -3594,7 +3645,7 @@ async function _sbPushConfig(){
 async function pushAllToSupabase(){
   if(!_sbc){ showToast('⚠️ Supabase no configurado'); return; }
   const dot = document.getElementById('sb-dot');
-  if(dot){ dot.style.background='#f59e0b'; dot.title='Supabase: subiendo...'; }
+  if(dot){ dot.style.background='#f59e0b'; dot.title='Supabase: sincronizando...'; }
   try {
     // Connect first if offline
     if(!_sbOnline){
@@ -3602,6 +3653,9 @@ async function pushAllToSupabase(){
       if(pingErr) throw pingErr;
       _sbOnline = true;
     }
+    // 1. Bajar config remota primero (estructuras, distribuidores, pesos)
+    //    para que los cambios hechos en otro dispositivo queden aplicados localmente
+    await _sbApplyRemoteConfig();
     let ev=0, ae=0;
     if(saved.length){
       const rows = saved.map(a=>({
@@ -3696,55 +3750,8 @@ async function loadFromSupabase(){
       if(error) console.warn('[SB] initial upload autoevals:', error.message);
     }
 
-    // ── Load config + structures (only on first page load, not on realtime) ──
-    if(isFirstLoad){
-      const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
-      if(cfgRow && cfgRow.data){
-        const remote = cfgRow.data;
-        // 1. Write all structures to localStorage so loadStructure() can find them
-        if(remote.structures && typeof remote.structures === 'object'){
-          Object.entries(remote.structures).forEach(([key, val])=>{
-            localStorage.setItem(key, JSON.stringify(val));
-          });
-        }
-        // 2. Replace DISTRIBUTORS entirely (not merge — avoids stale defaults)
-        if(remote.dists && remote.dists.length > 0){
-          DISTRIBUTORS.length = 0;
-          remote.dists.forEach(d=>DISTRIBUTORS.push(d));
-          try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
-        }
-        // 3. Apply pais/anio + structure — if user has a country restriction, use that
-        if(remote.pais){
-          if(remote.thr) Object.assign(THR, remote.thr);
-          if(remote.aw)  Object.assign(AW,  remote.aw);
-          // Determine effective pais/anio respecting country restriction
-          let _ePais = _userPais || remote.pais;
-          let _eAnio = remote.anio||2025;
-          if(_userPais){
-            const _anios=[];
-            for(let _j=0;_j<localStorage.length;_j++){
-              const _k=localStorage.key(_j);
-              if(_k&&_k.startsWith('bpl_struct_'+_userPais+'_')){
-                const _a=Number(_k.slice(('bpl_struct_'+_userPais+'_').length));
-                if(!isNaN(_a)) _anios.push(_a);
-              }
-            }
-            if(_anios.length) _eAnio=Math.max(..._anios);
-          }
-          cfg.pais=_ePais; cfg.anio=_eAnio;
-          localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
-          const structLoaded = loadStructure(_ePais, _eAnio);
-          if(structLoaded){
-            try{
-              ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
-                const el=document.getElementById(id); if(el) el.innerHTML='';
-              });
-              rebuildAll(); rebuildDynamicUI(); loadPaisAnio(); edInitAreas();
-            }catch(e){ console.warn('[SB] rebuild after struct load:', e); }
-          }
-        }
-      }
-    }
+    // ── Load config + structures ─────────────────────────────
+    if(isFirstLoad) await _sbApplyRemoteConfig();
 
     // Fallback: apply restriction in case auth completed before Supabase load
     _applyPaisRestriction();
