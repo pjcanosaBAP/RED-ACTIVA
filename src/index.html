@@ -2063,12 +2063,14 @@ function deleteStruct(pais, anio){
   showToast('🗑️ '+pais+' '+anio+' eliminado');
   rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){}
 }
-function duplicateStruct(srcPais, srcAnio){
-  const newPais=prompt('País para la nueva estructura:', srcPais);
-  if(newPais===null) return;
+async function duplicateStruct(srcPais, srcAnio){
+  const newPais=await miniPrompt('País para la nueva estructura:', srcPais);
+  if(!newPais) return;
   const np=newPais.trim().toUpperCase();
   if(!np){ showToast('⚠️ País inválido'); return; }
-  const newAnio=parseInt(prompt('Año para la nueva estructura:', srcAnio+1));
+  const newAnioStr=await miniPrompt('Año para la nueva estructura:', String(srcAnio+1));
+  if(!newAnioStr) return;
+  const newAnio=parseInt(newAnioStr);
   if(!newAnio||isNaN(newAnio)){ showToast('⚠️ Año inválido'); return; }
   const dstKey=structureKey(np,newAnio);
   if(localStorage.getItem(dstKey)){
