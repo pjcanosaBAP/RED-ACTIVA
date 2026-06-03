@@ -10510,9 +10510,13 @@ async function generateDevolucionPPTX(){
   <div class="auth-box">
     <!-- Logos BAP + ARCOR -->
     <div class="auth-logos-row">
-      <img id="auth-img-bap" class="auth-logo-bap" alt="BAP Partners">
+      <img id="auth-img-bap" class="auth-logo-bap" alt="BAP Partners"
+           style="display:none">
+      <div id="auth-bap-text" style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:1px;opacity:.9">BAP Partners</div>
       <div class="auth-logo-divider"></div>
-      <img id="auth-img-arcor" class="auth-logo-arcor" alt="ARCOR">
+      <img id="auth-img-arcor" class="auth-logo-arcor" alt="ARCOR"
+           style="display:none">
+      <div id="auth-arcor-text" style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:2px;opacity:.9">ARCOR</div>
     </div>
     <div class="auth-logo">
       <div class="auth-logo-title">RED ACTIVA 2.0</div>
@@ -10564,9 +10568,18 @@ async function generateDevolucionPPTX(){
 <script defer>
 window.addEventListener('load',function(){
   const bap=document.getElementById('auth-img-bap');
+  const bapTxt=document.getElementById('auth-bap-text');
+  if(bap&&typeof IMG_BAP_SM!=='undefined'){
+    bap.src=IMG_BAP_SM; bap.style.display='';
+    if(bapTxt) bapTxt.style.display='none';
+  }
+  // ARCOR: usar IMG_ARCOR2 que es el logo sin contexto de país
   const arc=document.getElementById('auth-img-arcor');
-  if(bap&&typeof IMG_BAP_SM!=='undefined') bap.src=IMG_BAP_SM;
-  if(arc&&typeof IMG_ARCOR!=='undefined')  arc.src=IMG_ARCOR;
+  const arcTxt=document.getElementById('auth-arcor-text');
+  if(arc&&typeof IMG_ARCOR2!=='undefined'){
+    arc.src=IMG_ARCOR2; arc.style.display='';
+    if(arcTxt) arcTxt.style.display='none';
+  }
 });
 </script>
 </body>
