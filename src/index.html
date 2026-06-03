@@ -6975,7 +6975,7 @@ async function generateDistPPTX(){
   // ── SLIDE 1: PORTADA ────────────────────────────────────
   {const s=pptx.addSlide(); _bgP(s);
     if(typeof IMG_LOGO_SM!=='undefined') s.addImage({data:IMG_LOGO_SM,x:-0.26,y:2.76,w:0.61,h:0.59});
-    if(typeof IMG_BAP_SM!=='undefined')  s.addImage({data:IMG_BAP_SM,x:5.98,y:5.63,w:1.24,h:0.83});
+    {const _p=(curAudit.pais||cfg.pais||'').toUpperCase();const _f=(_p==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined')?LOGO_FLAG_UY:(typeof LOGO_FLAG_CL!=='undefined'?LOGO_FLAG_CL:null);if(_f) s.addImage({data:_f,x:5.98,y:5.63,w:1.24,h:0.83});}
     s.addText('INFORME EVALUACIÓN '+ed,{x:1.38,y:2.06,w:10.10,h:0.91,fontFace:'Calibri',fontSize:38,bold:true,color:'0070C0',align:'center',valign:'middle'});
     s.addText(dist,{x:2.18,y:3.28,w:8.83,h:1.45,fontFace:'Calibri',fontSize:30,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
     if(fechaRaw) s.addText(_ff(fechaRaw),{x:4.56,y:4.62,w:3.89,h:0.64,fontFace:'Calibri',fontSize:26,bold:true,color:'1F2937',align:'center',valign:'middle'});
@@ -10463,7 +10463,7 @@ async function generateDevolucionPPTX(){
   // Portada
   const s1=pptx.addSlide(); _bgP(s1);
   if(typeof IMG_LOGO_SM!=='undefined') s1.addImage({data:IMG_LOGO_SM,x:-0.26,y:2.76,w:0.61,h:0.59});
-  if(typeof IMG_BAP_SM!=='undefined') s1.addImage({data:IMG_BAP_SM,x:5.98,y:5.63,w:1.24,h:0.83});
+  {const _p=((audit&&audit.pais)||cfg.pais||'').toUpperCase();const _f=(_p==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined')?LOGO_FLAG_UY:(typeof LOGO_FLAG_CL!=='undefined'?LOGO_FLAG_CL:null);if(_f) s1.addImage({data:_f,x:5.98,y:5.63,w:1.24,h:0.83});}
   s1.addText('DEVOLUCIÓN EVALUACIÓN '+ed,{x:1.38,y:2.06,w:10.10,h:0.91,fontFace:'Fira Sans',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle'});
   s1.addText(dist,{x:2.18,y:3.28,w:8.83,h:1.45,fontFace:'Fira Sans',fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
   if(fechaRaw) s1.addText(_fechaDev(fechaRaw),{x:4.56,y:4.62,w:3.89,h:0.64,fontFace:'Fira Sans',fontSize:28,bold:true,color:'1F2937',align:'center',valign:'middle'});
