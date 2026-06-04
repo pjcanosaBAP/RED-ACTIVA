@@ -4153,7 +4153,8 @@ async function loadFromSupabase(){
     if(aeData && aeData.length > 0){
       autoevals = aeData.map(r=>({
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
-        pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{}
+        pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{},
+        source:r.source||'excel'
       }));
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
     } else if(autoevals.length > 0){
@@ -4211,13 +4212,18 @@ function _setupSBRealtime(){
 
 // ── COMPARACIÓN: helpers ────────────────────────────────────
 function _getAEFor(distribuidor, edicion){
-  // Match exacto primero
-  let ae = autoevals.find(a=>a.distribuidor===distribuidor&&a.edicion===edicion);
-  if(ae) return ae;
-  // Fuzzy: comparar solo dígitos (EV2026 == 2026)
   const edNum = (edicion||'').replace(/\D/g,'');
-  if(edNum) ae = autoevals.find(a=>a.distribuidor===distribuidor&&(a.edicion||'').replace(/\D/g,'')===edNum);
-  return ae||null;
+  // Candidatos: match exacto o fuzzy por dígitos
+  const candidates = autoevals.filter(a=>{
+    if(a.distribuidor!==distribuidor) return false;
+    if(a.edicion===edicion) return true;
+    if(edNum&&(a.edicion||'').replace(/\D/g,'')===edNum) return true;
+    return false;
+  });
+  if(!candidates.length) return null;
+  // Preferir portal sobre excel cuando hay ambos
+  const portal = candidates.find(a=>a.source==='portal');
+  return portal || candidates[0];
 }
 function _getPrevAudit(distribuidor, edicion, overrideEdicion){
   if(overrideEdicion) return saved.find(a=>a.distribuidor===distribuidor&&a.edicion===overrideEdicion)||null;
