@@ -1761,7 +1761,7 @@ body.readonly .admin-only{display:none!important;}
             </div>
             <div class="fg">
               <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Edición <span style="color:#ef4444">*</span></label>
-              <input type="text" id="ae-edicion" class="cfg-input" style="width:100px" placeholder="ej: EV2026">
+              <input type="text" id="ae-edicion" class="cfg-input" style="width:100px" placeholder="ej: EV26">
             </div>
             <button class="btn btn-sm btn-out" onclick="aeCopyLink()" style="white-space:nowrap">📋 Copiar link</button>
           </div>
@@ -3680,7 +3680,7 @@ function aeOnStructChange(){
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
   const ei = document.getElementById('ae-edicion');
-  if(ei && !ei.value) ei.value = 'AE'+anio;
+  if(ei && !ei.value) ei.value = 'AE'+String(anio).slice(-2);
   // Mostrar distribuidores del país desde saved[] inmediatamente
   _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0; _aeCampaignAW = {}; _aeCampaignNV = {}; _aeCampaignQ = [];
   renderAETable([], '');
@@ -3867,7 +3867,7 @@ async function aeSaveCampaign(){
   const edicion = (document.getElementById('ae-edicion').value||'').trim();
   if(!codigo){ aeSetStatus('Ingresá un código de acceso','err'); return; }
   if(!pais||!anio){ aeSetStatus('Seleccioná el programa del dropdown','err'); return; }
-  if(!edicion){ aeSetStatus('Ingresá la edición (ej: EV2026)','err'); return; }
+  if(!edicion){ aeSetStatus('Ingresá la edición (ej: EV26)','err'); return; }
   aeSetStatus('Guardando...','warn');
   // Cargar la estructura correcta para este pais/anio antes de tomar el snapshot
   const prevPais = cfg.pais, prevAnio = cfg.anio;
