@@ -3636,14 +3636,15 @@ function aeOnStructChange(){
 }
 
 async function aeLoadCampaign(){
-  if(!_sbc||!_sbOnline) return;
+  // Dropdown solo necesita localStorage — no requiere Supabase
   aeRebuildStructDropdown();
-  // Try to match active cfg pais/anio in dropdown
   const sel = document.getElementById('ae-struct-sel');
   if(sel && cfg.pais && cfg.anio){
     const val = cfg.pais+'|'+cfg.anio;
     if(sel.querySelector(`option[value="${val}"]`)){ sel.value=val; aeOnStructChange(); }
   }
+  // Si no hay Supabase, no intentar cargar campaña remota
+  if(!_sbc||!_sbOnline) return;
 }
 
 async function aeLoadCampaignForPaisAnio(pais, anio){
