@@ -3838,32 +3838,55 @@ async function aeRefreshStatus(){
     if(pais&&anio){ await aeLoadCampaignForPaisAnio(pais,anio); return; }
     renderAETable([]); return;
   }
-  const {data:acc} = await _sbc.from('ae_access').select('distribuidor,pin,submitted,unlock_requested,unlock_granted').eq('campaign_id',_aeCampaignId);
+  // Leer ae_access con answers (ahí guarda ae_save_answers RPC)
+  const {data:acc} = await _sbc.from('ae_access').select('id,distribuidor,pin,submitted,unlock_requested,unlock_granted,answers').eq('campaign_id',_aeCampaignId);
   _aeAccessRows = acc||[];
+  // Mapa distribuidor → answers desde ae_access
+  const accAnswersMap={};
+  (acc||[]).forEach(row=>{ if(row.answers&&Object.keys(row.answers).length>0) accAnswersMap[row.distribuidor]=row.answers; });
+
   if(_aeCampaignEdicion){
     const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
-    if(aeData){
-      // Cargar estructura correcta del país/año para usar computeScores exacto
-      const aePais=(document.getElementById('ae-pais')||{}).value||'';
-      const aeAnio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
-      const prevPais=cfg.pais, prevAnio=cfg.anio;
-      const needSwitch=aePais&&aeAnio&&(aePais!==prevPais||aeAnio!==prevAnio);
-      if(needSwitch){ loadStructure(aePais,aeAnio); _rebuildCritList(); }
-      const toUpdate=[];
-      aeData.forEach(r=>{
-        const sc=computeScores(r.answers||{});
+    const aePais=(document.getElementById('ae-pais')||{}).value||'';
+    const aeAnio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
+    const prevPais=cfg.pais, prevAnio=cfg.anio;
+    const needSwitch=aePais&&aeAnio&&(aePais!==prevPais||aeAnio!==prevAnio);
+    if(needSwitch){ loadStructure(aePais,aeAnio); _rebuildCritList(); }
+    const toUpdate=[];
+
+    // Procesar autoevals existentes en tabla autoevals
+    (aeData||[]).forEach(r=>{
+      // Prioridad: ae_access.answers (fuente real del portal) > autoevals.answers
+      const answers=accAnswersMap[r.distribuidor]||r.answers||{};
+      const sc=computeScores(answers);
+      const scores={total:sc.total,areas:sc.areas,critMet:sc.critMet,critStatus:sc.critStatus,category:sc.category,answered:sc.answered};
+      const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||aePais,fecha:r.fecha||'',answers,scores,source:'portal'};
+      const idx=autoevals.findIndex(a=>String(a.id)===String(r.id));
+      if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
+      toUpdate.push({id:String(r.id),scores,answers});
+    });
+
+    // Crear autoevals para distribuidores que tienen answers en ae_access pero no en autoevals
+    Object.entries(accAnswersMap).forEach(([dist,answers])=>{
+      const already=autoevals.find(a=>a.distribuidor===dist&&a.edicion===_aeCampaignEdicion);
+      if(!already){
+        const sc=computeScores(answers);
         const scores={total:sc.total,areas:sc.areas,critMet:sc.critMet,critStatus:sc.critStatus,category:sc.category,answered:sc.answered};
-        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores,source:r.source||'portal'};
-        const idx=autoevals.findIndex(a=>String(a.id)===String(r.id));
-        if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
-        toUpdate.push({id:String(r.id),scores});
-      });
-      if(needSwitch&&prevPais&&prevAnio){ loadStructure(prevPais,prevAnio); _rebuildCritList(); }
-      toUpdate.forEach(row=>{
-        _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
-          .then(({error})=>{ if(error) console.warn('[AE] score update:',error.message); });
-      });
-    }
+        const newId='portal_'+_aeCampaignId+'_'+dist.replace(/\W/g,'_').slice(0,20)+'_'+Date.now();
+        const ae={id:newId,distribuidor:dist,edicion:_aeCampaignEdicion,pais:aePais,fecha:'',answers,scores,source:'portal'};
+        autoevals.push(ae);
+        _sbc.from('autoevals').upsert({id:newId,distribuidor:dist,edicion:_aeCampaignEdicion,pais:aePais,fecha:'',answers,scores,source:'portal'},{onConflict:'id'})
+          .then(({error})=>{ if(error) console.warn('[AE] upsert portal:',error.message); });
+      }
+    });
+
+    if(needSwitch&&prevPais&&prevAnio){ loadStructure(prevPais,prevAnio); _rebuildCritList(); }
+    // Actualizar scores y answers en Supabase
+    toUpdate.forEach(row=>{
+      _sbc.from('autoevals').update({scores:row.scores,answers:row.answers}).eq('id',row.id)
+        .then(({error})=>{ if(error) console.warn('[AE] update:',error.message); });
+    });
+    persist();
   }
   renderAETable(_aeAccessRows, _aeCampaignEdicion);
 }
