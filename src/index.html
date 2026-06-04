@@ -1717,26 +1717,51 @@ body.readonly .admin-only{display:none!important;}
           <a href="autoeval.html" target="_blank" class="cfg-reset-btn" style="text-decoration:none">🔗 Abrir portal</a>
         </div>
         <div class="cfg-bd">
-          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Programa / País / Año</label>
+
+          <!-- Acciones principales -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:18px">
+            <button onclick="aeSaveCampaign()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--blue2);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
+              <span style="font-size:18px">💾</span>
+              <span style="font-size:13px;font-weight:700">Guardar período AE</span>
+              <span style="font-size:10px;opacity:.8">Crea o actualiza el período para el programa seleccionado</span>
+            </button>
+            <button onclick="aeAutoAssignPins()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--g700);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
+              <span style="font-size:18px">🎲</span>
+              <span style="font-size:13px;font-weight:700">Asignar PINs</span>
+              <span style="font-size:10px;opacity:.8">Genera PINs de 4 dígitos para los distribuidores sin PIN</span>
+            </button>
+            <button onclick="aeSavePins()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--g700);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
+              <span style="font-size:18px">🔑</span>
+              <span style="font-size:13px;font-weight:700">Guardar PINs</span>
+              <span style="font-size:10px;opacity:.8">Confirma los PINs editados en la tabla para que sean válidos en el portal</span>
+            </button>
+            <button onclick="aeRefreshStatus()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--g700);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
+              <span style="font-size:18px">🔄</span>
+              <span style="font-size:13px;font-weight:700">Actualizar estados</span>
+              <span style="font-size:10px;opacity:.8">Recarga desde Supabase el estado y progreso de cada distribuidor</span>
+            </button>
+          </div>
+
+          <!-- Selector de programa + código -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:10px">
+            <div class="fg">
+              <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Programa · País · Año</label>
               <select id="ae-struct-sel" class="cfg-input" style="min-width:200px" onchange="aeOnStructChange()">
                 <option value="">— Seleccioná el programa —</option>
-              </select></div>
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Código de acceso</label>
-              <input type="text" id="ae-codigo" class="cfg-input" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()"></div>
-            <input type="hidden" id="ae-pais">
-            <input type="hidden" id="ae-anio">
-            <input type="hidden" id="ae-edicion">
-            <button class="btn btn-blue btn-sm" onclick="aeSaveCampaign()">💾 Guardar campaña</button>
-            <button class="btn btn-sm btn-out" onclick="aeCopyLink()">📋 Copiar link</button>
+              </select>
+            </div>
+            <div class="fg">
+              <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Código de acceso para el portal</label>
+              <input type="text" id="ae-codigo" class="cfg-input" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <button class="btn btn-sm btn-out" onclick="aeCopyLink()" style="white-space:nowrap">📋 Copiar link del portal</button>
           </div>
-          <div id="ae-status-msg" style="font-size:11px;margin-top:8px;padding:6px 10px;border-radius:6px;display:none"></div>
-          <div id="ae-table-wrap" style="margin-top:14px;overflow-x:auto"></div>
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-sm btn-out" onclick="aeAutoAssignPins()">🎲 Asignar PINs automáticos</button>
-            <button class="btn btn-sm btn-out" onclick="aeSavePins()">💾 Guardar PINs</button>
-            <button class="btn btn-sm btn-out" onclick="aeRefreshStatus()">🔄 Actualizar estados</button>
-          </div>
+          <input type="hidden" id="ae-pais">
+          <input type="hidden" id="ae-anio">
+          <input type="hidden" id="ae-edicion">
+
+          <div id="ae-status-msg" style="font-size:11px;margin-bottom:10px;padding:7px 12px;border-radius:7px;display:none"></div>
+          <div id="ae-table-wrap" style="overflow-x:auto"></div>
         </div>
       </div>
 
@@ -3606,15 +3631,26 @@ let _aeAccessRows = []; // [{distribuidor, pin, submitted, unlock_requested, unl
 
 function aeRebuildStructDropdown(){
   const sel = document.getElementById('ae-struct-sel'); if(!sel) return;
+  const seen = new Set();
   const structs = [];
+  // Fuente 1: localStorage bpl_struct_*
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(!k||!k.startsWith('bpl_struct_')) continue;
     const rest=k.slice('bpl_struct_'.length);
     const lastUs=rest.lastIndexOf('_');
     if(lastUs<1) continue;
-    const pais=rest.slice(0,lastUs), anio=parseInt(rest.slice(lastUs+1))||0;
-    if(pais&&anio) structs.push({pais,anio,key:k});
+    const pais=rest.slice(0,lastUs).toUpperCase(), anio=parseInt(rest.slice(lastUs+1))||0;
+    const key=pais+'|'+anio;
+    if(pais&&anio&&!seen.has(key)){ seen.add(key); structs.push({pais,anio}); }
+  }
+  // Fuente 2: saved[] (auditorías existentes)
+  if(typeof saved !== 'undefined'){
+    saved.forEach(a=>{
+      const pais=(a.pais||'').toUpperCase(), anio=parseInt(a.anio||a.edicion)||0;
+      const key=pais+'|'+anio;
+      if(pais&&anio&&!seen.has(key)){ seen.add(key); structs.push({pais,anio}); }
+    });
   }
   structs.sort((a,b)=>a.pais.localeCompare(b.pais)||b.anio-a.anio);
   const prev = sel.value;
@@ -3628,10 +3664,11 @@ function aeOnStructChange(){
   const [pais,anio] = sel.value.split('|');
   document.getElementById('ae-pais').value = pais;
   document.getElementById('ae-anio').value = anio;
-  // Auto-suggest código based on pais+anio if empty
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
-  // Load existing campaign for this pais/anio
+  // Mostrar distribuidores del país inmediatamente (sin esperar Supabase)
+  renderAETable(_aeAccessRows.filter(r=>r.campaign_id===_aeCampaignId), '');
+  // Cargar campaña existente si hay Supabase
   aeLoadCampaignForPaisAnio(pais, parseInt(anio));
 }
 
@@ -3678,8 +3715,22 @@ function renderAETable(rows, edicion){
   const wrap = document.getElementById('ae-table-wrap'); if(!wrap) return;
   const totalQ = Q.length;
   const distMap = {}; rows.forEach(r=>distMap[r.distribuidor]=r);
-  const dists = DISTRIBUTORS.length ? DISTRIBUTORS : rows.map(r=>r.distribuidor);
-  if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500)">No hay distribuidores cargados. Agregalos en la sección de Distribuidores.</div>'; return; }
+  // Distribuidores del país seleccionado
+  const selPais = (document.getElementById('ae-pais')||{}).value||'';
+  const paisDistSet = selPais
+    ? new Set(saved.filter(a=>(a.pais||'').toUpperCase()===selPais.toUpperCase()).map(a=>a.distribuidor).filter(Boolean))
+    : null;
+  // Combinar: los del ae_access + los del país en saved[] + los de DISTRIBUTORS sin país aún
+  const seen = new Set();
+  const dists = [];
+  // Primero los que ya están en ae_access para esta campaña
+  rows.forEach(r=>{ if(r.distribuidor&&!seen.has(r.distribuidor)){ seen.add(r.distribuidor); dists.push(r.distribuidor); }});
+  // Luego los del país seleccionado que están en saved pero no en ae_access aún
+  if(paisDistSet) paisDistSet.forEach(d=>{ if(!seen.has(d)){ seen.add(d); dists.push(d); }});
+  // Si no hay filtro de país, usar DISTRIBUTORS como fallback
+  if(!selPais) DISTRIBUTORS.forEach(d=>{ if(!seen.has(d)){ seen.add(d); dists.push(d); }});
+  dists.sort();
+  if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500);padding:12px 0">No se encontraron distribuidores para este programa. Verificá que hay auditorías cargadas para '+selPais+'.</div>'; return; }
 
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
