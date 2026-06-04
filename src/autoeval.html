@@ -388,6 +388,12 @@ async function step2Next(){
     S.questions = data.questions || [];
     S.AN = data.area_names || {};
     S.AC = data.area_colors || {};
+    // Debug: verificar si comp_num está presente en las preguntas
+    if(S.questions.length){
+      const sample=S.questions[0];
+      console.log('[PORTAL debug] primera pregunta:',JSON.stringify({comp_num:sample.comp_num,sheet:sample.sheet,bpl_num:sample.bpl_num}));
+      alert('DEBUG — primera pregunta comp_num: "'+sample.comp_num+'" (tipo: '+typeof sample.comp_num+')\nSi dice "undefined" hay un problema con la RPC.');
+    }
     S.submitted = data.submitted || false;
     S.unlock_requested = data.unlock_requested || false;
     S.unlock_granted = data.unlock_granted || false;
