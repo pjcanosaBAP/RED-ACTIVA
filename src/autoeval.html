@@ -393,14 +393,14 @@ function buildQuestionsUI(){
         <div class="bpl-header">${bplName}</div>`;
       qs.forEach(q=>{
         const ans = S.answers[String(q.comp_num)] || '';
-        html += `<div class="q-row" id="qr-${q.comp_num}">
-          <div class="q-text">${q.critico?'<span class="q-crit">🔴 CRÍTICO</span> ':''}${q.question}</div>
-          <div class="ans-btns">
-            <button class="ans-btn${ans==='si'?' si':''}" onclick="pick(${q.comp_num},'si',this)">Sí</button>
-            <button class="ans-btn${ans==='no'?' no':''}" onclick="pick(${q.comp_num},'no',this)">No</button>
-            <button class="ans-btn${ans==='na'?' na':''}" onclick="pick(${q.comp_num},'na',this)">N/A</button>
-          </div>
-        </div>`;
+        const crit = q.critico ? '<span class="q-crit">🔴 CRÍTICO</span> ' : '';
+        html += '<div class="q-row" id="qr-'+q.comp_num+'">'
+          + '<div class="q-text">'+crit+q.question+'</div>'
+          + '<div class="ans-btns" data-comp="'+q.comp_num+'">'
+          + '<button class="ans-btn'+(ans==='si'?' si':'')+'" data-val="si">Sí</button>'
+          + '<button class="ans-btn'+(ans==='no'?' no':'')+'" data-val="no">No</button>'
+          + '<button class="ans-btn'+(ans==='na'?' na':'')+'" data-val="na">N/A</button>'
+          + '</div></div>';
       });
       html += '</div>';
     });
@@ -408,19 +408,23 @@ function buildQuestionsUI(){
   });
 
   document.getElementById('q-container').innerHTML = html;
-  updateProgress();
-}
 
-// ── ANSWER HANDLING ───────────────────────────────────────────────────────────
-function pick(compNum, val, btn){
-  const prev = S.answers[String(compNum)];
-  S.answers[String(compNum)] = val;
-  // Update buttons in row
-  const row = document.getElementById('qr-'+compNum);
-  if(row) row.querySelectorAll('.ans-btn').forEach(b=>b.className='ans-btn');
-  btn.className = 'ans-btn ' + val;
+  // Event delegation — un solo listener para todos los botones
+  document.getElementById('q-container').addEventListener('click', function(e){
+    const btn = e.target.closest('.ans-btn[data-val]');
+    if(!btn) return;
+    const wrap = btn.closest('[data-comp]');
+    if(!wrap) return;
+    const compNum = wrap.dataset.comp;
+    const val = btn.dataset.val;
+    S.answers[compNum] = val;
+    wrap.querySelectorAll('.ans-btn').forEach(b=>{ b.className='ans-btn'; });
+    btn.className = 'ans-btn ' + val;
+    updateProgress();
+    scheduleSave();
+  }, {once: false});
+
   updateProgress();
-  scheduleSave();
 }
 
 function updateProgress(){
