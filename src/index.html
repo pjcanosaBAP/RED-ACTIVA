@@ -3666,8 +3666,9 @@ function aeOnStructChange(){
   document.getElementById('ae-anio').value = anio;
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
-  // Mostrar distribuidores del país inmediatamente (sin esperar Supabase)
-  renderAETable(_aeAccessRows.filter(r=>r.campaign_id===_aeCampaignId), '');
+  // Mostrar distribuidores del país desde saved[] inmediatamente
+  _aeCampaignId = null; _aeAccessRows = [];
+  renderAETable([], '');
   // Cargar campaña existente si hay Supabase
   aeLoadCampaignForPaisAnio(pais, parseInt(anio));
 }
@@ -3714,24 +3715,13 @@ async function aeRefreshStatus(){
 function renderAETable(rows, edicion){
   const wrap = document.getElementById('ae-table-wrap'); if(!wrap) return;
   const totalQ = Q.length;
+  const selPais = ((document.getElementById('ae-pais')||{}).value||'').toUpperCase();
+  // Fuente de verdad: saved[] filtrado por país. Los ae_access rows solo aportan PIN/estado.
   const distMap = {}; rows.forEach(r=>distMap[r.distribuidor]=r);
-  // Distribuidores del país seleccionado
-  const selPais = (document.getElementById('ae-pais')||{}).value||'';
-  const paisDistSet = selPais
-    ? new Set(saved.filter(a=>(a.pais||'').toUpperCase()===selPais.toUpperCase()).map(a=>a.distribuidor).filter(Boolean))
-    : null;
-  // Combinar: los del ae_access + los del país en saved[] + los de DISTRIBUTORS sin país aún
-  const seen = new Set();
-  const dists = [];
-  // Primero los que ya están en ae_access para esta campaña
-  rows.forEach(r=>{ if(r.distribuidor&&!seen.has(r.distribuidor)){ seen.add(r.distribuidor); dists.push(r.distribuidor); }});
-  // Luego los del país seleccionado que están en saved pero no en ae_access aún
-  if(paisDistSet) paisDistSet.forEach(d=>{ if(!seen.has(d)){ seen.add(d); dists.push(d); }});
-  // Solo agregar de DISTRIBUTORS los que no tienen auditoría en ningún país (sin asignar)
-  const anyPaisSet2 = new Set(saved.map(a=>a.distribuidor).filter(Boolean));
-  DISTRIBUTORS.forEach(d=>{ if(!seen.has(d)&&!anyPaisSet2.has(d)){ seen.add(d); dists.push(d); }});
-  dists.sort();
-  if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500);padding:12px 0">No se encontraron distribuidores para este programa. Verificá que hay auditorías cargadas para '+selPais+'.</div>'; return; }
+  const dists = [...new Set(
+    saved.filter(a=>(a.pais||'').toUpperCase()===selPais).map(a=>a.distribuidor).filter(Boolean)
+  )].sort();
+  if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500);padding:12px 0">No se encontraron distribuidores para "'+selPais+'". Verificá que hay auditorías cargadas para ese país.</div>'; return; }
 
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
@@ -3796,15 +3786,19 @@ async function aeSaveCampaign(){
   }
   if(res.error){ aeSetStatus('❌ Error al guardar: '+res.error.message,'err'); console.error('[AE] save campaign:', res.error); return; }
   _aeCampaignId = res.data.id;
-  // Upsert ae_access — usar distribuidores del país seleccionado (de saved[])
+  // Distribuidores del país — fuente de verdad: saved[]
   let accessErr = null;
-  const paisDistSet = new Set(saved.filter(a=>(a.pais||'').toUpperCase()===pais).map(a=>a.distribuidor).filter(Boolean));
-  // Agregar de DISTRIBUTORS solo los que no tienen auditoría en ningún país aún
-  const anyPaisSet = new Set(saved.map(a=>a.distribuidor).filter(Boolean));
-  DISTRIBUTORS.forEach(d=>{ if(!anyPaisSet.has(d)) paisDistSet.add(d); });
-  const allDists = [...paisDistSet].filter(Boolean).sort();
+  const allDists = [...new Set(
+    saved.filter(a=>(a.pais||'').toUpperCase()===pais).map(a=>a.distribuidor).filter(Boolean)
+  )].sort();
   if(allDists.length){
-    const rows = allDists.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:(_aeAccessRows.find(r=>r.distribuidor===d)||{}).pin||''}));
+    // Borrar registros que ya no corresponden a este país
+    const {data:existing} = await _sbc.from('ae_access').select('id,distribuidor,pin').eq('campaign_id',_aeCampaignId);
+    const toDelete = (existing||[]).filter(r=>!allDists.includes(r.distribuidor)).map(r=>r.id);
+    if(toDelete.length) await _sbc.from('ae_access').delete().in('id',toDelete);
+    // Preservar PINs existentes
+    const pinMap = {}; (existing||[]).forEach(r=>{ pinMap[r.distribuidor]=r.pin; });
+    const rows = allDists.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:pinMap[d]||''}));
     const {error:ae} = await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor'});
     accessErr = ae;
   }
