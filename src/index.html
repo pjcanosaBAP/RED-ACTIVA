@@ -4592,8 +4592,11 @@ function renderCmpColumns(){
     el.style.display='flex';
     let html='';
     if(cmpShowAE){
-      // null val renders as "—" chip (cmp-none class)
-      const v=ae?(ae.answers||{})[q.comp_num]||null:null;
+      // Buscar respuesta AE: comp_num puede ser number o string — probar ambas formas
+      const _ans=ae?(ae.answers||{}):null;
+      const v=_ans
+        ?(_ans[q.comp_num]||_ans[String(q.comp_num)]||_ans[Number(q.comp_num)]||null)
+        :null;
       html+=_cmpChipHTML('AE',v);
     }
     if(cmpShowPrev){
@@ -4626,9 +4629,10 @@ function renderCmpBar(dist, edicion, ae, prev){
   if(cmpShowAE){
     if(ae){
       const aeScore=(ae.scores||{}).total||0;
-      html+=`<div class="cmp-score-pill csp-ae"><span class="csp-lbl">Autoevaluación ${edicion}</span><span class="csp-val">${(aeScore*100).toFixed(1)}%</span></div>`;
+      const aeAnsCount=Object.keys(ae.answers||{}).length;
+      html+=`<div class="cmp-score-pill csp-ae"><span class="csp-lbl">Autoevaluación ${ae.edicion||edicion}</span><span class="csp-val">${(aeScore*100).toFixed(1)}%</span><span style="font-size:9px;margin-left:4px;color:#a78bfa">${aeAnsCount} resp.</span></div>`;
     } else {
-      html+=`<div class="cmp-score-pill csp-ae" style="opacity:.45;border-style:dashed"><span class="csp-lbl">Autoevaluación ${edicion}</span><span class="csp-val" style="font-size:10px;color:var(--g400)">Sin datos — importá EV/AE</span></div>`;
+      html+=`<div class="cmp-score-pill csp-ae" style="opacity:.45;border-style:dashed"><span class="csp-lbl">Autoevaluación ${edicion}</span><span class="csp-val" style="font-size:10px;color:var(--g400)">Sin datos</span></div>`;
     }
   }
   // Prev edition score pill — show placeholder if toggle on but no data
