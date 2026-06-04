@@ -1738,7 +1738,12 @@ body.readonly .admin-only{display:none!important;}
             <button onclick="aeRefreshStatus()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--g700);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
               <span style="font-size:18px">🔄</span>
               <span style="font-size:13px;font-weight:700">Actualizar estados</span>
-              <span style="font-size:10px;opacity:.8">Recarga desde Supabase el estado y progreso de cada distribuidor</span>
+              <span style="font-size:10px;opacity:.8">Recarga estados, progreso y puntajes desde Supabase</span>
+            </button>
+            <button onclick="aeDeleteCampaign()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:10px;color:#fca5a5;cursor:pointer;text-align:left">
+              <span style="font-size:18px">🗑</span>
+              <span style="font-size:13px;font-weight:700">Borrar campaña</span>
+              <span style="font-size:10px;opacity:.8">Elimina el período AE seleccionado y todos sus registros</span>
             </button>
           </div>
 
@@ -3714,19 +3719,27 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
 
 async function aeRefreshStatus(){
   if(!_sbc||!_sbOnline){ renderAETable([]); return; }
-  // Si no hay campaña cargada, intentar cargarla del dropdown actual
   if(!_aeCampaignId){
     const pais=(document.getElementById('ae-pais')||{}).value||'';
     const anio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
     if(pais&&anio){ await aeLoadCampaignForPaisAnio(pais,anio); return; }
     renderAETable([]); return;
   }
-  // Get access rows
+  // Recargar ae_access desde Supabase
   const {data:acc} = await _sbc.from('ae_access').select('distribuidor,pin,submitted,unlock_requested,unlock_granted').eq('campaign_id',_aeCampaignId);
   _aeAccessRows = acc||[];
-  // Get answer counts from autoevals
-  const edicion = (document.getElementById('ae-edicion')||{}).value||'';
-  renderAETable(_aeAccessRows, edicion);
+  // Recargar autoevals desde Supabase para esta edicion (para tener conteos actualizados)
+  if(_aeCampaignEdicion){
+    const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
+    if(aeData){
+      aeData.forEach(r=>{
+        const idx=autoevals.findIndex(a=>String(a.id)===String(r.id));
+        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores:r.scores||{}};
+        if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
+      });
+    }
+  }
+  renderAETable(_aeAccessRows, _aeCampaignEdicion);
 }
 
 function renderAETable(rows, edicion){
@@ -3762,14 +3775,16 @@ function renderAETable(rows, edicion){
       }
     }
     const statusHtml = r.submitted
-      ? (r.unlock_requested
-          ? '<span style="color:#f59e0b;font-weight:700">🔓 Unlock solicitado</span>'
-          : '<span style="color:#10b981;font-weight:700">✅ Enviada</span>')
+      ? (r.unlock_granted
+          ? '<span style="color:#8b5cf6;font-weight:700">🔓 Rehabilitada</span>'
+          : r.unlock_requested
+            ? '<span style="color:#f59e0b;font-weight:700">🔔 Solicita corrección</span>'
+            : '<span style="color:#10b981;font-weight:700">✅ Enviada</span>')
       : (answered>0
           ? '<span style="color:#3b82f6;font-weight:700">⏳ En curso</span>'
           : '<span style="color:#94a3b8">⬜ Pendiente</span>');
     const dSafe = d.replace(/'/g,"\\'");
-    const unlockBtn = r.submitted
+    const unlockBtn = r.submitted && !r.unlock_granted
       ? `<button onclick="aeGrantUnlock('${dSafe}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">🔓 Rehabilitar</button>`
       : '';
     return `<tr style="border-bottom:1px solid var(--g100)">
@@ -3885,6 +3900,21 @@ async function aeGrantUnlock(dist){
   if(error){ showToast('❌ '+error.message); return; }
   showToast('✅ Corrección habilitada para '+dist);
   await aeRefreshStatus();
+}
+
+async function aeDeleteCampaign(){
+  if(!_aeCampaignId){ showToast('⚠️ Seleccioná una campaña primero'); return; }
+  const codigo = (document.getElementById('ae-codigo').value||'');
+  if(!confirm('¿Eliminar la campaña "'+codigo+'" y todos sus registros de acceso?\n\nEsto NO elimina las autoevaluaciones ya cargadas en Auditorías.')) return;
+  if(!_sbc||!_sbOnline){ showToast('⚠️ Sin conexión Supabase'); return; }
+  await _sbc.from('ae_access').delete().eq('campaign_id',_aeCampaignId);
+  await _sbc.from('ae_campaigns').delete().eq('id',_aeCampaignId);
+  _aeCampaignId=null; _aeCampaignEdicion=''; _aeCampaignTotalQ=0; _aeAccessRows=[];
+  document.getElementById('ae-codigo').value='';
+  document.getElementById('ae-edicion').value='';
+  aeSetStatus('🗑 Campaña eliminada. Podés crear una nueva.','warn');
+  renderAETable([]);
+  showToast('✅ Campaña eliminada');
 }
 
 function aeCopyLink(){
