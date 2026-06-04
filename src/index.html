@@ -3795,6 +3795,18 @@ function _calcAEScore(answers, qArr, aw, nv){
   return {total, areas, critMet, critStatus, totalCrits, category, answered};
 }
 
+function _rebuildCritList(){
+  Object.keys(CRIT).forEach(k=>delete CRIT[k]);
+  Q.forEach(q=>{
+    if(q.critico){
+      if(!CRIT[q.critico]) CRIT[q.critico]={tag:q.critico,bpl_name:q.bpl_name,subattr:q.subattr||q.bpl_name,sheet:q.sheet,qs:[]};
+      CRIT[q.critico].qs.push(q.comp_num);
+    }
+  });
+  CRIT_LIST.length=0;
+  Object.values(CRIT).sort((a,b)=>+a.tag.replace('CRITICO ','')-+b.tag.replace('CRITICO ','')).forEach(v=>CRIT_LIST.push(v));
+}
+
 async function aeRefreshStatus(){
   if(!_sbc||!_sbOnline){ renderAETable([]); return; }
   if(!_aeCampaignId){
@@ -3803,26 +3815,30 @@ async function aeRefreshStatus(){
     if(pais&&anio){ await aeLoadCampaignForPaisAnio(pais,anio); return; }
     renderAETable([]); return;
   }
-  // Recargar ae_access desde Supabase
   const {data:acc} = await _sbc.from('ae_access').select('distribuidor,pin,submitted,unlock_requested,unlock_granted').eq('campaign_id',_aeCampaignId);
   _aeAccessRows = acc||[];
-  // Recargar autoevals desde Supabase para esta edicion (para tener conteos actualizados)
   if(_aeCampaignEdicion){
     const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
     if(aeData){
-      const toUpdate = [];
+      // Cargar estructura correcta del país/año para usar computeScores exacto
+      const aePais=(document.getElementById('ae-pais')||{}).value||'';
+      const aeAnio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
+      const prevPais=cfg.pais, prevAnio=cfg.anio;
+      const needSwitch=aePais&&aeAnio&&(aePais!==prevPais||aeAnio!==prevAnio);
+      if(needSwitch){ loadStructure(aePais,aeAnio); _rebuildCritList(); }
+      const toUpdate=[];
       aeData.forEach(r=>{
-        const sc = _calcAEScore(r.answers||{}, _aeCampaignQ, _aeCampaignAW, _aeCampaignNV);
-        const scores = sc || r.scores || {};
-        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores};
+        const sc=computeScores(r.answers||{});
+        const scores={total:sc.total,areas:sc.areas,critMet:sc.critMet,critStatus:sc.critStatus,category:sc.category,answered:sc.answered};
+        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores,source:r.source||'portal'};
         const idx=autoevals.findIndex(a=>String(a.id)===String(r.id));
         if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
-        if(sc) toUpdate.push({id:String(r.id), scores:sc});
+        toUpdate.push({id:String(r.id),scores});
       });
-      // Guardar scores recalculados en Supabase para que el audit view los use correctamente
+      if(needSwitch&&prevPais&&prevAnio){ loadStructure(prevPais,prevAnio); _rebuildCritList(); }
       toUpdate.forEach(row=>{
         _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
-          .then(({error})=>{ if(error) console.warn('[AE] score update:', error.message); });
+          .then(({error})=>{ if(error) console.warn('[AE] score update:',error.message); });
       });
     }
   }
@@ -3884,7 +3900,11 @@ function renderAETable(rows, edicion){
       <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered>0&&answered===totalQ?'var(--green)':'var(--g500)'}">
         ${totalQ>0 ? answered+'/'+totalQ : (answered>0 ? answered+'/?' : '—')}</td>
       <td style="padding:6px 8px">${scoreHtml}</td>
-      <td style="padding:6px 4px;display:flex;gap:4px;align-items:center">${unlockBtn}${deleteBtn}</td>
+      <td style="padding:6px 4px;display:flex;gap:4px;align-items:center">
+        ${unlockBtn}
+        ${aeRow?`<button onclick="exportDistAEExcel('${dSafe}');return false" style="font-size:10px;padding:2px 7px;background:transparent;border:1px solid #3b82f6;color:#3b82f6;border-radius:4px;cursor:pointer" title="Exportar Excel AE">📊</button>`:''}
+        ${deleteBtn}
+      </td>
     </tr>`;
   }).join('');
 
@@ -4102,9 +4122,144 @@ async function exportAECampaignExcel(){
 
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='AE_'+pais+'_'+edicion+'.xlsx'; a.click();
+  const buf2=await wb.xlsx.writeBuffer();
+  const blob2=new Blob([buf2],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url2=URL.createObjectURL(blob2);
+  const a2=document.createElement('a'); a2.href=url2; a2.download='AE_'+pais+'_'+edicion+'.xlsx';
+  document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); URL.revokeObjectURL(url2);
   showToast('✅ Excel AE generado');
+}
+
+async function exportDistAEExcel(distribuidor){
+  if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún');return;}
+  if(!_aeCampaignId){showToast('⚠️ Seleccioná una campaña primero');return;}
+  const ae=_getAEFor(distribuidor,_aeCampaignEdicion)||autoevals.find(a=>a.distribuidor===distribuidor&&(a.edicion||'').replace(/\D/g,'')===((_aeCampaignEdicion||'').replace(/\D/g,'')));
+  if(!ae||!Object.keys(ae.answers||{}).length){showToast('⚠️ Sin respuestas para '+distribuidor);return;}
+  showToast('⏳ Generando Excel AE...');
+  // Cargar estructura correcta
+  const aePais=(document.getElementById('ae-pais')||{}).value||'';
+  const aeAnio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
+  const prevPais=cfg.pais, prevAnio=cfg.anio;
+  const needSwitch=aePais&&aeAnio&&(aePais!==prevPais||aeAnio!==prevAnio);
+  if(needSwitch){loadStructure(aePais,aeAnio);_rebuildCritList();}
+  // Calcular puntajes con computeScores (misma lógica que auditorías)
+  const sc=computeScores(ae.answers||{});
+  const ans=ae.answers||{};
+  const cat=sc.category||'PENDIENTE';
+  const catColors_={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030',PENDIENTE:'718096'};
+  const catHex=catColors_[cat]||'718096';
+  const NAVY='FF0F172A',WHITE='FFFFFFFF',LGRAY='FFF8FAFC';
+  const AR=hex=>'FF'+(hex||'607d8b').replace('#','').toUpperCase();
+  const scoreARGB=v=>v>=0.85?'FF00A854':v>=0.70?'FF0078C8':v>=0.50?'FFE67E00':'FFD63030';
+  const pctStr=v=>((v||0)*100).toFixed(1)+'%';
+  const solidFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
+  const noFill={type:'pattern',pattern:'none'};
+  const thinBorder=(argb='FF94A3B8')=>({style:'thin',color:{argb}});
+  const bottomBorder=argb=>({bottom:thinBorder(argb)});
+  const centerMid={horizontal:'center',vertical:'middle'};
+  const leftMid={horizontal:'left',vertical:'middle'};
+  const leftTop={horizontal:'left',vertical:'top',wrapText:true};
+  function applyStyle(cell,font,fill,alignment,border){if(font)cell.font=font;if(fill)cell.fill=fill;if(alignment)cell.alignment=alignment;if(border)cell.border=border;}
+  const wb=new ExcelJS.Workbook(); wb.creator='RED Activa 2.0 · BAP Partners';
+
+  // ── HOJA 1: RESUMEN EJECUTIVO ──
+  {
+    const ws=wb.addWorksheet('Resumen Ejecutivo',{views:[{showGridLines:false}],pageSetup:{fitToPage:true,fitToWidth:1}});
+    ws.columns=[{width:2},{width:38},{width:8},{width:10},{width:14},{width:12}];
+    ws.addRow([]).height=8;
+    const r2=ws.addRow(['','INFORME DE AUTOEVALUACIÓN BPL · RED ACTIVA 2.0']);
+    r2.height=32; ws.mergeCells('B2:G2');
+    applyStyle(r2.getCell(2),{name:'Calibri',bold:true,size:14,color:{argb:'FF7C3AED'}},solidFill('FFF5F3FF'),{horizontal:'left',vertical:'middle'},bottomBorder('FF7C3AED'));
+    const r3=ws.addRow(['',distribuidor]); r3.height=26; ws.mergeCells('B3:G3');
+    applyStyle(r3.getCell(2),{name:'Calibri',bold:true,size:13,color:{argb:NAVY}},noFill,leftMid);
+    const r4=ws.addRow(['','Edición: '+_aeCampaignEdicion,'','Fecha: '+(ae.fecha||'—'),'','País: '+aePais]); r4.height=18;
+    [2,4,6].forEach(i=>applyStyle(r4.getCell(i),{name:'Calibri',size:10,color:{argb:'FF475569'}},noFill,leftMid));
+    ws.addRow([]).height=10;
+    const r6=ws.addRow(['','PUNTAJE TOTAL','',pctStr(sc.total||0),'CATEGORÍA','',cat]); r6.height=34;
+    ws.mergeCells('B6:C6'); ws.mergeCells('E6:F6');
+    applyStyle(r6.getCell(2),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    applyStyle(r6.getCell(4),{name:'Calibri',bold:true,size:20,color:{argb:scoreARGB(sc.total||0)}},solidFill(LGRAY),centerMid);
+    applyStyle(r6.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    applyStyle(r6.getCell(7),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill('FF'+catHex),centerMid);
+    ws.addRow([]).height=10;
+    const rAH=ws.addRow(['','NOMBRE','ÁREA','PESO','ADHERENCIA','PUNTAJE']); rAH.height=20;
+    [2,3,4,5,6].forEach(i=>applyStyle(rAH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    SHEETS_CORE().forEach((sh,si)=>{
+      const v=(sc.areas||{})[sh]||0; const w=AW[sh]||0; const adh=v*w;
+      const aARGB=AR(AC[sh]||'#607d8b'); const bg=si%2===0?LGRAY:'FFFFFFFF';
+      const rA=ws.addRow(['',AN[sh]||sh,sh,(w*100).toFixed(0)+'%',pctStr(adh),pctStr(v)]); rA.height=20;
+      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),leftMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(adh)}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(bg),centerMid);
+    });
+    SHEETS_NV().forEach(sh=>{
+      const v=(sc.areas||{})[sh]||0; const aARGB=AR(AC[sh]||'#94a3b8');
+      const rA=ws.addRow(['',(AN[sh]||sh)+' · No Vinculante',sh,'—','—',pctStr(v)]); rA.height=18;
+      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),leftMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10},{},centerMid);
+      applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill('FFF1F5F9'),centerMid);
+    });
+    ws.addRow([]).height=12;
+    const rCH=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO']); rCH.height=20;
+    [2,3,4,5,6].forEach(i=>applyStyle(rCH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    CRIT_LIST.forEach((c,ci)=>{
+      const met=(sc.critStatus||{})[c.tag]?.st==='met';
+      const qs=Q.filter(q=>q.critico===c.tag);
+      const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
+      const bg=ci%2===0?LGRAY:'FFFFFFFF';
+      const rC=ws.addRow(['',qs[0]?.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE']); rC.height=18;
+      applyStyle(rC.getCell(2),{name:'Calibri',size:10},{},solidFill(bg),leftMid);
+      applyStyle(rC.getCell(3),{name:'Calibri',bold:true,size:10},{},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(met?'FF00A854':'FFD63030'),centerMid);
+    });
+  }
+
+  // ── HOJAS POR ÁREA ──
+  SHEETS().forEach(sh=>{
+    const isNV=!!NV[sh]; const aScore=(sc.areas||{})[sh]||0;
+    const aARGB=AR(AC[sh]||'#607d8b'); const aName=(AN[sh]||sh)+(isNV?' · No Vinculante':'');
+    const ws=wb.addWorksheet(sh+(isNV?' NV':''),{views:[{showGridLines:false,state:'frozen',ySplit:2}]});
+    ws.columns=[{width:10},{width:70},{width:9},{width:16}];
+    const rH=ws.addRow([sh+' · '+aName,'','',pctStr(aScore)]); rH.height=28;
+    ws.mergeCells(`A${rH.number}:C${rH.number}`);
+    applyStyle(rH.getCell(1),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),{horizontal:'left',vertical:'middle'});
+    applyStyle(rH.getCell(4),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),centerMid);
+    const rCols=ws.addRow(['CÓDIGO','DESCRIPCIÓN','RESP.','CRÍTICO']); rCols.height=18;
+    [1,2,3,4].forEach(i=>applyStyle(rCols.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid));
+    const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
+    bplNums.forEach(bk=>{
+      const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
+      const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||'BPL '+bk;
+      const rBPL=ws.addRow([`BPL ${bk} · ${bName}`,'','',pctStr(bv)]); rBPL.height=20;
+      ws.mergeCells(`A${rBPL.number}:C${rBPL.number}`);
+      applyStyle(rBPL.getCell(1),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),{horizontal:'left',vertical:'middle'});
+      applyStyle(rBPL.getCell(4),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(bv)}},solidFill('FFF1F5F9'),centerMid);
+      Q.filter(q=>q.sheet===sh&&q.bpl_num===bk).forEach((q,qi)=>{
+        const resp=ans[q.comp_num]||'';
+        const bg=qi%2===0?'FFFFFFFF':LGRAY;
+        const rQ=ws.addRow([q.comp_num,q.question,resp==='si'?'SÍ':resp==='no'?'NO':resp==='na'?'N/A':'—',q.critico||'']); rQ.height=15;
+        applyStyle(rQ.getCell(1),{name:'Calibri',bold:!!q.critico,size:9,color:{argb:q.critico?'FFD63030':'FF334155'}},solidFill(bg),centerMid);
+        applyStyle(rQ.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),{horizontal:'left',vertical:'top',wrapText:true});
+        const rColor=resp==='si'?'FF00A854':resp==='no'?'FFD63030':resp==='na'?'FF94A3B8':'FFCBD5E0';
+        const rBg=resp==='si'?'FFE8F5EE':resp==='no'?'FFFDEAEA':resp==='na'?'FFF8FAFC':bg;
+        applyStyle(rQ.getCell(3),{name:'Calibri',bold:resp==='si'||resp==='no',size:10,color:{argb:rColor}},solidFill(rBg),centerMid);
+        applyStyle(rQ.getCell(4),{name:'Calibri',bold:true,size:9,color:{argb:q.critico?'FFD63030':'FF94A3B8'}},solidFill(bg),centerMid);
+      });
+    });
+  });
+
+  if(needSwitch&&prevPais&&prevAnio){loadStructure(prevPais,prevAnio);_rebuildCritList();}
+  try{
+    const fname='AE_'+distribuidor.replace(/[^a-zA-Z0-9]/g,'_')+'_'+_aeCampaignEdicion+'.xlsx';
+    const buffer=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    showToast('📊 Excel AE: '+fname);
+  }catch(e){showToast('❌ Error Excel: '+e.message);console.error(e);}
 }
 
 function aeCopyLink(){

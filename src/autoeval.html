@@ -6,7 +6,7 @@
 <title>RED Activa — Autoevaluación BPL</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="logos.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -625,68 +625,116 @@ async function exportAEExcel(){
   const sc=_calcPortalScore();
   if(!sc){ toast('⚠️ Respondé al menos una pregunta primero'); return; }
   toast('⏳ Generando Excel...');
+  const ans=S.answers, qs=S.questions;
   const NAVY='FF0F172A',WHITE='FFFFFFFF',LGRAY='FFF8FAFC';
   const AR=hex=>'FF'+(hex||'607d8b').replace('#','').toUpperCase();
   const pctStr=v=>((v||0)*100).toFixed(1)+'%';
   const scoreARGB=v=>v>=0.85?'FF00A854':v>=0.70?'FF0078C8':v>=0.50?'FFE67E00':'FFD63030';
   const solidFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
-  const thinB=(argb='FF94A3B8')=>({style:'thin',color:{argb}});
-  const cv=(h,v)=>({horizontal:h||'left',vertical:v||'middle'});
-  function sty(cell,font,fill,align){ if(font)cell.font=font; if(fill)cell.fill=fill; if(align)cell.alignment=align; }
+  const noFill={type:'pattern',pattern:'none'};
+  const bottomBorder=argb=>({bottom:{style:'thin',color:{argb}}});
+  const centerMid={horizontal:'center',vertical:'middle'};
+  const leftMid={horizontal:'left',vertical:'middle'};
+  function sty(cell,font,fill,align,border){ if(font)cell.font=font; if(fill)cell.fill=fill; if(align)cell.alignment=align; if(border)cell.border=border; }
+  const cat=sc.cat; const catHex={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030'}[cat]||'718096';
+  // Criticos desde preguntas
+  const crits={}; qs.forEach(q=>{if(q.critico){if(!crits[q.critico])crits[q.critico]={tag:q.critico,qs:[],bpl_name:q.bpl_name,sheet:q.sheet}; crits[q.critico].qs.push(String(q.comp_num));}});
+  const critList=Object.values(crits).sort((a,b)=>+a.tag.replace('CRITICO ','')-+b.tag.replace('CRITICO ',''));
   const wb=new ExcelJS.Workbook(); wb.creator='RED Activa 2.0 · BAP Partners';
-  const catHex={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030'}[sc.cat]||'718096';
 
-  // ── HOJA 1: RESUMEN ──
-  const wsR=wb.addWorksheet('Resumen AE',{views:[{showGridLines:false}]});
-  wsR.columns=[{width:2},{width:40},{width:14}];
-  const r1=wsR.addRow(['','INFORME DE AUTOEVALUACIÓN BPL · RED ACTIVA 2.0']);
-  r1.height=32; wsR.mergeCells('B1:C1');
-  sty(r1.getCell(2),{name:'Calibri',bold:true,size:14,color:{argb:'FF0070C0'}},solidFill('FFF0F7FF'),{horizontal:'left',vertical:'middle'});
-  wsR.addRow(['',S.distribuidor]).height=22;
-  sty(wsR.lastRow.getCell(2),{name:'Calibri',bold:true,size:13},{},{horizontal:'left',vertical:'middle'});
-  wsR.addRow(['','Edición: '+S.edicion+'  ·  '+S.pais+' '+S.anio]).height=16;
-  wsR.addRow([]).height=8;
-  const rK=wsR.addRow(['','PUNTAJE','CATEGORÍA']); rK.height=30;
-  sty(rK.getCell(2),{name:'Calibri',bold:true,size:24,color:{argb:scoreARGB(sc.total)}},solidFill(LGRAY),cv('center'));
-  sty(rK.getCell(3),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill('FF'+catHex),cv('center'));
-  wsR.addRow([]).height=8;
-  const rCrit=wsR.addRow(['','Condicionales Críticos',sc.critMet+'/'+sc.totalCrits]); rCrit.height=18;
-  sty(rCrit.getCell(2),{name:'Calibri',bold:true,size:10},{},{horizontal:'left',vertical:'middle'});
-  wsR.addRow([]).height=4;
-  const rAH=wsR.addRow(['','ÁREA','PUNTAJE']); rAH.height=18;
-  [2,3].forEach(i=>sty(rAH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),cv('center')));
-  Object.entries(sc.areaScores).forEach(([sh,v],si)=>{
-    const bg=si%2===0?LGRAY:'FFFFFFFF';
-    const rA=wsR.addRow(['',sh,pctStr(v)]); rA.height=18;
-    sty(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:AR(S.AC[sh]||'#607d8b')}},solidFill(bg),{horizontal:'left',vertical:'middle'});
-    sty(rA.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill(bg),cv('center'));
+  // ── HOJA 1: RESUMEN EJECUTIVO ──
+  {
+    const ws=wb.addWorksheet('Resumen Ejecutivo',{views:[{showGridLines:false}]});
+    ws.columns=[{width:2},{width:38},{width:8},{width:10},{width:14},{width:12}];
+    ws.addRow([]).height=8;
+    const r2=ws.addRow(['','INFORME DE AUTOEVALUACIÓN BPL · RED ACTIVA 2.0']); r2.height=32; ws.mergeCells('B2:G2');
+    sty(r2.getCell(2),{name:'Calibri',bold:true,size:14,color:{argb:'FF7C3AED'}},solidFill('FFF5F3FF'),{horizontal:'left',vertical:'middle'},bottomBorder('FF7C3AED'));
+    const r3=ws.addRow(['',S.distribuidor]); r3.height=26; ws.mergeCells('B3:G3');
+    sty(r3.getCell(2),{name:'Calibri',bold:true,size:13,color:{argb:NAVY}},noFill,leftMid);
+    const r4=ws.addRow(['','Edición: '+S.edicion,'','País: '+S.pais+' '+S.anio,'','Fecha: '+(new Date().toLocaleDateString('es'))]); r4.height=18;
+    [2,4,6].forEach(i=>sty(r4.getCell(i),{name:'Calibri',size:10,color:{argb:'FF475569'}},noFill,leftMid));
+    ws.addRow([]).height=10;
+    const r6=ws.addRow(['','PUNTAJE TOTAL','',pctStr(sc.total),'CATEGORÍA','',cat]); r6.height=34;
+    ws.mergeCells('B6:C6'); ws.mergeCells('E6:F6');
+    sty(r6.getCell(2),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    sty(r6.getCell(4),{name:'Calibri',bold:true,size:20,color:{argb:scoreARGB(sc.total)}},solidFill(LGRAY),centerMid);
+    sty(r6.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+    sty(r6.getCell(7),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill('FF'+catHex),centerMid);
+    ws.addRow([]).height=10;
+    const rAH=ws.addRow(['','NOMBRE','ÁREA','PESO','ADHERENCIA','PUNTAJE']); rAH.height=20;
+    [2,3,4,5,6].forEach(i=>sty(rAH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    const sheets=[...new Set(qs.map(q=>q.sheet))];
+    sheets.forEach((sh,si)=>{
+      const v=sc.areaScores[sh]||0; const w=S.AW[sh]||0; const adh=v*w; const isNV=S.NV[sh];
+      const aARGB=AR(S.AC[sh]||'#607d8b'); const bg=si%2===0?LGRAY:'FFFFFFFF';
+      const rA=ws.addRow(['',S.AN[sh]||sh,sh,isNV?'—':(w*100).toFixed(0)+'%',isNV?'—':pctStr(adh),pctStr(v)]); rA.height=20;
+      sty(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB},italic:!!isNV},solidFill(isNV?'FFF1F5F9':bg),leftMid);
+      sty(rA.getCell(6),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(isNV?'FFF1F5F9':bg),centerMid);
+    });
+    ws.addRow([]).height=12;
+    if(critList.length){
+      const rCH=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO']); rCH.height=20;
+      [2,3,4,5,6].forEach(i=>sty(rCH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+      critList.forEach((c,ci)=>{
+        const met=sc.critStatus[c.tag]==='met';
+        const siQ=c.qs.filter(qc=>ans[qc]==='si').length;
+        const bg=ci%2===0?LGRAY:'FFFFFFFF';
+        const rC=ws.addRow(['',c.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),c.sheet||'',siQ+'/'+c.qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE']); rC.height=18;
+        sty(rC.getCell(2),{name:'Calibri',size:10},solidFill(bg),leftMid);
+        sty(rC.getCell(3),{name:'Calibri',bold:true,size:10},solidFill(bg),centerMid);
+        sty(rC.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(met?'FF00A854':'FFD63030'),centerMid);
+      });
+    }
+  }
+
+  // ── HOJAS POR ÁREA ──
+  const sheetOrder=[...new Set(qs.map(q=>q.sheet))];
+  sheetOrder.forEach(sh=>{
+    const isNV=!!S.NV[sh]; const aScore=sc.areaScores[sh]||0;
+    const aARGB=AR(S.AC[sh]||'#607d8b'); const aName=(S.AN[sh]||sh)+(isNV?' · No Vinculante':'');
+    const ws=wb.addWorksheet(sh+(isNV?' NV':''),{views:[{showGridLines:false,state:'frozen',ySplit:2}]});
+    ws.columns=[{width:10},{width:70},{width:9},{width:16}];
+    const rH=ws.addRow([sh+' · '+aName,'','',pctStr(aScore)]); rH.height=28;
+    ws.mergeCells(`A${rH.number}:C${rH.number}`);
+    sty(rH.getCell(1),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),{horizontal:'left',vertical:'middle'});
+    sty(rH.getCell(4),{name:'Calibri',bold:true,size:13,color:{argb:WHITE}},solidFill(aARGB),centerMid);
+    const rCols=ws.addRow(['CÓDIGO','DESCRIPCIÓN','RESP.','CRÍTICO']); rCols.height=18;
+    [1,2,3,4].forEach(i=>sty(rCols.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid));
+    const bplNums=[...new Set(qs.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>+a-+b);
+    bplNums.forEach(bk=>{
+      const bName=(qs.find(q=>q.sheet===sh&&q.bpl_num===bk)||{}).bpl_name||'BPL '+bk;
+      const bQs=qs.filter(q=>q.sheet===sh&&q.bpl_num===bk);
+      let bSumW=0,bSiW=0;
+      bQs.forEach(q=>{ const a=ans[String(q.comp_num)],cw=typeof q.weight_attr==='number'?q.weight_attr:1; if(a!=='na'&&cw>0){bSumW+=cw;if(a==='si')bSiW+=cw;} });
+      const bv=bSumW>0?bSiW/bSumW:0;
+      const rBPL=ws.addRow([`BPL ${bk} · ${bName}`,'','',pctStr(bv)]); rBPL.height=20;
+      ws.mergeCells(`A${rBPL.number}:C${rBPL.number}`);
+      sty(rBPL.getCell(1),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),{horizontal:'left',vertical:'middle'});
+      sty(rBPL.getCell(4),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(bv)}},solidFill('FFF1F5F9'),centerMid);
+      bQs.forEach((q,qi)=>{
+        const resp=ans[String(q.comp_num)]||'';
+        const bg=qi%2===0?'FFFFFFFF':LGRAY;
+        const rQ=ws.addRow([q.comp_num,q.question,resp==='si'?'SÍ':resp==='no'?'NO':resp==='na'?'N/A':'—',q.critico||'']); rQ.height=15;
+        sty(rQ.getCell(1),{name:'Calibri',bold:!!q.critico,size:9,color:{argb:q.critico?'FFD63030':'FF334155'}},solidFill(bg),centerMid);
+        rQ.getCell(2).value=q.question; rQ.getCell(2).alignment={horizontal:'left',vertical:'top',wrapText:true};
+        sty(rQ.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg));
+        const rColor=resp==='si'?'FF00A854':resp==='no'?'FFD63030':resp==='na'?'FF94A3B8':'FFCBD5E0';
+        const rBg=resp==='si'?'FFE8F5EE':resp==='no'?'FFFDEAEA':resp==='na'?'FFF8FAFC':bg;
+        sty(rQ.getCell(3),{name:'Calibri',bold:resp==='si'||resp==='no',size:10,color:{argb:rColor}},solidFill(rBg),centerMid);
+        sty(rQ.getCell(4),{name:'Calibri',bold:true,size:9,color:{argb:q.critico?'FFD63030':'FF94A3B8'}},solidFill(bg),centerMid);
+      });
+    });
   });
 
-  // ── HOJA 2: DETALLE RESPUESTAS ──
-  const wsD=wb.addWorksheet('Detalle Respuestas',{views:[{showGridLines:false,state:'frozen',ySplit:1}]});
-  wsD.columns=[{width:2},{width:16},{width:24},{width:50},{width:8},{width:10}];
-  const dH=wsD.addRow(['','ÁREA','ATRIBUTO / BPL','PREGUNTA','CRÍTICO','RESPUESTA']);
-  dH.height=20;
-  [2,3,4,5,6].forEach(i=>sty(dH.getCell(i),{name:'Calibri',bold:true,size:9,color:{argb:WHITE}},solidFill(NAVY),cv('center')));
-  const ansLabel={si:'SÍ',no:'NO',na:'N/A','':''};
-  const ansArgb={si:'FF00A854',no:'FFD63030',na:'FF94A3B8','':'FF94A3B8'};
-  S.questions.forEach((q,qi)=>{
-    const bg=qi%2===0?LGRAY:'FFFFFFFF';
-    const ans=S.answers[String(q.comp_num)]||'';
-    const rQ=wsD.addRow(['',q.sheet||'',q.bpl_name||'',q.question||'',q.critico||'',ansLabel[ans]||ans]);
-    rQ.height=18;
-    sty(rQ.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:AR(S.AC[q.sheet]||'#607d8b')}},solidFill(bg),cv('center'));
-    sty(rQ.getCell(3),{name:'Calibri',size:9},solidFill(bg));
-    sty(rQ.getCell(4),{name:'Calibri',size:9},solidFill(bg),{horizontal:'left',vertical:'top',wrapText:true});
-    sty(rQ.getCell(5),{name:'Calibri',bold:true,size:9,color:{argb:q.critico?'FFEF4444':'FF94A3B8'}},solidFill(bg),cv('center'));
-    sty(rQ.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:ansArgb[ans]||'FF94A3B8'}},solidFill(bg),cv('center'));
-  });
-
-  const buf=await wb.xlsx.writeBuffer();
-  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='AE_'+S.distribuidor+'_'+S.edicion+'.xlsx'; a.click();
-  toast('✅ Excel AE generado');
+  try{
+    const fname='AE_'+S.distribuidor.replace(/[^a-zA-Z0-9]/g,'_')+'_'+S.edicion+'.xlsx';
+    const buffer=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('📊 Excel descargado');
+  }catch(e){ toast('❌ Error: '+e.message); console.error(e); }
 }
 
 function scheduleSave(){
