@@ -2165,6 +2165,7 @@ function switchStruct(pais, anio){
   const inp=document.getElementById('cfg-pais'); if(inp) inp.value=pais;
   const inpa=document.getElementById('cfg-anio'); if(inpa) inpa.value=anio;
   if(loadStructure(pais,anio)){
+    _rebuildCritList();
     showToast('✅ '+pais+' '+anio+' cargado — '+Object.keys(AC).join(', '));
   } else {
     showToast('⚠️ No se encontró estructura para '+pais+' '+anio);
@@ -3943,7 +3944,16 @@ async function aeSaveCampaign(){
   // Cargar la estructura correcta para este pais/anio antes de tomar el snapshot
   const prevPais = cfg.pais, prevAnio = cfg.anio;
   const structLoaded = loadStructure(pais, anio);
-  const snapQ = structLoaded ? [...Q] : Q;
+  // Bake WCfg overrides into each question's weights so el portal las recibe correctas
+  const snapQ = (structLoaded ? Q : Q).map(q=>{
+    const atKey=q.sheet+'_'+q.bpl_num;
+    const bplKey=q.sheet+'_'+q.bpl_num+'_'+(q.subattr||'').replace(/\W+/g,'_');
+    return {...q,
+      weight_attr: WCfg.comp&&WCfg.comp[q.comp_num]!==undefined ? WCfg.comp[q.comp_num] : q.weight_attr,
+      peso_bpl:    WCfg.bpl &&WCfg.bpl[bplKey]!==undefined      ? WCfg.bpl[bplKey]       : q.peso_bpl,
+      bpl_weight:  WCfg.at  &&WCfg.at[atKey]!==undefined        ? WCfg.at[atKey]         : q.bpl_weight,
+    };
+  });
   const snapAN = structLoaded ? {...AN} : AN;
   const snapAC = structLoaded ? {...AC} : AC;
   const snapAW = structLoaded ? {...AW} : AW;
@@ -4308,6 +4318,7 @@ async function _sbApplyRemoteConfig(){
     localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
     const structLoaded = loadStructure(_ePais, _eAnio);
     if(structLoaded){
+      _rebuildCritList();
       try{
         ['form-sections','crit-grid','sb-area-nav','db-area-bars','cfg-area-weight-rows'].forEach(id=>{
           const el=document.getElementById(id); if(el) el.innerHTML='';
@@ -4445,6 +4456,18 @@ async function loadFromSupabase(){
         pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{},
         source:r.source||'excel'
       }));
+      // Recalcular scores con estructura activa (computeScores exacto igual que auditorias)
+      _rebuildCritList();
+      const _aeToUpdate=[];
+      autoevals.filter(a=>Object.keys(a.answers||{}).length>0&&(a.pais||'').toUpperCase()===(cfg.pais||'').toUpperCase()).forEach(ae=>{
+        const _sc=computeScores(ae.answers);
+        ae.scores={total:_sc.total,areas:_sc.areas,critMet:_sc.critMet,critStatus:_sc.critStatus,category:_sc.category,answered:_sc.answered};
+        _aeToUpdate.push({id:String(ae.id),scores:ae.scores});
+      });
+      _aeToUpdate.forEach(row=>{
+        _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
+          .then(({error})=>{if(error)console.warn('[AE init score]',error.message);});
+      });
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
     } else if(autoevals.length > 0){
       const rows = autoevals.map(a=>({
@@ -6219,6 +6242,7 @@ function savePaisAnio(){
   } else {
     showToast('✅ '+pais+' '+anio+' cargado — '+Object.keys(AC).join(', '));
   }
+  _rebuildCritList();
   markFormDirty();
   rebuildAll(); rebuildDynamicUI(); edInitAreas();
 }
