@@ -1717,14 +1717,19 @@ body.readonly .admin-only{display:none!important;}
           <a href="autoeval.html" target="_blank" class="cfg-reset-btn" style="text-decoration:none">🔗 Abrir portal</a>
         </div>
         <div class="cfg-bd">
-          <div class="cfg-row" style="flex-wrap:wrap;gap:8px">
-            <div class="cfg-lbl"><strong>Código de acceso</strong><div class="cfg-sub">Los distribuidores lo ingresan en el portal para acceder</div></div>
-            <input type="text" id="ae-codigo" class="cfg-input" style="width:140px;text-transform:uppercase;letter-spacing:2px" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()">
-            <input type="text" id="ae-edicion" class="cfg-input" style="width:110px" placeholder="Edición (ej: EV2026)">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Código acceso</label>
+              <input type="text" id="ae-codigo" class="cfg-input" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Edición</label>
+              <input type="text" id="ae-edicion" class="cfg-input" style="width:100px" placeholder="ej: EV2026"></div>
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">País</label>
+              <input type="text" id="ae-pais" class="cfg-input" style="width:90px;text-transform:uppercase" placeholder="ej: CHILE" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Año</label>
+              <input type="number" id="ae-anio" class="cfg-input" style="width:70px" placeholder="2026"></div>
             <button class="btn btn-blue btn-sm" onclick="aeSaveCampaign()">💾 Guardar campaña</button>
             <button class="btn btn-sm btn-out" onclick="aeCopyLink()">📋 Copiar link</button>
           </div>
-          <div id="ae-status-msg" style="font-size:11px;color:var(--g500);margin-top:6px"></div>
+          <div id="ae-status-msg" style="font-size:11px;margin-top:8px;padding:6px 10px;border-radius:6px;display:none"></div>
           <div id="ae-table-wrap" style="margin-top:14px;overflow-x:auto"></div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-sm btn-out" onclick="aeAutoAssignPins()">🎲 Asignar PINs automáticos</button>
@@ -3600,13 +3605,21 @@ let _aeAccessRows = []; // [{distribuidor, pin, submitted, unlock_requested, unl
 
 async function aeLoadCampaign(){
   if(!_sbc||!_sbOnline) return;
-  const pais = cfg.pais||''; const anio = parseInt(cfg.anio)||0;
-  if(!pais||!anio) return;
-  const {data} = await _sbc.from('ae_campaigns').select('*').eq('pais',pais).eq('anio',anio).maybeSingle();
+  // Pre-fill pais/anio from cfg
+  const pi=document.getElementById('ae-pais'), ai=document.getElementById('ae-anio');
+  if(pi&&!pi.value&&cfg.pais) pi.value=cfg.pais;
+  if(ai&&!ai.value&&cfg.anio) ai.value=cfg.anio;
+  const pais=(pi&&pi.value)||cfg.pais||''; const anio=parseInt((ai&&ai.value)||cfg.anio)||0;
+  if(!pais||!anio){ aeSetStatus('Configurá País y Año para cargar la campaña','warn'); return; }
+  const {data,error} = await _sbc.from('ae_campaigns').select('*').eq('pais',pais).eq('anio',anio).maybeSingle();
+  if(error){ console.warn('[AE] load campaign:', error); return; }
   if(data){
     _aeCampaignId = data.id;
-    const ci = document.getElementById('ae-codigo'); if(ci) ci.value = data.codigo_acceso||'';
-    const ei = document.getElementById('ae-edicion'); if(ei) ei.value = data.edicion||'';
+    const ci=document.getElementById('ae-codigo'); if(ci) ci.value=data.codigo_acceso||'';
+    const ei=document.getElementById('ae-edicion'); if(ei) ei.value=data.edicion||'';
+    aeSetStatus('✅ Campaña cargada — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio,'ok');
+  } else {
+    aeSetStatus('No hay campaña guardada para '+pais+' '+anio+'. Completá el formulario y guardá.','warn');
   }
   await aeRefreshStatus();
 }
@@ -3664,29 +3677,42 @@ function renderAETable(rows, edicion){
   </table>`;
 }
 
+function aeSetStatus(msg, type){
+  const el=document.getElementById('ae-status-msg'); if(!el) return;
+  el.style.display='block';
+  el.style.background = type==='ok'?'rgba(16,185,129,.1)':type==='err'?'rgba(239,68,68,.1)':'rgba(245,158,11,.1)';
+  el.style.color = type==='ok'?'var(--green)':type==='err'?'#ef4444':'#f59e0b';
+  el.textContent = msg;
+}
+
 async function aeSaveCampaign(){
   if(!_sbc||!_sbOnline){ showToast('⚠️ Sin conexión Supabase'); return; }
   const codigo = (document.getElementById('ae-codigo').value||'').trim().toUpperCase();
   const edicion = (document.getElementById('ae-edicion').value||'').trim();
-  if(!codigo){ showToast('⚠️ Ingresá un código de acceso'); return; }
-  const pais = cfg.pais||''; const anio = parseInt(cfg.anio)||0;
-  if(!pais||!anio){ showToast('⚠️ Configurá el País y Año antes'); return; }
+  const pais = ((document.getElementById('ae-pais').value||cfg.pais||'')).trim().toUpperCase();
+  const anio = parseInt(document.getElementById('ae-anio').value||cfg.anio)||0;
+  if(!codigo){ aeSetStatus('Ingresá un código de acceso','err'); return; }
+  if(!pais){ aeSetStatus('Ingresá el país','err'); return; }
+  if(!anio){ aeSetStatus('Ingresá el año','err'); return; }
+  aeSetStatus('Guardando...','warn');
   const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:Q, area_names:AN, area_colors:AC};
   let res;
   if(_aeCampaignId){
     res = await _sbc.from('ae_campaigns').update(payload).eq('id',_aeCampaignId).select().single();
   } else {
-    res = await _sbc.from('ae_campaigns').insert(payload).select().single();
+    res = await _sbc.from('ae_campaigns').upsert(payload, {onConflict:'pais,anio'}).select().single();
   }
-  if(res.error){ showToast('❌ '+res.error.message); return; }
+  if(res.error){ aeSetStatus('❌ Error al guardar: '+res.error.message,'err'); console.error('[AE] save campaign:', res.error); return; }
   _aeCampaignId = res.data.id;
-  // Upsert ae_access for each distributor (preserve existing PINs)
+  // Upsert ae_access for each distributor
+  let accessErr = null;
   if(DISTRIBUTORS.length){
     const rows = DISTRIBUTORS.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:(_aeAccessRows.find(r=>r.distribuidor===d)||{}).pin||''}));
-    await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor', ignoreDuplicates:true});
+    const {error:ae} = await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor', ignoreDuplicates:true});
+    accessErr = ae;
   }
-  const msg = document.getElementById('ae-status-msg');
-  if(msg) msg.textContent = '✅ Campaña guardada · ID: '+_aeCampaignId;
+  const distCount = DISTRIBUTORS.length;
+  aeSetStatus('✅ Campaña guardada — código: '+codigo+' · '+pais+' '+anio+' · '+distCount+' distribuidores'+(accessErr?' (⚠️ error en access: '+accessErr.message+')':''),'ok');
   showToast('✅ Campaña AE guardada');
   await aeRefreshStatus();
 }

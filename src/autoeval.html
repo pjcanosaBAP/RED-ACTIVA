@@ -251,8 +251,9 @@ async function step1Next(){
   setErr('err1','');
   try{
     const {data, error} = await sbc.rpc('ae_get_distributors', {p_codigo: code});
-    if(error) throw error;
-    if(!data || !data.length){ setErr('err1','Código no encontrado. Verificá con el administrador.'); return; }
+    console.log('[AE] get_distributors:', {code, data, error});
+    if(error){ setErr('err1','Error: '+error.message); return; }
+    if(!data || !data.length){ setErr('err1','Código "'+code+'" no encontrado. Verificá que el administrador guardó la campaña con ese código exacto.'); return; }
     S.codigo = code;
     // Populate distributor dropdown
     const sel = document.getElementById('sel-dist');
