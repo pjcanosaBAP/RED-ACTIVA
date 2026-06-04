@@ -4578,6 +4578,7 @@ function renderCmpColumns(){
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   const ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
   const prev=cmpShowPrev&&dist&&edicion?_getPrevAudit(dist,edicion,cmpEdicion||null):null;
+  if(dist&&edicion) console.log('[AE debug] dist='+dist+' ed='+edicion+' ae='+(ae?'encontrada':'null')+(ae?' edicion='+ae.edicion+' answers_keys='+JSON.stringify(Object.keys(ae.answers||{}).slice(0,3))+' total_answers='+Object.keys(ae.answers||{}).length+' score='+((ae.scores||{}).total||0):''));
   // Show bar whenever a distributor is selected (even without comparison data)
   const bar=document.getElementById('cmp-compare-bar');
   if(bar) bar.style.display=dist?'block':'none';
