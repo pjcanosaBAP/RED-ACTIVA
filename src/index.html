@@ -3620,7 +3620,7 @@ async function persist(){
     if(autoevals.length){
       const rows = autoevals.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
+        pais:a.pais||'', fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
       }));
       const {error} = await _sbc.from('autoevals').upsert(rows, {onConflict:'id'});
       if(error) console.warn('[SB] persist autoevals:', error.message);
@@ -3985,7 +3985,7 @@ async function pushAllToSupabase(){
     if(autoevals.length){
       const rows = autoevals.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
+        pais:a.pais||'', fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
       }));
       const {error} = await _sbc.from('autoevals').upsert(rows, {onConflict:'id'});
       if(error) throw error;
@@ -4049,13 +4049,13 @@ async function loadFromSupabase(){
     if(aeData && aeData.length > 0){
       autoevals = aeData.map(r=>({
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
-        fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{}
+        pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{}
       }));
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
     } else if(autoevals.length > 0){
       const rows = autoevals.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
-        fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
+        pais:a.pais||'', fecha:a.fecha||'', answers:a.answers||{}, scores:a.scores||{}
       }));
       const {error} = await _sbc.from('autoevals').upsert(rows, {onConflict:'id'});
       if(error) console.warn('[SB] initial upload autoevals:', error.message);
