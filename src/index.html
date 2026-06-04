@@ -3843,20 +3843,29 @@ async function aeRefreshStatus(){
   const acc = accRaw||[];
   _aeAccessRows = acc;
 
-  // Cargar respuestas usando ae_load_answers RPC (la misma que usa el portal)
-  // Es la única forma confiable de obtener las respuestas reales
+  // DEBUG: mostrar estructura de ae_access y buscar respuestas
   const accAnswersMap = {};
   const codigoAcceso = (document.getElementById('ae-codigo')||{}).value||'';
+  // Log ae_access para ver qué columnas existen
+  if(acc.length) console.log('[AE DEBUG] ae_access[0] keys:', Object.keys(acc[0]), '| pin:', acc[0].pin, '| has answers col:', 'answers' in acc[0]);
+  // Fallback 1: columna answers en ae_access
+  acc.forEach(row=>{ if(row.answers&&Object.keys(row.answers).length) accAnswersMap[row.distribuidor]=row.answers; });
+  // Intentar ae_load_answers RPC con PIN
   const rowsConPin = acc.filter(row=>row.pin&&String(row.pin).trim());
+  console.log('[AE DEBUG] codigo:', codigoAcceso, '| rowsConPin:', rowsConPin.length);
   if(codigoAcceso && rowsConPin.length){
     await Promise.all(rowsConPin.map(row=>
       _sbc.rpc('ae_load_answers',{p_codigo:codigoAcceso,p_distribuidor:row.distribuidor,p_pin:String(row.pin)})
-        .then(({data})=>{ if(data&&data.answers&&Object.keys(data.answers).length) accAnswersMap[row.distribuidor]=data.answers; })
-        .catch(()=>{})
+        .then(({data,error})=>{
+          console.log('[AE DEBUG] ae_load_answers',row.distribuidor,':',error?'ERROR:'+error.message:'OK keys='+Object.keys((data&&data.answers)||{}));
+          if(data&&data.answers&&Object.keys(data.answers).length) accAnswersMap[row.distribuidor]=data.answers;
+        }).catch(e=>console.warn('[AE] rpc err:',e))
     ));
   }
-  // Fallback: si ae_access tiene columna answers la usamos también
-  acc.forEach(row=>{ if(!accAnswersMap[row.distribuidor]&&row.answers&&Object.keys(row.answers).length) accAnswersMap[row.distribuidor]=row.answers; });
+  // Intentar leer autoevals sin filtro de edicion para ver qué hay
+  const {data:allAE} = await _sbc.from('autoevals').select('id,distribuidor,edicion').in('distribuidor',acc.map(r=>r.distribuidor).filter(Boolean));
+  console.log('[AE DEBUG] autoevals rows para estos distribuidores:', (allAE||[]).map(r=>r.distribuidor+'|'+r.edicion));
+  aeSetStatus('Debug activo — revisá F12 Console para diagnóstico','warn');
 
   if(_aeCampaignEdicion){
     const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
