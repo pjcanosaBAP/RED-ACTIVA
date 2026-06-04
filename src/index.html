@@ -1751,14 +1751,17 @@ body.readonly .admin-only{display:none!important;}
               </select>
             </div>
             <div class="fg">
-              <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Código de acceso para el portal</label>
-              <input type="text" id="ae-codigo" class="cfg-input" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()">
+              <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Código de acceso</label>
+              <input type="text" id="ae-codigo" class="cfg-input" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()">
             </div>
-            <button class="btn btn-sm btn-out" onclick="aeCopyLink()" style="white-space:nowrap">📋 Copiar link del portal</button>
+            <div class="fg">
+              <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Edición <span style="color:#ef4444">*</span></label>
+              <input type="text" id="ae-edicion" class="cfg-input" style="width:100px" placeholder="ej: EV2026">
+            </div>
+            <button class="btn btn-sm btn-out" onclick="aeCopyLink()" style="white-space:nowrap">📋 Copiar link</button>
           </div>
           <input type="hidden" id="ae-pais">
           <input type="hidden" id="ae-anio">
-          <input type="hidden" id="ae-edicion">
 
           <div id="ae-status-msg" style="font-size:11px;margin-bottom:10px;padding:7px 12px;border-radius:7px;display:none"></div>
           <div id="ae-table-wrap" style="overflow-x:auto"></div>
@@ -3668,6 +3671,8 @@ function aeOnStructChange(){
   document.getElementById('ae-anio').value = anio;
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
+  const ei = document.getElementById('ae-edicion');
+  if(ei && !ei.value) ei.value = 'EV'+anio;
   // Mostrar distribuidores del país desde saved[] inmediatamente
   _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0;
   renderAETable([], '');
@@ -3698,6 +3703,7 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
     _aeCampaignEdicion = data.edicion||'';
     _aeCampaignTotalQ = (data.questions_snapshot||[]).length;
     const ci=document.getElementById('ae-codigo'); if(ci) ci.value=data.codigo_acceso||'';
+    const ei=document.getElementById('ae-edicion'); if(ei) ei.value=data.edicion||'';
     aeSetStatus('✅ Campaña existente — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio+' · '+_aeCampaignTotalQ+' preguntas','ok');
     await aeRefreshStatus();
   } else {
@@ -3789,9 +3795,18 @@ async function aeSaveCampaign(){
   const anio = parseInt(document.getElementById('ae-anio').value)||0;
   const edicion = (document.getElementById('ae-edicion').value||'').trim();
   if(!codigo){ aeSetStatus('Ingresá un código de acceso','err'); return; }
-  if(!pais||!anio){ aeSetStatus('Seleccioná el programa (País/Año) del dropdown','err'); return; }
+  if(!pais||!anio){ aeSetStatus('Seleccioná el programa del dropdown','err'); return; }
+  if(!edicion){ aeSetStatus('Ingresá la edición (ej: EV2026)','err'); return; }
   aeSetStatus('Guardando...','warn');
-  const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:Q, area_names:AN, area_colors:AC};
+  // Cargar la estructura correcta para este pais/anio antes de tomar el snapshot
+  const prevPais = cfg.pais, prevAnio = cfg.anio;
+  const structLoaded = loadStructure(pais, anio);
+  const snapQ = structLoaded ? [...Q] : Q;
+  const snapAN = structLoaded ? {...AN} : AN;
+  const snapAC = structLoaded ? {...AC} : AC;
+  // Restaurar estructura previa
+  if(structLoaded && prevPais && prevAnio && (prevPais!==pais||prevAnio!=anio)) loadStructure(prevPais, prevAnio);
+  const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:snapQ, area_names:snapAN, area_colors:snapAC};
   let res;
   if(_aeCampaignId){
     res = await _sbc.from('ae_campaigns').update(payload).eq('id',_aeCampaignId).select().single();
