@@ -3817,7 +3817,10 @@ function renderAETable(rows, edicion){
           : '<span style="color:#94a3b8">⬜ Pendiente</span>');
     const dSafe = d.replace(/'/g,"\\'");
     const unlockBtn = r.submitted && !r.unlock_granted
-      ? `<button onclick="aeGrantUnlock('${dSafe}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">🔓 Rehabilitar</button>`
+      ? `<button onclick="aeGrantUnlock('${dSafe}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">🔓 Rehab.</button>`
+      : '';
+    const deleteBtn = answered>0 || r.submitted
+      ? `<button onclick="aeDeleteDistAE('${dSafe}');return false" style="font-size:10px;padding:2px 7px;background:transparent;border:1px solid #ef4444;color:#ef4444;border-radius:4px;cursor:pointer" title="Borrar AE y volver a Pendiente">✕</button>`
       : '';
     return `<tr style="border-bottom:1px solid var(--g100)">
       <td style="padding:6px 8px;font-size:12px">${d}</td>
@@ -3827,7 +3830,7 @@ function renderAETable(rows, edicion){
       <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered>0&&answered===totalQ?'var(--green)':'var(--g500)'}">
         ${totalQ>0 ? answered+'/'+totalQ : (answered>0 ? answered+'/?' : '—')}</td>
       <td style="padding:6px 8px">${scoreHtml}</td>
-      <td style="padding:6px 8px">${unlockBtn}</td>
+      <td style="padding:6px 4px;display:flex;gap:4px;align-items:center">${unlockBtn}${deleteBtn}</td>
     </tr>`;
   }).join('');
 
@@ -3936,6 +3939,22 @@ async function aeGrantUnlock(dist){
   const {error} = await _sbc.from('ae_access').update({unlock_granted:true, unlock_requested:false}).eq('campaign_id',_aeCampaignId).eq('distribuidor',dist);
   if(error){ showToast('❌ '+error.message); return; }
   showToast('✅ Corrección habilitada para '+dist);
+  await aeRefreshStatus();
+}
+
+async function aeDeleteDistAE(dist){
+  if(!_sbc||!_sbOnline||!_aeCampaignId){ showToast('⚠️ Sin conexión o campaña no cargada'); return; }
+  if(!confirm('¿Borrar la AE de "'+dist+'" y volver a Pendiente?\nEl distribuidor podrá cargar nuevamente desde el portal.')) return;
+  // Borrar de autoevals en Supabase (por distribuidor + edicion de esta campaña)
+  if(_aeCampaignEdicion){
+    await _sbc.from('autoevals').delete().eq('distribuidor',dist).eq('edicion',_aeCampaignEdicion);
+    // También borrar del array local
+    autoevals = autoevals.filter(a=>!(a.distribuidor===dist&&a.edicion===_aeCampaignEdicion));
+  }
+  // Resetear ae_access a pendiente
+  await _sbc.from('ae_access').update({submitted:false, unlock_requested:false, unlock_granted:false})
+    .eq('campaign_id',_aeCampaignId).eq('distribuidor',dist);
+  showToast('✅ AE de '+dist+' borrada → Pendiente');
   await aeRefreshStatus();
 }
 
