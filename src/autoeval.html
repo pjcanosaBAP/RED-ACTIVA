@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>RED Activa — Autoevaluación BPL</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="logos.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.page{max-width:720px;margin:0 auto;padding:16px}
+
+/* ── HEADER ── */
+.hdr{background:#1e293b;border-bottom:1px solid rgba(255,255,255,.08);padding:12px 20px;
+  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.hdr-logo{height:32px;width:auto;object-fit:contain;background:rgba(255,255,255,.93);
+  border-radius:6px;padding:3px 8px}
+.hdr-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
+  color:#fff;letter-spacing:.5px}
+.hdr-sub{font-size:10px;color:#64748b;letter-spacing:1px;text-transform:uppercase}
+.hdr-dist{margin-left:auto;text-align:right}
+.hdr-dist-name{font-size:12px;font-weight:600;color:#94a3b8;max-width:200px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── PROGRESS BAR ── */
+.prog-bar{height:4px;background:#1e3a5f;position:sticky;top:57px;z-index:99}
+.prog-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#06b6d4);
+  transition:width .3s;border-radius:0 2px 2px 0}
+.prog-txt{font-size:11px;color:#64748b;text-align:right;padding:4px 16px 2px}
+
+/* ── CARDS / STEPS ── */
+.card{background:#1e293b;border:1px solid rgba(255,255,255,.08);border-radius:14px;
+  padding:32px;margin:24px 0}
+.step-icon{font-size:36px;margin-bottom:12px}
+.step-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;
+  color:#fff;margin-bottom:6px}
+.step-sub{font-size:13px;color:#94a3b8;margin-bottom:24px;line-height:1.5}
+.inp-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+  letter-spacing:.8px;margin-bottom:5px;display:block}
+.inp{width:100%;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:11px 14px;color:#fff;font-size:14px;font-family:'Barlow',sans-serif;
+  outline:none;transition:border .2s}
+.inp:focus{border-color:#3b82f6}
+.inp-pin{width:100px;text-align:center;letter-spacing:6px;font-size:20px;font-weight:700}
+.inp-code{text-transform:uppercase;letter-spacing:3px;font-size:18px;font-weight:700}
+select.inp{cursor:pointer}
+.btn-primary{width:100%;padding:13px;background:#2563eb;border:none;border-radius:8px;
+  color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s;
+  font-family:'Barlow',sans-serif;margin-top:8px}
+.btn-primary:hover{background:#1d4ed8}
+.btn-primary:disabled{background:#334155;cursor:not-allowed;color:#64748b}
+.btn-sec{width:100%;padding:11px;background:transparent;border:1.5px solid rgba(255,255,255,.2);
+  border-radius:8px;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:'Barlow',sans-serif;margin-top:8px;transition:all .2s}
+.btn-sec:hover{border-color:#3b82f6;color:#3b82f6}
+.err-msg{color:#f87171;font-size:12px;margin-top:8px;min-height:18px}
+.badge-ok{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,.15);
+  color:#10b981;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;margin-bottom:16px}
+
+/* ── QUESTIONS ── */
+.area-block{margin-bottom:20px}
+.area-header{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+  color:#fff;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:8px 8px 0 0;
+  border-left:4px solid #3b82f6;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+.area-code{font-size:11px;background:rgba(255,255,255,.1);border-radius:4px;
+  padding:1px 6px;font-weight:700}
+.bpl-block{background:#162032;border-left:4px solid transparent;border-radius:0 0 0 0;
+  margin-bottom:1px}
+.bpl-block:last-child{border-radius:0 0 8px 8px}
+.bpl-header{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;
+  letter-spacing:.8px;padding:8px 14px 4px;border-top:1px solid rgba(255,255,255,.04)}
+.q-row{padding:8px 14px 10px;border-bottom:1px solid rgba(255,255,255,.04);
+  display:flex;align-items:flex-start;gap:12px}
+.q-row:last-child{border-bottom:none}
+.q-text{flex:1;font-size:12.5px;color:#cbd5e1;line-height:1.5}
+.q-crit{color:#f87171;font-size:10px;font-weight:700}
+.ans-btns{display:flex;gap:4px;flex-shrink:0}
+.ans-btn{padding:5px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,.15);
+  background:transparent;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer;
+  font-family:'Barlow',sans-serif;transition:all .15s;white-space:nowrap}
+.ans-btn:hover{border-color:#3b82f6;color:#3b82f6}
+.ans-btn.si{background:#dcfce7;border-color:#16a34a;color:#15803d}
+.ans-btn.no{background:#fee2e2;border-color:#dc2626;color:#dc2626}
+.ans-btn.na{background:#f1f5f9;border-color:#64748b;color:#475569}
+
+/* ── STICKY FOOTER ── */
+.sticky-footer{position:sticky;bottom:0;background:#1e293b;border-top:1px solid rgba(255,255,255,.08);
+  padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:100}
+.sf-prog{flex:1;font-size:12px;color:#64748b}
+.sf-prog strong{color:#e2e8f0}
+.btn-submit{padding:10px 24px;background:#16a34a;border:none;border-radius:8px;
+  color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;
+  transition:background .2s;flex-shrink:0}
+.btn-submit:hover{background:#15803d}
+.btn-submit:disabled{background:#334155;color:#64748b;cursor:not-allowed}
+.btn-save{padding:10px 16px;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);
+  border-radius:8px;color:#94a3b8;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:'Barlow',sans-serif;transition:all .2s;flex-shrink:0}
+.btn-save:hover{border-color:#3b82f6;color:#3b82f6}
+
+/* ── DONE SCREEN ── */
+.done-icon{font-size:56px;margin-bottom:12px}
+.done-title{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:#10b981}
+.done-sub{font-size:14px;color:#94a3b8;margin:8px 0 24px;line-height:1.6}
+.btn-unlock{padding:12px;background:rgba(245,158,11,.15);border:1.5px solid #f59e0b;
+  border-radius:8px;color:#f59e0b;font-size:13px;font-weight:600;cursor:pointer;
+  font-family:'Barlow',sans-serif;width:100%;margin-top:8px;transition:all .2s}
+.btn-unlock:hover{background:rgba(245,158,11,.25)}
+.btn-unlock:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:10px;
+  padding:10px 20px;font-size:13px;color:#e2e8f0;opacity:0;transition:all .3s;
+  pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── LOADING ── */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.2);
+  border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:480px){
+  .card{padding:20px}
+  .q-row{flex-direction:column;gap:8px}
+  .ans-btns{width:100%;justify-content:flex-start}
+  .ans-btn{flex:1;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER (hidden until step 3) -->
+<div class="hdr" id="hdr" style="display:none">
+  <img id="hdr-logo-ra" class="hdr-logo" alt="RED Activa">
+  <div>
+    <div class="hdr-title">Autoevaluación BPL</div>
+    <div class="hdr-sub">RED Activa</div>
+  </div>
+  <div class="hdr-dist"><div class="hdr-dist-name" id="hdr-dist-name"></div></div>
+</div>
+
+<!-- PROGRESS (step 3 only) -->
+<div id="prog-wrap" style="display:none">
+  <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+  <div class="prog-txt"><span id="prog-txt">0 / 0 respondidas</span></div>
+</div>
+
+<!-- ── STEP 1: CÓDIGO ── -->
+<div class="page" id="step1">
+  <div class="card" style="text-align:center;margin-top:40px">
+    <img id="logo-ra-s1" style="height:52px;width:auto;object-fit:contain;background:rgba(255,255,255,.93);border-radius:10px;padding:5px 16px;margin-bottom:20px" alt="RED Activa">
+    <div class="step-title">Autoevaluación BPL</div>
+    <div class="step-sub">Ingresá el código de acceso<br>que te proporcionó el administrador del programa</div>
+    <div style="text-align:left">
+      <label class="inp-label">Código de acceso</label>
+      <input type="text" id="inp-code" class="inp inp-code" placeholder="ej: CHILE2026"
+        maxlength="20" onkeydown="if(event.key==='Enter')step1Next()">
+      <div class="err-msg" id="err1"></div>
+      <button class="btn-primary" onclick="step1Next()" id="btn1">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STEP 2: DISTRIBUIDOR + PIN ── -->
+<div class="page" id="step2" style="display:none">
+  <div class="card" style="margin-top:40px">
+    <div class="badge-ok">✓ <span id="badge-codigo"></span></div>
+    <div class="step-title">Identificate</div>
+    <div class="step-sub">Seleccioná tu empresa e ingresá tu PIN de 4 dígitos</div>
+    <div style="margin-bottom:14px">
+      <label class="inp-label">Tu empresa</label>
+      <select id="sel-dist" class="inp">
+        <option value="">— Seleccioná —</option>
+      </select>
+    </div>
+    <div>
+      <label class="inp-label">PIN (4 dígitos)</label>
+      <input type="password" id="inp-pin" class="inp inp-pin" maxlength="4"
+        inputmode="numeric" pattern="[0-9]*" placeholder="••••"
+        onkeydown="if(event.key==='Enter')step2Next()">
+    </div>
+    <div class="err-msg" id="err2"></div>
+    <button class="btn-primary" onclick="step2Next()" id="btn2">Ingresar</button>
+    <button class="btn-sec" onclick="goStep1()">← Volver</button>
+  </div>
+</div>
+
+<!-- ── STEP 3: PREGUNTAS ── -->
+<div id="step3" style="display:none">
+  <div class="page" id="q-container"></div>
+  <div class="sticky-footer">
+    <div class="sf-prog">Respondidas: <strong id="sf-count">0 / 0</strong></div>
+    <button class="btn-save" onclick="saveDraft()">💾 Guardar</button>
+    <button class="btn-submit" id="btn-submit" onclick="confirmSubmit()">Enviar AE ✓</button>
+  </div>
+</div>
+
+<!-- ── STEP 4: ENVIADA ── -->
+<div class="page" id="step4" style="display:none">
+  <div class="card" style="text-align:center;margin-top:40px">
+    <div class="done-icon">✅</div>
+    <div class="done-title">¡Autoevaluación enviada!</div>
+    <div class="done-sub" id="done-msg">Tu autoevaluación fue enviada correctamente.<br>
+      Si necesitás hacer correcciones, solicitalo al administrador.</div>
+    <button class="btn-unlock" id="btn-unlock" onclick="requestUnlock()">
+      🔓 Solicitar corrección al administrador
+    </button>
+    <button class="btn-sec" onclick="location.reload()" style="margin-top:8px">
+      ↩ Volver al inicio
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const SBURL = 'https://fkyifkbfgdxgmwbgnhud.supabase.co';
+const SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZreWlma2JmZ2R4Z213YmduaHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTkxMDYsImV4cCI6MjA5NTQ3NTEwNn0.lHuJ3onWCd0v2LWp5Sftzc_kdWR59ar_7oRqsgwYA8M';
+const sbc = supabase.createClient(SBURL, SBKEY);
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  codigo:'', distribuidor:'', pin:'',
+  questions:[], answers:{}, AN:{}, AC:{},
+  submitted:false, unlock_requested:false, unlock_granted:false,
+  pais:'', anio:0, edicion:''
+};
+let _saveTimer = null;
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', function(){
+  if(typeof LOGO_RA !== 'undefined'){
+    document.getElementById('logo-ra-s1').src = LOGO_RA;
+    document.getElementById('hdr-logo-ra').src = LOGO_RA;
+  }
+  // Pre-fill code from URL param
+  const p = new URLSearchParams(location.search);
+  if(p.get('c')) document.getElementById('inp-code').value = p.get('c').toUpperCase();
+});
+
+// ── STEP 1 ───────────────────────────────────────────────────────────────────
+async function step1Next(){
+  const code = (document.getElementById('inp-code').value||'').trim().toUpperCase();
+  if(!code){ setErr('err1','Ingresá el código de acceso'); return; }
+  setBtn('btn1', true);
+  setErr('err1','');
+  try{
+    const {data, error} = await sbc.rpc('ae_get_distributors', {p_codigo: code});
+    if(error) throw error;
+    if(!data || !data.length){ setErr('err1','Código no encontrado. Verificá con el administrador.'); return; }
+    S.codigo = code;
+    // Populate distributor dropdown
+    const sel = document.getElementById('sel-dist');
+    sel.innerHTML = '<option value="">— Seleccioná tu empresa —</option>' +
+      data.map(d=>`<option value="${d.distribuidor}" data-sub="${d.submitted?'1':'0'}">${d.distribuidor}${d.submitted?' ✓':''}</option>`).join('');
+    document.getElementById('badge-codigo').textContent = code;
+    showStep(2);
+  }catch(e){ setErr('err1','Error de conexión. Intentá de nuevo.'); }
+  finally{ setBtn('btn1', false); }
+}
+
+// ── STEP 2 ───────────────────────────────────────────────────────────────────
+async function step2Next(){
+  const dist = document.getElementById('sel-dist').value;
+  const pin  = document.getElementById('inp-pin').value;
+  if(!dist){ setErr('err2','Seleccioná tu empresa'); return; }
+  if(!pin || pin.length !== 4){ setErr('err2','El PIN debe tener 4 dígitos'); return; }
+  setBtn('btn2', true);
+  setErr('err2','');
+  try{
+    const {data, error} = await sbc.rpc('ae_authenticate', {
+      p_codigo: S.codigo, p_distribuidor: dist, p_pin: pin
+    });
+    if(error) throw error;
+    if(data.error){ setErr('err2', data.error === 'invalid_credentials' ? 'PIN incorrecto' : data.error); return; }
+    S.distribuidor = dist;
+    S.pin = pin;
+    S.questions = data.questions || [];
+    S.AN = data.area_names || {};
+    S.AC = data.area_colors || {};
+    S.submitted = data.submitted || false;
+    S.unlock_requested = data.unlock_requested || false;
+    S.unlock_granted = data.unlock_granted || false;
+    S.pais = data.pais || '';
+    S.anio = data.anio || 0;
+    S.edicion = data.edicion || '';
+    // Load existing answers
+    const {data: ans} = await sbc.rpc('ae_load_answers', {
+      p_codigo: S.codigo, p_distribuidor: dist, p_pin: pin
+    });
+    S.answers = (ans && ans.answers) ? ans.answers : {};
+    document.getElementById('hdr-dist-name').textContent = dist;
+    if(S.submitted && !S.unlock_granted){ showStep(4); updateDoneScreen(); return; }
+    buildQuestionsUI();
+    showStep(3);
+  }catch(e){ setErr('err2','Error de conexión. Intentá de nuevo.'); }
+  finally{ setBtn('btn2', false); }
+}
+
+function goStep1(){
+  S.codigo = ''; S.distribuidor = ''; S.pin = '';
+  document.getElementById('inp-code').value = '';
+  document.getElementById('inp-pin').value = '';
+  showStep(1);
+}
+
+// ── BUILD QUESTIONS UI ────────────────────────────────────────────────────────
+function buildQuestionsUI(){
+  const Q = S.questions;
+  if(!Q.length){ document.getElementById('q-container').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">No hay preguntas disponibles.</div>'; return; }
+
+  // Group: sheet → bpl_key → questions
+  const order = [];
+  const grouped = {};
+  Q.forEach(q=>{
+    if(!grouped[q.sheet]){ grouped[q.sheet] = {}; order.push(q.sheet); }
+    const bk = (q.bpl_num||'')+'|'+(q.bpl_name||q.subattr||'');
+    if(!grouped[q.sheet][bk]) grouped[q.sheet][bk] = [];
+    grouped[q.sheet][bk].push(q);
+  });
+
+  let html = '';
+  order.forEach(sh=>{
+    const color = S.AC[sh] || '#3b82f6';
+    const name  = S.AN[sh] || sh;
+    html += `<div class="area-block">
+      <div class="area-header" style="border-left-color:${color}">
+        <span class="area-code" style="color:${color}">${sh}</span>${name}
+      </div>`;
+    Object.entries(grouped[sh]).forEach(([bk, qs])=>{
+      const bplName = bk.split('|')[1] || bk.split('|')[0];
+      html += `<div class="bpl-block">
+        <div class="bpl-header">${bplName}</div>`;
+      qs.forEach(q=>{
+        const ans = S.answers[String(q.comp_num)] || '';
+        html += `<div class="q-row" id="qr-${q.comp_num}">
+          <div class="q-text">${q.critico?'<span class="q-crit">🔴 CRÍTICO</span> ':''}${q.question}</div>
+          <div class="ans-btns">
+            <button class="ans-btn${ans==='si'?' si':''}" onclick="pick(${q.comp_num},'si',this)">Sí</button>
+            <button class="ans-btn${ans==='no'?' no':''}" onclick="pick(${q.comp_num},'no',this)">No</button>
+            <button class="ans-btn${ans==='na'?' na':''}" onclick="pick(${q.comp_num},'na',this)">N/A</button>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('q-container').innerHTML = html;
+  updateProgress();
+}
+
+// ── ANSWER HANDLING ───────────────────────────────────────────────────────────
+function pick(compNum, val, btn){
+  const prev = S.answers[String(compNum)];
+  S.answers[String(compNum)] = val;
+  // Update buttons in row
+  const row = document.getElementById('qr-'+compNum);
+  if(row) row.querySelectorAll('.ans-btn').forEach(b=>b.className='ans-btn');
+  btn.className = 'ans-btn ' + val;
+  updateProgress();
+  scheduleSave();
+}
+
+function updateProgress(){
+  const total = S.questions.length;
+  const done  = S.questions.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
+  const pct   = total ? Math.round(done/total*100) : 0;
+  document.getElementById('prog-fill').style.width = pct+'%';
+  document.getElementById('prog-txt').textContent  = done+' / '+total+' respondidas ('+pct+'%)';
+  document.getElementById('sf-count').textContent  = done+' / '+total;
+  document.getElementById('btn-submit').disabled = done < total;
+}
+
+function scheduleSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveDraft, 3000);
+}
+
+async function saveDraft(){
+  clearTimeout(_saveTimer);
+  try{
+    await sbc.rpc('ae_save_answers',{
+      p_codigo: S.codigo, p_distribuidor: S.distribuidor, p_pin: S.pin,
+      p_answers: S.answers, p_submit: false
+    });
+    toast('💾 Guardado');
+  }catch(e){ toast('⚠️ Error al guardar'); }
+}
+
+async function confirmSubmit(){
+  const total = S.questions.length;
+  const done  = S.questions.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
+  if(done < total){ toast('Respondé todas las preguntas antes de enviar'); return; }
+  if(!confirm('¿Confirmás el envío de tu autoevaluación?\n\nUna vez enviada quedará bloqueada para edición. Podés solicitar corrección al administrador si es necesario.')) return;
+  document.getElementById('btn-submit').disabled = true;
+  try{
+    const {data, error} = await sbc.rpc('ae_save_answers',{
+      p_codigo: S.codigo, p_distribuidor: S.distribuidor, p_pin: S.pin,
+      p_answers: S.answers, p_submit: true
+    });
+    if(error) throw error;
+    if(data && data.error){ alert('Error: '+data.error); return; }
+    S.submitted = true;
+    showStep(4);
+    updateDoneScreen();
+  }catch(e){ alert('Error al enviar. Intentá de nuevo.'); document.getElementById('btn-submit').disabled = false; }
+}
+
+// ── STEP 4 ───────────────────────────────────────────────────────────────────
+function updateDoneScreen(){
+  const total = S.questions.length;
+  const done  = S.questions.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
+  document.getElementById('done-msg').innerHTML = `Tu autoevaluación fue enviada correctamente.<br>
+    <strong style="color:#10b981">${done}/${total} preguntas respondidas</strong><br>
+    Si necesitás hacer correcciones, solicitalo al administrador.`;
+  const btn = document.getElementById('btn-unlock');
+  if(S.unlock_requested){ btn.textContent = '⏳ Corrección solicitada (pendiente)'; btn.disabled = true; }
+}
+
+async function requestUnlock(){
+  const btn = document.getElementById('btn-unlock');
+  btn.disabled = true;
+  try{
+    await sbc.rpc('ae_request_unlock',{
+      p_codigo: S.codigo, p_distribuidor: S.distribuidor, p_pin: S.pin
+    });
+    S.unlock_requested = true;
+    btn.textContent = '⏳ Corrección solicitada — el administrador la habilitará';
+    toast('✅ Solicitud enviada');
+  }catch(e){ btn.disabled = false; toast('Error al enviar solicitud'); }
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function showStep(n){
+  [1,2,3,4].forEach(i=>{
+    const el = document.getElementById('step'+i);
+    if(el) el.style.display = i===n ? '' : 'none';
+  });
+  const hdr = document.getElementById('hdr');
+  const prog = document.getElementById('prog-wrap');
+  if(hdr)  hdr.style.display  = n===3 ? '' : 'none';
+  if(prog) prog.style.display = n===3 ? '' : 'none';
+}
+
+function setErr(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg; }
+function setBtn(id, loading){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span>' : (id==='btn1'?'Continuar':'Ingresar');
+}
+let _toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

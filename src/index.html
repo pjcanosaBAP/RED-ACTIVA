@@ -1711,6 +1711,29 @@ body.readonly .admin-only{display:none!important;}
         </div>
       </div>
 
+      <!-- ── AE PORTAL ── -->
+      <div class="cfg-section" id="cfg-sec-ae">
+        <div class="cfg-hd">📋 Portal Autoevaluación
+          <a href="autoeval.html" target="_blank" class="cfg-reset-btn" style="text-decoration:none">🔗 Abrir portal</a>
+        </div>
+        <div class="cfg-bd">
+          <div class="cfg-row" style="flex-wrap:wrap;gap:8px">
+            <div class="cfg-lbl"><strong>Código de acceso</strong><div class="cfg-sub">Los distribuidores lo ingresan en el portal para acceder</div></div>
+            <input type="text" id="ae-codigo" class="cfg-input" style="width:140px;text-transform:uppercase;letter-spacing:2px" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()">
+            <input type="text" id="ae-edicion" class="cfg-input" style="width:110px" placeholder="Edición (ej: EV2026)">
+            <button class="btn btn-blue btn-sm" onclick="aeSaveCampaign()">💾 Guardar campaña</button>
+            <button class="btn btn-sm btn-out" onclick="aeCopyLink()">📋 Copiar link</button>
+          </div>
+          <div id="ae-status-msg" style="font-size:11px;color:var(--g500);margin-top:6px"></div>
+          <div id="ae-table-wrap" style="margin-top:14px;overflow-x:auto"></div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-out" onclick="aeAutoAssignPins()">🎲 Asignar PINs automáticos</button>
+            <button class="btn btn-sm btn-out" onclick="aeSavePins()">💾 Guardar PINs</button>
+            <button class="btn btn-sm btn-out" onclick="aeRefreshStatus()">🔄 Actualizar estados</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 <div class="panel" id="panel-analisis">
@@ -3392,7 +3415,7 @@ function goTab(t){
   if(idx!==undefined) document.querySelectorAll('.sb-tab')[idx].classList.add('on');
   if(t==='global') renderGlobal();
   if(t==='compare') initCompare();
-  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){} }
+  if(t==='config'){ renderWeightsCfg(); renderMatrixEditor(); edInitAreas(); rebuildStructSelector(); try{ rebuildSbStructSel(); }catch(e){} try{ aeLoadCampaign(); }catch(e){} }
   if(t==='form') flushFormIfDirty();
   if(t==='analisis') initAnalisis();
   if(t==='network') renderNetworkDashboard();
@@ -3570,6 +3593,137 @@ async function persist(){
     }
   } catch(e){ console.warn('[SB] persist error:', e); }
 }
+
+// ── AE PORTAL ADMIN ──────────────────────────────────────────────────────────
+let _aeCampaignId = null;
+let _aeAccessRows = []; // [{distribuidor, pin, submitted, unlock_requested, unlock_granted}]
+
+async function aeLoadCampaign(){
+  if(!_sbc||!_sbOnline) return;
+  const pais = cfg.pais||''; const anio = parseInt(cfg.anio)||0;
+  if(!pais||!anio) return;
+  const {data} = await _sbc.from('ae_campaigns').select('*').eq('pais',pais).eq('anio',anio).maybeSingle();
+  if(data){
+    _aeCampaignId = data.id;
+    const ci = document.getElementById('ae-codigo'); if(ci) ci.value = data.codigo_acceso||'';
+    const ei = document.getElementById('ae-edicion'); if(ei) ei.value = data.edicion||'';
+  }
+  await aeRefreshStatus();
+}
+
+async function aeRefreshStatus(){
+  if(!_sbc||!_sbOnline||!_aeCampaignId){ renderAETable([]); return; }
+  // Get access rows
+  const {data:acc} = await _sbc.from('ae_access').select('distribuidor,pin,submitted,unlock_requested,unlock_granted').eq('campaign_id',_aeCampaignId);
+  _aeAccessRows = acc||[];
+  // Get answer counts from autoevals
+  const edicion = (document.getElementById('ae-edicion')||{}).value||'';
+  renderAETable(_aeAccessRows, edicion);
+}
+
+function renderAETable(rows, edicion){
+  const wrap = document.getElementById('ae-table-wrap'); if(!wrap) return;
+  const totalQ = Q.length;
+  const distMap = {}; rows.forEach(r=>distMap[r.distribuidor]=r);
+  const dists = DISTRIBUTORS.length ? DISTRIBUTORS : rows.map(r=>r.distribuidor);
+  if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500)">No hay distribuidores cargados. Agregalos en la sección de Distribuidores.</div>'; return; }
+
+  const trs = dists.map(d=>{
+    const r = distMap[d]||{};
+    const aeRow = edicion ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicion) : null;
+    const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
+    const statusHtml = r.submitted
+      ? (r.unlock_requested
+          ? '<span style="color:#f59e0b;font-weight:700">🔓 Unlock solicitado</span>'
+          : '<span style="color:#10b981;font-weight:700">✅ Enviada</span>')
+      : (answered>0
+          ? '<span style="color:#3b82f6;font-weight:700">⏳ En curso</span>'
+          : '<span style="color:#94a3b8">⬜ Pendiente</span>');
+    const unlockBtn = (r.submitted&&r.unlock_requested)
+      ? `<button onclick="aeGrantUnlock('${d.replace(/'/g,"\\'")}','${(r.distribuidor||'').replace(/'/g,"\\'")}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">Habilitar</button>` : '';
+    return `<tr style="border-bottom:1px solid var(--g100)">
+      <td style="padding:6px 8px;font-size:12px">${d}</td>
+      <td style="padding:6px 8px;text-align:center"><input type="text" value="${r.pin||''}" maxlength="4" data-dist="${d}" placeholder="—"
+        style="width:52px;text-align:center;border:1px solid var(--g200);border-radius:4px;padding:3px 6px;font-size:13px;letter-spacing:3px;font-weight:700"></td>
+      <td style="padding:6px 8px">${statusHtml}</td>
+      <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered===totalQ&&totalQ>0?'var(--green)':'var(--g500)'}">
+        ${answered}/${totalQ}</td>
+      <td style="padding:6px 8px">${unlockBtn}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:var(--g50);font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--g500)">
+      <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Distribuidor</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:1.5px solid var(--g200)">PIN</th>
+      <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Estado AE</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:1.5px solid var(--g200)">Respondidas</th>
+      <th style="padding:6px 8px;border-bottom:1.5px solid var(--g200)"></th>
+    </tr></thead>
+    <tbody>${trs}</tbody>
+  </table>`;
+}
+
+async function aeSaveCampaign(){
+  if(!_sbc||!_sbOnline){ showToast('⚠️ Sin conexión Supabase'); return; }
+  const codigo = (document.getElementById('ae-codigo').value||'').trim().toUpperCase();
+  const edicion = (document.getElementById('ae-edicion').value||'').trim();
+  if(!codigo){ showToast('⚠️ Ingresá un código de acceso'); return; }
+  const pais = cfg.pais||''; const anio = parseInt(cfg.anio)||0;
+  if(!pais||!anio){ showToast('⚠️ Configurá el País y Año antes'); return; }
+  const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:Q, area_names:AN, area_colors:AC};
+  let res;
+  if(_aeCampaignId){
+    res = await _sbc.from('ae_campaigns').update(payload).eq('id',_aeCampaignId).select().single();
+  } else {
+    res = await _sbc.from('ae_campaigns').insert(payload).select().single();
+  }
+  if(res.error){ showToast('❌ '+res.error.message); return; }
+  _aeCampaignId = res.data.id;
+  // Upsert ae_access for each distributor (preserve existing PINs)
+  if(DISTRIBUTORS.length){
+    const rows = DISTRIBUTORS.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:(_aeAccessRows.find(r=>r.distribuidor===d)||{}).pin||''}));
+    await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor', ignoreDuplicates:true});
+  }
+  const msg = document.getElementById('ae-status-msg');
+  if(msg) msg.textContent = '✅ Campaña guardada · ID: '+_aeCampaignId;
+  showToast('✅ Campaña AE guardada');
+  await aeRefreshStatus();
+}
+
+async function aeSavePins(){
+  if(!_sbc||!_sbOnline||!_aeCampaignId){ showToast('⚠️ Guardá la campaña primero'); return; }
+  const inputs = document.querySelectorAll('#ae-table-wrap input[data-dist]');
+  const rows = [];
+  inputs.forEach(inp=>{ if(inp.value.trim()) rows.push({campaign_id:_aeCampaignId, distribuidor:inp.dataset.dist, pin:inp.value.trim()}); });
+  if(!rows.length){ showToast('⚠️ No hay PINs para guardar'); return; }
+  const {error} = await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor'});
+  if(error){ showToast('❌ '+error.message); return; }
+  showToast('✅ PINs guardados ('+rows.length+')');
+  await aeRefreshStatus();
+}
+
+function aeAutoAssignPins(){
+  const inputs = document.querySelectorAll('#ae-table-wrap input[data-dist]');
+  inputs.forEach(inp=>{ if(!inp.value) inp.value = String(Math.floor(1000+Math.random()*9000)); });
+  showToast('🎲 PINs asignados — guardá para confirmar');
+}
+
+async function aeGrantUnlock(dist){
+  if(!_sbc||!_sbOnline||!_aeCampaignId) return;
+  const {error} = await _sbc.from('ae_access').update({unlock_granted:true, unlock_requested:false}).eq('campaign_id',_aeCampaignId).eq('distribuidor',dist);
+  if(error){ showToast('❌ '+error.message); return; }
+  showToast('✅ Corrección habilitada para '+dist);
+  await aeRefreshStatus();
+}
+
+function aeCopyLink(){
+  const code = (document.getElementById('ae-codigo').value||'').trim().toUpperCase();
+  const base = location.origin+location.pathname.replace('index.html','')+'autoeval.html';
+  const url = code ? base+'?c='+encodeURIComponent(code) : base;
+  navigator.clipboard.writeText(url).then(()=>showToast('✅ Link copiado')).catch(()=>{ prompt('Copiá el link:',url); });
+}
+
 // ── SUPABASE: bajar config remota y aplicar localmente ───────────────────────
 async function _sbApplyRemoteConfig(){
   if(!_sbc) return false;
