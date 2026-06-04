@@ -3638,6 +3638,9 @@ let _aeCampaignId = null;
 let _aeAccessRows = [];
 let _aeCampaignEdicion = '';
 let _aeCampaignTotalQ = 0;
+let _aeCampaignAW = {};
+let _aeCampaignNV = {};
+let _aeCampaignQ = [];
 
 function aeRebuildStructDropdown(){
   const sel = document.getElementById('ae-struct-sel'); if(!sel) return;
@@ -3679,7 +3682,7 @@ function aeOnStructChange(){
   const ei = document.getElementById('ae-edicion');
   if(ei && !ei.value) ei.value = 'EV'+anio;
   // Mostrar distribuidores del país desde saved[] inmediatamente
-  _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0;
+  _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0; _aeCampaignAW = {}; _aeCampaignNV = {}; _aeCampaignQ = [];
   renderAETable([], '');
   // Cargar campaña existente si hay Supabase
   aeLoadCampaignForPaisAnio(pais, parseInt(anio));
@@ -3707,6 +3710,9 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
     _aeCampaignId = data.id;
     _aeCampaignEdicion = data.edicion||'';
     _aeCampaignTotalQ = (data.questions_snapshot||[]).length;
+    _aeCampaignAW = data.area_weights||{};
+    _aeCampaignNV = data.nv||{};
+    _aeCampaignQ  = data.questions_snapshot||[];
     const ci=document.getElementById('ae-codigo'); if(ci) ci.value=data.codigo_acceso||'';
     const ei=document.getElementById('ae-edicion'); if(ei) ei.value=data.edicion||'';
     aeSetStatus('✅ Campaña existente — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio+' · '+_aeCampaignTotalQ+' preguntas','ok');
@@ -3760,17 +3766,43 @@ function renderAETable(rows, edicion){
       ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
       : autoevals.find(a=>a.distribuidor===d);
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
-    // Score y categoria
+    // Score ponderado usando estructura de la campaña
     let scoreHtml = '—';
-    if(aeRow&&aeRow.answers){
+    if(aeRow&&aeRow.answers&&_aeCampaignQ.length){
       const ans = aeRow.answers;
-      const si = Object.values(ans).filter(v=>v==='si').length;
-      const no = Object.values(ans).filter(v=>v==='no').length;
-      const tot = si+no;
-      if(tot>0){
-        const pct = Math.round(si/tot*100);
-        const cat = pct>=85?'PROACTIVO':pct>=70?'ACTIVO':pct>=50?'REACTIVO':'INACTIVO';
-        const col = pct>=85?'#16a34a':pct>=70?'#2563eb':pct>=50?'#d97706':'#dc2626';
+      const qArr = _aeCampaignQ;
+      const aw = _aeCampaignAW;
+      const nv = _aeCampaignNV;
+      // Calcular score por área
+      const areaScores = {};
+      const sheets = [...new Set(qArr.map(q=>q.sheet))];
+      sheets.forEach(sh=>{
+        const shQ = qArr.filter(q=>q.sheet===sh);
+        let wSi=0, wTot=0;
+        shQ.forEach(q=>{
+          const v = ans[String(q.comp_num)];
+          const w = q.weight_attr||1;
+          if(v==='si'){ wSi+=w; wTot+=w; }
+          else if(v==='no'){ wTot+=w; }
+          // na: no cuenta
+        });
+        areaScores[sh] = wTot>0 ? wSi/wTot : null;
+      });
+      // Promedio ponderado entre áreas (excluir NV)
+      let totalW=0, totalScore=0;
+      sheets.forEach(sh=>{
+        if(nv[sh]) return; // excluir no vinculantes
+        const w = aw[sh]||0;
+        if(w>0 && areaScores[sh]!==null && areaScores[sh]!==undefined){
+          totalScore += areaScores[sh]*w;
+          totalW += w;
+        }
+      });
+      if(totalW>0){
+        const pct = Math.round(totalScore/totalW*100);
+        const thr = THR||{pro:85,act:70,rea:50};
+        const cat = pct>=thr.pro?'PROACTIVO':pct>=thr.act?'ACTIVO':pct>=thr.rea?'REACTIVO':'INACTIVO';
+        const col = pct>=thr.pro?'#16a34a':pct>=thr.act?'#2563eb':pct>=thr.rea?'#d97706':'#dc2626';
         scoreHtml = `<span style="font-weight:700;color:${col}">${pct}%</span> <span style="font-size:10px;color:${col}">${cat}</span>`;
       }
     }
@@ -3837,9 +3869,11 @@ async function aeSaveCampaign(){
   const snapQ = structLoaded ? [...Q] : Q;
   const snapAN = structLoaded ? {...AN} : AN;
   const snapAC = structLoaded ? {...AC} : AC;
+  const snapAW = structLoaded ? {...AW} : AW;
+  const snapNV = structLoaded ? {...NV} : NV;
   // Restaurar estructura previa
   if(structLoaded && prevPais && prevAnio && (prevPais!==pais||prevAnio!=anio)) loadStructure(prevPais, prevAnio);
-  const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:snapQ, area_names:snapAN, area_colors:snapAC};
+  const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:snapQ, area_names:snapAN, area_colors:snapAC, area_weights:snapAW, nv:snapNV};
   let res;
   if(_aeCampaignId){
     res = await _sbc.from('ae_campaigns').update(payload).eq('id',_aeCampaignId).select().single();
@@ -3849,7 +3883,10 @@ async function aeSaveCampaign(){
   if(res.error){ aeSetStatus('❌ Error al guardar: '+res.error.message,'err'); console.error('[AE] save campaign:', res.error); return; }
   _aeCampaignId = res.data.id;
   _aeCampaignEdicion = edicion;
-  _aeCampaignTotalQ = Q.length;
+  _aeCampaignTotalQ = snapQ.length;
+  _aeCampaignAW = snapAW;
+  _aeCampaignNV = snapNV;
+  _aeCampaignQ  = snapQ;
   // Distribuidores del país — fuente de verdad: saved[]
   let accessErr = null;
   const allDists = [...new Set(
