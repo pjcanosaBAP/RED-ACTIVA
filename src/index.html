@@ -2579,9 +2579,17 @@ function _saveDistsForPais(arr,pais){
   cfg.dists[p]=[...arr];
 }
 function _syncDistributors(pais){
-  const arr=_distsForPais(pais||cfg.pais);
+  const p=(pais||cfg.pais||'').toUpperCase();
+  if(!p){ DISTRIBUTORS.length=0; return; }
+  _distsObj(); // asegurar migración
+  if(!cfg.dists||Array.isArray(cfg.dists)) cfg.dists={};
+  // Fusionar: lista configurada + distribuidores de auditorías guardadas para ese país
+  const configured=cfg.dists[p]||[];
+  const fromSaved=saved.filter(a=>(a.pais||'').toUpperCase()===p&&a.distribuidor).map(a=>a.distribuidor);
+  const merged=[...new Set([...configured,...fromSaved])].sort();
+  cfg.dists[p]=merged;
   DISTRIBUTORS.length=0;
-  arr.forEach(d=>DISTRIBUTORS.push(d));
+  merged.forEach(d=>DISTRIBUTORS.push(d));
 }
 
 // Load cfg
@@ -2589,7 +2597,7 @@ function loadCfg(){
   // FIX 1a: merge AW en vez de reemplazar — evita borrar áreas recién creadas
   if(cfg.aw) Object.assign(AW, cfg.aw);
   if(cfg.thr) THR = {...cfg.thr};
-  if(cfg.dists) _syncDistributors();
+  _syncDistributors();
   // Set UI
   SHEETS().forEach(sh=>{
     const el=document.getElementById('cfg-w-'+sh);
