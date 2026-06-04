@@ -3723,6 +3723,33 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
   }
 }
 
+function _calcAEScore(answers, qArr, aw, nv){
+  if(!answers||!qArr||!qArr.length) return null;
+  const sheets=[...new Set(qArr.map(q=>q.sheet))];
+  const areaScores={};
+  sheets.forEach(sh=>{
+    const shQ=qArr.filter(q=>q.sheet===sh);
+    let wSi=0,wTot=0;
+    shQ.forEach(q=>{
+      const v=answers[String(q.comp_num)];
+      const w=q.weight_attr||1;
+      if(v==='si'){wSi+=w;wTot+=w;}
+      else if(v==='no'){wTot+=w;}
+    });
+    areaScores[sh]=wTot>0?wSi/wTot:null;
+  });
+  let totalW=0,totalScore=0;
+  sheets.forEach(sh=>{
+    if((nv||{})[sh]) return;
+    const w=(aw||{})[sh]||0;
+    if(w>0&&areaScores[sh]!=null){totalScore+=areaScores[sh]*w;totalW+=w;}
+  });
+  if(!totalW) return null;
+  const areas={};
+  sheets.forEach(sh=>{areas[sh]=areaScores[sh]||0;});
+  return {total:totalScore/totalW, areas};
+}
+
 async function aeRefreshStatus(){
   if(!_sbc||!_sbOnline){ renderAETable([]); return; }
   if(!_aeCampaignId){
@@ -3738,10 +3765,19 @@ async function aeRefreshStatus(){
   if(_aeCampaignEdicion){
     const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
     if(aeData){
+      const toUpdate = [];
       aeData.forEach(r=>{
+        const sc = _calcAEScore(r.answers||{}, _aeCampaignQ, _aeCampaignAW, _aeCampaignNV);
+        const scores = sc || r.scores || {};
+        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores};
         const idx=autoevals.findIndex(a=>String(a.id)===String(r.id));
-        const ae={id:r.id,distribuidor:r.distribuidor,edicion:r.edicion,pais:r.pais||'',fecha:r.fecha||'',answers:r.answers||{},scores:r.scores||{}};
         if(idx>=0) autoevals[idx]=ae; else autoevals.push(ae);
+        if(sc) toUpdate.push({id:String(r.id), scores:sc});
+      });
+      // Guardar scores recalculados en Supabase para que el audit view los use correctamente
+      toUpdate.forEach(row=>{
+        _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
+          .then(({error})=>{ if(error) console.warn('[AE] score update:', error.message); });
       });
     }
   }
