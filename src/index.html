@@ -4582,12 +4582,15 @@ function _getAEFor(distribuidor, edicion){
     ? (/^EV/i.test(edicion)?edicion.replace(/^EV/i,'AE'):edicion.replace(/^AE/i,'EV'))
     : '';
   const distNorm=(distribuidor||'').trim().toUpperCase();
+  // Normalize year: 4-digit "2025" → "25", 2-digit "25" stays "25"
+  const _ny=n=>n&&n.length===4?n.slice(-2):n;
   const candidates=autoevals.filter(a=>{
     if(!a.distribuidor) return false;
     if(a.distribuidor.trim().toUpperCase()!==distNorm) return false;
     if(a.edicion===edicion) return true;
     if(altEdicion&&a.edicion===altEdicion) return true;
-    if(edNum&&(a.edicion||'').replace(/\D/g,'')===edNum) return true;
+    const aeEdNum=(a.edicion||'').replace(/\D/g,'');
+    if(edNum&&aeEdNum&&_ny(edNum)===_ny(aeEdNum)) return true;
     return false;
   });
   if(!candidates.length) return null;
@@ -4613,7 +4616,6 @@ function renderCmpColumns(){
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   const ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
   const prev=cmpShowPrev&&dist&&edicion?_getPrevAudit(dist,edicion,cmpEdicion||null):null;
-  if(dist&&edicion) console.log('[AE debug] dist='+dist+' ed='+edicion+' ae='+(ae?'encontrada':'null')+(ae?' edicion='+ae.edicion+' answers_keys='+JSON.stringify(Object.keys(ae.answers||{}).slice(0,3))+' total_answers='+Object.keys(ae.answers||{}).length+' score='+((ae.scores||{}).total||0):''));
   // Show bar whenever a distributor is selected (even without comparison data)
   const bar=document.getElementById('cmp-compare-bar');
   if(bar) bar.style.display=dist?'block':'none';
