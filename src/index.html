@@ -3747,6 +3747,20 @@ function renderAETable(rows, edicion){
       ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
       : autoevals.find(a=>a.distribuidor===d);
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
+    // Score y categoria
+    let scoreHtml = '—';
+    if(aeRow&&aeRow.answers){
+      const ans = aeRow.answers;
+      const si = Object.values(ans).filter(v=>v==='si').length;
+      const no = Object.values(ans).filter(v=>v==='no').length;
+      const tot = si+no;
+      if(tot>0){
+        const pct = Math.round(si/tot*100);
+        const cat = pct>=85?'PROACTIVO':pct>=70?'ACTIVO':pct>=50?'REACTIVO':'INACTIVO';
+        const col = pct>=85?'#16a34a':pct>=70?'#2563eb':pct>=50?'#d97706':'#dc2626';
+        scoreHtml = `<span style="font-weight:700;color:${col}">${pct}%</span> <span style="font-size:10px;color:${col}">${cat}</span>`;
+      }
+    }
     const statusHtml = r.submitted
       ? (r.unlock_requested
           ? '<span style="color:#f59e0b;font-weight:700">🔓 Unlock solicitado</span>'
@@ -3754,8 +3768,10 @@ function renderAETable(rows, edicion){
       : (answered>0
           ? '<span style="color:#3b82f6;font-weight:700">⏳ En curso</span>'
           : '<span style="color:#94a3b8">⬜ Pendiente</span>');
-    const unlockBtn = (r.submitted&&r.unlock_requested)
-      ? `<button onclick="aeGrantUnlock('${d.replace(/'/g,"\\'")}','${(r.distribuidor||'').replace(/'/g,"\\'")}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">Habilitar</button>` : '';
+    const dSafe = d.replace(/'/g,"\\'");
+    const unlockBtn = r.submitted
+      ? `<button onclick="aeGrantUnlock('${dSafe}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">🔓 Rehabilitar</button>`
+      : '';
     return `<tr style="border-bottom:1px solid var(--g100)">
       <td style="padding:6px 8px;font-size:12px">${d}</td>
       <td style="padding:6px 8px;text-align:center"><input type="text" value="${r.pin||''}" maxlength="4" data-dist="${d}" placeholder="—"
@@ -3763,6 +3779,7 @@ function renderAETable(rows, edicion){
       <td style="padding:6px 8px">${statusHtml}</td>
       <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered>0&&answered===totalQ?'var(--green)':'var(--g500)'}">
         ${totalQ>0 ? answered+'/'+totalQ : (answered>0 ? answered+'/?' : '—')}</td>
+      <td style="padding:6px 8px">${scoreHtml}</td>
       <td style="padding:6px 8px">${unlockBtn}</td>
     </tr>`;
   }).join('');
@@ -3773,6 +3790,7 @@ function renderAETable(rows, edicion){
       <th style="padding:6px 8px;text-align:center;border-bottom:1.5px solid var(--g200)">PIN</th>
       <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Estado AE</th>
       <th style="padding:6px 8px;text-align:center;border-bottom:1.5px solid var(--g200)">Respondidas</th>
+      <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Puntaje AE</th>
       <th style="padding:6px 8px;border-bottom:1.5px solid var(--g200)"></th>
     </tr></thead>
     <tbody>${trs}</tbody>
@@ -4107,7 +4125,13 @@ function _setupSBRealtime(){
 
 // ── COMPARACIÓN: helpers ────────────────────────────────────
 function _getAEFor(distribuidor, edicion){
-  return autoevals.find(a=>a.distribuidor===distribuidor&&a.edicion===edicion)||null;
+  // Match exacto primero
+  let ae = autoevals.find(a=>a.distribuidor===distribuidor&&a.edicion===edicion);
+  if(ae) return ae;
+  // Fuzzy: comparar solo dígitos (EV2026 == 2026)
+  const edNum = (edicion||'').replace(/\D/g,'');
+  if(edNum) ae = autoevals.find(a=>a.distribuidor===distribuidor&&(a.edicion||'').replace(/\D/g,'')===edNum);
+  return ae||null;
 }
 function _getPrevAudit(distribuidor, edicion, overrideEdicion){
   if(overrideEdicion) return saved.find(a=>a.distribuidor===distribuidor&&a.edicion===overrideEdicion)||null;
@@ -10396,21 +10420,37 @@ function printCurrentTab(){
   });
 }
 
+function _aeResetAccess(distribuidor, edicion){
+  // Al borrar una AE, resetear ae_access a pendiente para que el distri pueda volver a cargar
+  if(!_sbc||!_sbOnline) return;
+  _sbc.from('ae_campaigns').select('id').eq('edicion',edicion).maybeSingle()
+    .then(({data:c})=>{
+      if(!c) return;
+      _sbc.from('ae_access').update({submitted:false, unlock_requested:false, unlock_granted:false})
+        .eq('campaign_id',c.id).eq('distribuidor',distribuidor)
+        .then(()=>{ try{ aeRefreshStatus(); }catch(e){} });
+    });
+}
 function deleteAE(id){
   const ae=autoevals.find(a=>String(a.id)===String(id));
-  if(!ae||!confirm('¿Eliminar autoevaluación de '+ae.distribuidor+'?')) return;
+  if(!ae||!confirm('¿Eliminar autoevaluación de '+ae.distribuidor+'?\nEsto la volverá a estado Pendiente en el portal.')) return;
   autoevals=autoevals.filter(a=>String(a.id)!==String(id));
   if(_sbc&&_sbOnline) _sbc.from('autoevals').delete().eq('id',String(id)).then(({error})=>{if(error)console.warn('[SB] deleteAE:',error.message);});
+  _aeResetAccess(ae.distribuidor, ae.edicion||'');
   persist(); updateAudCnt(); renderAEList();
-  showToast('🗑 AE eliminada: '+ae.distribuidor);
+  showToast('🗑 AE eliminada: '+ae.distribuidor+' → vuelve a Pendiente');
 }
 function clearAEByEdPais(pais,ed){
-  if(!confirm('¿Eliminar todas las AE de '+pais+' '+ed+'?')) return;
-  const toDelete=autoevals.filter(a=>(a.pais||'—')===pais&&(a.edicion||'—')===ed).map(a=>String(a.id));
+  if(!confirm('¿Eliminar todas las AE de '+pais+' '+ed+'?\nVolverán a estado Pendiente en el portal.')) return;
+  const toDelete=autoevals.filter(a=>(a.pais||'—')===pais&&(a.edicion||'—')===ed);
+  const ids=toDelete.map(a=>String(a.id));
   autoevals=autoevals.filter(a=>!((a.pais||'—')===pais&&(a.edicion||'—')===ed));
-  if(_sbc&&_sbOnline&&toDelete.length) _sbc.from('autoevals').delete().in('id',toDelete).then(({error})=>{if(error)console.warn('[SB] clearAEByEdPais:',error.message);});
+  if(_sbc&&_sbOnline&&ids.length) _sbc.from('autoevals').delete().in('id',ids).then(({error})=>{if(error)console.warn('[SB] clearAEByEdPais:',error.message);});
+  // Resetear ae_access para todos
+  if(_sbc&&_sbOnline) _sbc.from('ae_campaigns').select('id').eq('pais',pais).eq('edicion',ed).maybeSingle()
+    .then(({data:c})=>{ if(c) _sbc.from('ae_access').update({submitted:false,unlock_requested:false,unlock_granted:false}).eq('campaign_id',c.id).then(()=>{ try{aeRefreshStatus();}catch(e){} }); });
   persist(); updateAudCnt(); renderAEList();
-  showToast('🗑 AE '+pais+' '+ed+' eliminadas');
+  showToast('🗑 AE '+pais+' '+ed+' eliminadas → vuelven a Pendiente');
 }
 function renderAEList(){
   const el=document.getElementById('ae-list'); if(!el) return;
