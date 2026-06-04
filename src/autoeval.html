@@ -84,24 +84,31 @@ select.inp{cursor:pointer}
 .sb-bar-fill{height:5px;border-radius:3px;transition:width .4s}
 
 /* ── QUESTIONS ── */
-.area-block{margin-bottom:12px}
+.area-block{margin-bottom:8px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
 .area-header{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
-  color:#fff;padding:10px 14px;background:rgba(255,255,255,.05);border-radius:8px;
-  border-left:4px solid #3b82f6;letter-spacing:.3px;display:flex;align-items:center;gap:8px;
-  cursor:pointer;user-select:none;transition:background .15s}
-.area-header:hover{background:rgba(255,255,255,.08)}
-.area-content{border-radius:0 0 8px 8px;overflow:hidden}
-.area-code{font-size:11px;background:rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-weight:700}
-.area-prog{margin-left:auto;font-size:10px;color:rgba(255,255,255,.45);font-family:'Barlow',sans-serif;font-weight:400}
-.bpl-block{background:#162032;border-left:4px solid transparent;margin-bottom:1px}
-.bpl-block:last-child{border-radius:0 0 8px 8px}
-.bpl-header{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;
-  letter-spacing:.8px;padding:8px 14px 4px;border-top:1px solid rgba(255,255,255,.04)}
-.q-row{padding:8px 14px 10px;border-bottom:1px solid rgba(255,255,255,.04);
-  display:flex;align-items:flex-start;gap:12px}
+  color:#fff;padding:11px 14px;letter-spacing:.3px;display:flex;align-items:center;gap:9px;
+  cursor:pointer;user-select:none;transition:filter .15s}
+.area-header:hover{filter:brightness(1.12)}
+.area-content{overflow:hidden}
+.area-code{font-size:11px;background:rgba(0,0,0,.3);border-radius:4px;padding:2px 7px;font-weight:800;letter-spacing:.5px}
+.area-prog{margin-left:auto;font-size:11px;color:rgba(255,255,255,.55);font-family:'Barlow',sans-serif;font-weight:600}
+.bpl-block{border-top:1px solid rgba(255,255,255,.07);background:#111827}
+.bpl-header{font-size:12px;font-weight:600;color:#94a3b8;padding:9px 14px;
+  background:rgba(255,255,255,.03);cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:8px;transition:background .15s;border:none}
+.bpl-header:hover{background:rgba(255,255,255,.07)}
+.sa-header{padding:5px 14px 4px 16px;font-size:9px;font-weight:700;color:#475569;
+  text-transform:uppercase;letter-spacing:.8px;background:rgba(0,0,0,.2);
+  border-top:1px solid rgba(255,255,255,.04)}
+.q-row{padding:9px 14px 9px 16px;border-bottom:1px solid rgba(255,255,255,.05);
+  display:flex;align-items:flex-start;gap:10px;transition:background .1s}
 .q-row:last-child{border-bottom:none}
-.q-text{flex:1;font-size:12.5px;color:#cbd5e1;line-height:1.5}
-.q-crit{color:#f87171;font-size:10px;font-weight:700}
+.q-row:hover{background:rgba(255,255,255,.03)}
+.q-num{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:#4b5563;
+  min-width:38px;padding-top:3px;font-weight:700;flex-shrink:0;text-align:right}
+.q-main{flex:1}
+.q-text{font-size:13px;color:#f1f5f9;line-height:1.55}
+.q-crit{color:#f87171;font-size:10px;font-weight:700;margin-right:3px}
 .ans-btns{display:flex;gap:4px;flex-shrink:0}
 .ans-btn{padding:5px 10px;border-radius:6px;border:1.5px solid rgba(255,255,255,.15);
   background:transparent;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer;
@@ -457,71 +464,95 @@ function toggleArea(sh){
   if(!content) return;
   const open=content.style.display!=='none';
   content.style.display=open?'none':'';
-  if(arrow) arrow.textContent=open?'▶':'▼';
+  if(arrow){ arrow.textContent=open?'▶':'▼'; arrow.style.transform=open?'':'rotate(90deg)'; }
+}
+
+function toggleBpl(uid){
+  const el=document.getElementById(uid);
+  const arr=document.getElementById(uid+'-arr');
+  if(!el) return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'';
+  if(arr) arr.style.transform=open?'':'rotate(90deg)';
 }
 
 function buildQuestionsUI(){
   const Q = S.questions;
-  if(!Q.length){ document.getElementById('q-container').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">No hay preguntas disponibles.</div>'; return; }
+  if(!Q.length){ document.getElementById('q-container').innerHTML='<div style="padding:40px;text-align:center;color:#64748b">No hay preguntas disponibles.</div>'; return; }
 
-  // Group: sheet → bpl_key → questions
-  const order = [];
-  const grouped = {};
+  // Group: sheet → bpl_num → subattr → questions
+  const shOrder=[], bplOrder={}, saOrder={};
+  const grouped={};
   Q.forEach(q=>{
-    if(!grouped[q.sheet]){ grouped[q.sheet] = {}; order.push(q.sheet); }
-    const bk = (q.bpl_num||'')+'|'+(q.bpl_name||q.subattr||'');
-    if(!grouped[q.sheet][bk]) grouped[q.sheet][bk] = [];
-    grouped[q.sheet][bk].push(q);
+    const sh=q.sheet, bk=String(q.bpl_num||''), sa=q.subattr||'';
+    if(!grouped[sh]){ grouped[sh]={}; shOrder.push(sh); bplOrder[sh]=[]; }
+    if(!grouped[sh][bk]){ grouped[sh][bk]={name:q.bpl_name||'',sas:{}}; bplOrder[sh].push(bk); saOrder[sh+'_'+bk]=[]; }
+    if(!grouped[sh][bk].sas[sa]){ grouped[sh][bk].sas[sa]=[]; saOrder[sh+'_'+bk].push(sa); }
+    grouped[sh][bk].sas[sa].push(q);
   });
 
-  let html = '';
-  order.forEach(sh=>{
-    const color = S.AC[sh] || '#3b82f6';
-    const name  = S.AN[sh] || sh;
-    const total = Q.filter(q=>q.sheet===sh).length;
-    html += `<div class="area-block">
-      <div class="area-header" style="border-left-color:${color}" onclick="toggleArea('${sh}')">
-        <span id="aw-${sh}" style="font-size:10px;color:${color};flex-shrink:0">▶</span>
-        <span class="area-code" style="color:${color}">${sh}</span>${name}
+  let html='';
+  shOrder.forEach(sh=>{
+    const color=S.AC[sh]||'#3b82f6';
+    const name=S.AN[sh]||sh;
+    const total=Q.filter(q=>q.sheet===sh).length;
+    html+=`<div class="area-block">
+      <div class="area-header" style="background:${color}22;border-left:4px solid ${color}" onclick="toggleArea('${sh}')">
+        <span id="aw-${sh}" style="font-size:11px;color:${color};flex-shrink:0;transition:transform .2s">▶</span>
+        <span class="area-code" style="color:${color}">${sh}</span>
+        <span>${name}</span>
         <span class="area-prog" id="aprog-${sh}">0/${total}</span>
       </div>
       <div class="area-content" id="ac-${sh}" style="display:none">`;
-    Object.entries(grouped[sh]).forEach(([bk, qs])=>{
-      const bplName = bk.split('|')[1] || bk.split('|')[0];
-      html += `<div class="bpl-block">
-        <div class="bpl-header">${bplName}</div>`;
-      qs.forEach(q=>{
-        const ans = S.answers[String(q.comp_num)] || '';
-        const crit = q.critico ? '<span class="q-crit">🔴 CRÍTICO</span> ' : '';
-        html += '<div class="q-row" id="qr-'+q.comp_num+'">'
-          + '<div class="q-text">'+crit+q.question+'</div>'
-          + '<div class="ans-btns" data-comp="'+q.comp_num+'">'
-          + '<button class="ans-btn'+(ans==='si'?' si':'')+'" data-val="si">Sí</button>'
-          + '<button class="ans-btn'+(ans==='no'?' no':'')+'" data-val="no">No</button>'
-          + '<button class="ans-btn'+(ans==='na'?' na':'')+'" data-val="na">N/A</button>'
-          + '</div></div>';
+
+    bplOrder[sh].forEach(bk=>{
+      const bpl=grouped[sh][bk];
+      const bplQs=Object.values(bpl.sas).flat();
+      const uid='bp-'+sh+'-'+bk.replace(/\W/g,'_');
+      html+=`<div class="bpl-block">
+        <div class="bpl-header" onclick="toggleBpl('${uid}')">
+          <span id="${uid}-arr" style="font-size:10px;color:#4b5563;transition:transform .2s;flex-shrink:0">▶</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:#cbd5e1;flex-shrink:0">BPL ${bk}</span>
+          <span style="flex:1;color:#94a3b8;font-size:12px">${bpl.name}</span>
+          <span id="${uid}-cnt" style="font-size:10px;color:#4b5563;font-family:'Barlow',sans-serif;flex-shrink:0">0/${bplQs.length}</span>
+        </div>
+        <div id="${uid}" style="display:none">`;
+
+      saOrder[sh+'_'+bk].forEach(sa=>{
+        if(sa) html+=`<div class="sa-header">▪ ${sa}</div>`;
+        bpl.sas[sa].forEach(q=>{
+          const ans=S.answers[String(q.comp_num)]||'';
+          const critBadge=q.critico?`<span class="q-crit">🔴 CRÍTICO</span>`:'';
+          html+='<div class="q-row" id="qr-'+q.comp_num+'">'
+            +'<div class="q-num">'+q.comp_num+'</div>'
+            +'<div class="q-main"><div class="q-text">'+critBadge+(critBadge?' ':'')+q.question+'</div></div>'
+            +'<div class="ans-btns" data-comp="'+q.comp_num+'">'
+            +'<button class="ans-btn'+(ans==='si'?' si':'')+'" data-val="si">Sí</button>'
+            +'<button class="ans-btn'+(ans==='no'?' no':'')+'" data-val="no">No</button>'
+            +'<button class="ans-btn'+(ans==='na'?' na':'')+'" data-val="na">N/A</button>'
+            +'</div></div>';
+        });
       });
-      html += '</div>';
+      html+=`</div></div>`; // close bpl-body + bpl-block
     });
-      html += '</div></div>'; // close area-content + area-block
+    html+=`</div></div>`; // close area-content + area-block
   });
 
-  document.getElementById('q-container').innerHTML = html;
+  document.getElementById('q-container').innerHTML=html;
 
-  // Event delegation — un solo listener para todos los botones
-  document.getElementById('q-container').addEventListener('click', function(e){
-    const btn = e.target.closest('.ans-btn[data-val]');
+  document.getElementById('q-container').addEventListener('click',function(e){
+    const btn=e.target.closest('.ans-btn[data-val]');
     if(!btn) return;
-    const wrap = btn.closest('[data-comp]');
+    const wrap=btn.closest('[data-comp]');
     if(!wrap) return;
-    const compNum = wrap.dataset.comp;
-    const val = btn.dataset.val;
-    S.answers[compNum] = val;
-    wrap.querySelectorAll('.ans-btn').forEach(b=>{ b.className='ans-btn'; });
-    btn.className = 'ans-btn ' + val;
+    const compNum=wrap.dataset.comp;
+    const val=btn.dataset.val;
+    S.answers[compNum]=val;
+    wrap.querySelectorAll('.ans-btn').forEach(b=>{b.className='ans-btn';});
+    btn.className='ans-btn '+val;
     updateProgress();
     scheduleSave();
-  }, {once: false});
+  },{once:false});
 
   updateProgress();
 }
@@ -537,13 +568,25 @@ function updateProgress(){
   btn.disabled = false;
   btn.textContent = done === total ? 'Enviar AE ✓' : 'Enviar AE ('+done+'/'+total+')';
   btn.style.background = done === total ? '' : '#b45309';
-  // Actualizar contadores por área en headers
+  // Contadores por área
   const sheets=[...new Set(S.questions.map(q=>q.sheet))];
   sheets.forEach(sh=>{
     const shQs=S.questions.filter(q=>q.sheet===sh);
     const shDone=shQs.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
     const el=document.getElementById('aprog-'+sh);
-    if(el) el.textContent=shDone+'/'+shQs.length;
+    if(el){ el.textContent=shDone+'/'+shQs.length; el.style.color=shDone===shQs.length?'#4ade80':shDone>0?'rgba(255,255,255,.7)':'rgba(255,255,255,.4)'; }
+  });
+  // Contadores por BPL
+  const bplMap={};
+  S.questions.forEach(q=>{
+    const uid='bp-'+q.sheet+'-'+String(q.bpl_num||'').replace(/\W/g,'_');
+    if(!bplMap[uid]){bplMap[uid]={t:0,d:0};}
+    bplMap[uid].t++;
+    if(S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='') bplMap[uid].d++;
+  });
+  Object.entries(bplMap).forEach(([uid,v])=>{
+    const el=document.getElementById(uid+'-cnt');
+    if(el){ el.textContent=v.d+'/'+v.t; el.style.color=v.d===v.t?'#4ade80':v.d>0?'#60a5fa':'#4b5563'; }
   });
   updateScorePanel();
 }
