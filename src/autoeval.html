@@ -252,14 +252,19 @@ async function step1Next(){
   try{
     const {data, error} = await sbc.rpc('ae_get_distributors', {p_codigo: code});
     console.log('[AE] get_distributors:', {code, data, error});
-    if(error){ setErr('err1','Error: '+error.message); return; }
-    if(!data || !data.length){ setErr('err1','Código "'+code+'" no encontrado. Verificá que el administrador guardó la campaña con ese código exacto.'); return; }
+    if(error){ setErr('err1','Error RPC: '+error.message); return; }
+    if(!data || !data.length){ setErr('err1','Código "'+code+'" no encontrado. Verificá que el administrador guardó la campaña con ese código.'); return; }
+    // Filtrar solo los que tienen distribuidor no vacío
+    const valid = data.filter(d=>d.distribuidor&&d.distribuidor.trim());
+    if(!valid.length){
+      setErr('err1','Código encontrado pero sin distribuidores cargados ('+data.length+' registros vacíos). El administrador debe guardar el período AE nuevamente.');
+      return;
+    }
     S.codigo = code;
-    // Populate distributor dropdown
     const sel = document.getElementById('sel-dist');
     sel.innerHTML = '<option value="">— Seleccioná tu empresa —</option>' +
-      data.map(d=>`<option value="${d.distribuidor}" data-sub="${d.submitted?'1':'0'}">${d.distribuidor}${d.submitted?' ✓':''}</option>`).join('');
-    document.getElementById('badge-codigo').textContent = code;
+      valid.map(d=>`<option value="${d.distribuidor}">${d.distribuidor}${d.submitted?' ✓':''}</option>`).join('');
+    document.getElementById('badge-codigo').textContent = code+' ('+valid.length+' empresas)';
     showStep(2);
   }catch(e){ setErr('err1','Error de conexión. Intentá de nuevo.'); }
   finally{ setBtn('btn1', false); }

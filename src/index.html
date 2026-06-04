@@ -3791,6 +3791,11 @@ async function aeSaveCampaign(){
   const allDists = [...new Set(
     saved.filter(a=>(a.pais||'').toUpperCase()===pais).map(a=>a.distribuidor).filter(Boolean)
   )].sort();
+  console.log('[AE] allDists para '+pais+':', allDists);
+  if(!allDists.length){
+    aeSetStatus('⚠️ No se encontraron distribuidores para "'+pais+'" en las auditorías cargadas. Verificá que hay auditorías con ese país antes de guardar.','err');
+    return;
+  }
   if(allDists.length){
     // Borrar registros que ya no corresponden a este país
     const {data:existing} = await _sbc.from('ae_access').select('id,distribuidor,pin').eq('campaign_id',_aeCampaignId);
