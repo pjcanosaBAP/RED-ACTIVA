@@ -3724,30 +3724,69 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
 }
 
 function _calcAEScore(answers, qArr, aw, nv){
+  // Cálculo idéntico al de auditorías: 3 niveles normalizados + críticos + categoría
   if(!answers||!qArr||!qArr.length) return null;
   const sheets=[...new Set(qArr.map(q=>q.sheet))];
-  const areaScores={};
+  const areas={};
+  let totalScore=0, totalW=0;
   sheets.forEach(sh=>{
-    const shQ=qArr.filter(q=>q.sheet===sh);
-    let wSi=0,wTot=0;
-    shQ.forEach(q=>{
-      const v=answers[String(q.comp_num)];
-      const w=q.weight_attr||1;
-      if(v==='si'){wSi+=w;wTot+=w;}
-      else if(v==='no'){wTot+=w;}
+    const shQs=qArr.filter(q=>q.sheet===sh);
+    // Nivel 1: grupos subattr (BPL)
+    const saScores={}, seen={};
+    shQs.forEach(q=>{
+      const sk=(q.subattr||'').replace(/[^\w]/g,'_');
+      const key=sh+'_'+q.bpl_num+'_'+sk;
+      if(!seen[key]){
+        seen[key]=true;
+        let sumW=0, siW=0;
+        shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
+          const a=answers[String(x.comp_num)], cw=x.weight_attr||1;
+          if(a!=='na'){sumW+=cw; if(a==='si') siW+=cw;}
+        });
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:q.peso_bpl||1};
+      }
     });
-    areaScores[sh]=wTot>0?wSi/wTot:null;
-  });
-  let totalW=0,totalScore=0;
-  sheets.forEach(sh=>{
-    if((nv||{})[sh]) return;
-    const w=(aw||{})[sh]||0;
-    if(w>0&&areaScores[sh]!=null){totalScore+=areaScores[sh]*w;totalW+=w;}
+    // Nivel 2: atributos
+    const bplKeys=[...new Set(shQs.map(q=>q.bpl_num))];
+    let aWSum=0, aSumW=0;
+    bplKeys.forEach(bk=>{
+      const gs=Object.entries(saScores).filter(([k])=>k.startsWith(sh+'_'+bk+'_'));
+      let bSum=0, bW=0;
+      gs.forEach(([,v])=>{bSum+=v.score*v.bplW; bW+=v.bplW;});
+      const bplSc=bW>0?bSum/bW:0;
+      const atW=(shQs.find(q=>q.bpl_num===bk)||{}).bpl_weight||1;
+      aWSum+=bplSc*atW; aSumW+=atW;
+    });
+    areas[sh]=aSumW>0?aWSum/aSumW:0;
+    if(!(nv||{})[sh]){const w=(aw||{})[sh]||0; totalScore+=areas[sh]*w; totalW+=w;}
   });
   if(!totalW) return null;
-  const areas={};
-  sheets.forEach(sh=>{areas[sh]=areaScores[sh]||0;});
-  return {total:totalScore/totalW, areas};
+  const total=totalScore/totalW;
+  // Críticos desde snapshot de preguntas
+  const crits={};
+  qArr.forEach(q=>{if(q.critico){if(!crits[q.critico])crits[q.critico]=[]; crits[q.critico].push(String(q.comp_num));}});
+  let critMet=0;
+  const critStatus={};
+  Object.entries(crits).forEach(([tag,comps])=>{
+    const allSi=comps.every(c=>answers[c]==='si');
+    const anyNo=comps.some(c=>answers[c]==='no');
+    const pct=comps.filter(c=>answers[c]==='si').length/comps.length;
+    critStatus[tag]={st:allSi?'met':anyNo?'unmet':'pending', pct};
+    if(allSi) critMet++;
+  });
+  const totalCrits=Object.keys(crits).length;
+  // Categoría con MATRIX_CFG y THR actuales
+  const p=total*100;
+  const _thr=THR||{pro:85,act:70,rea:50};
+  const _mx=MATRIX_CFG||MATRIX_DEFAULT;
+  const _bands=_mx.bands||[];
+  let bplCol=_bands.length-1;
+  if(critMet<totalCrits){for(let bi=0;bi<_bands.length-1;bi++){if(_bands[bi].max!==null&&critMet<=_bands[bi].max){bplCol=bi;break;}}}
+  const scoreRow=p>=_thr.pro?0:p>=_thr.act?1:p>=_thr.rea?2:3;
+  const _catMap={PR:'PROACTIVO',AC:'ACTIVO',RE:'REACTIVO',IN:'INACTIVO'};
+  const answered=Object.keys(answers).filter(k=>answers[k]&&answers[k]!=='').length;
+  const category=answered>0?(_catMap[((_mx.cells[scoreRow]||[])[bplCol]||'IN')]||'INACTIVO'):'PENDIENTE';
+  return {total, areas, critMet, critStatus, totalCrits, category, answered};
 }
 
 async function aeRefreshStatus(){

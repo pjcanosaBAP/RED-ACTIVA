@@ -87,7 +87,13 @@ select.inp{cursor:pointer}
 
 /* ── STICKY FOOTER ── */
 .sticky-footer{position:sticky;bottom:0;background:#1e293b;border-top:1px solid rgba(255,255,255,.08);
-  padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:100}
+  padding:0;display:flex;flex-direction:column;z-index:100}
+.sf-score-strip{padding:8px 16px 6px;border-bottom:1px solid rgba(255,255,255,.06);display:none}
+.sf-score-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sf-score-pct{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800}
+.sf-score-cat{font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px}
+.sf-crits-detail{margin-top:3px;display:flex;flex-wrap:wrap;gap:2px}
+.sf-row{padding:10px 16px;display:flex;align-items:center;gap:12px}
 .sf-prog{flex:1;font-size:12px;color:#64748b}
 .sf-prog strong{color:#e2e8f0}
 .btn-submit{padding:10px 24px;background:#16a34a;border:none;border-radius:8px;
@@ -210,9 +216,19 @@ select.inp{cursor:pointer}
 <div id="step3" style="display:none">
   <div class="page" id="q-container"></div>
   <div class="sticky-footer">
-    <div class="sf-prog">Respondidas: <strong id="sf-count">0 / 0</strong></div>
-    <button class="btn-save" onclick="saveDraft()">💾 Guardar</button>
-    <button class="btn-submit" id="btn-submit" onclick="confirmSubmit()">Enviar AE ✓</button>
+    <div class="sf-score-strip" id="sf-score-strip">
+      <div class="sf-score-main">
+        <span class="sf-score-pct" id="sp-pct"></span>
+        <span class="sf-score-cat" id="sp-cat"></span>
+        <span id="sp-crit"></span>
+      </div>
+      <div class="sf-crits-detail" id="sp-crits-detail"></div>
+    </div>
+    <div class="sf-row">
+      <div class="sf-prog">Respondidas: <strong id="sf-count">0 / 0</strong></div>
+      <button class="btn-save" onclick="saveDraft()">💾 Guardar</button>
+      <button class="btn-submit" id="btn-submit" onclick="confirmSubmit()">Enviar AE ✓</button>
+    </div>
   </div>
 </div>
 
@@ -243,7 +259,7 @@ const sbc = supabase.createClient(SBURL, SBKEY);
 // ── STATE ────────────────────────────────────────────────────────────────────
 const S = {
   codigo:'', distribuidor:'', pin:'',
-  questions:[], answers:{}, AN:{}, AC:{},
+  questions:[], answers:{}, AN:{}, AC:{}, AW:{}, NV:{},
   submitted:false, unlock_requested:false, unlock_granted:false,
   pais:'', anio:0, edicion:''
 };
@@ -344,6 +360,12 @@ async function step2Next(){
     S.pais = data.pais || '';
     S.anio = data.anio || 0;
     S.edicion = data.edicion || '';
+    // Cargar ponderaciones de la campaña para el cálculo de puntaje
+    try{
+      const {data:campData} = await sbc.from('ae_campaigns').select('area_weights,nv').eq('codigo_acceso',S.codigo).maybeSingle();
+      S.AW = (campData&&campData.area_weights)||{};
+      S.NV = (campData&&campData.nv)||{};
+    }catch(e){ S.AW={}; S.NV={}; }
     // Load existing answers
     const {data: ans} = await sbc.rpc('ae_load_answers', {
       p_codigo: S.codigo, p_distribuidor: dist, p_pin: pin
@@ -438,6 +460,95 @@ function updateProgress(){
   btn.disabled = false;
   btn.textContent = done === total ? 'Enviar AE ✓' : 'Enviar AE ('+done+'/'+total+')';
   btn.style.background = done === total ? '' : '#b45309';
+  updateScorePanel();
+}
+
+function _calcPortalScore(){
+  const qs=S.questions, answers=S.answers, AW=S.AW||{}, NV=S.NV||{};
+  if(!qs||!qs.length) return null;
+  const answered=Object.keys(answers).filter(k=>answers[k]&&answers[k]!=='').length;
+  if(!answered) return null;
+  const sheets=[...new Set(qs.map(q=>q.sheet))];
+  const areaScores={};
+  let totalScore=0, totalW=0;
+  sheets.forEach(sh=>{
+    const shQs=qs.filter(q=>q.sheet===sh);
+    const saScores={}, seen={};
+    shQs.forEach(q=>{
+      const sk=(q.subattr||'').replace(/[^\w]/g,'_');
+      const key=sh+'_'+q.bpl_num+'_'+sk;
+      if(!seen[key]){
+        seen[key]=true;
+        let sumW=0,siW=0;
+        shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
+          const a=answers[String(x.comp_num)],cw=x.weight_attr||1;
+          if(a!=='na'){sumW+=cw; if(a==='si') siW+=cw;}
+        });
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:q.peso_bpl||1};
+      }
+    });
+    const bplKeys=[...new Set(shQs.map(q=>q.bpl_num))];
+    let aWSum=0,aSumW=0;
+    bplKeys.forEach(bk=>{
+      const gs=Object.entries(saScores).filter(([k])=>k.startsWith(sh+'_'+bk+'_'));
+      let bSum=0,bW=0;
+      gs.forEach(([,v])=>{bSum+=v.score*v.bplW; bW+=v.bplW;});
+      const bplSc=bW>0?bSum/bW:0;
+      const atW=(shQs.find(q=>q.bpl_num===bk)||{}).bpl_weight||1;
+      aWSum+=bplSc*atW; aSumW+=atW;
+    });
+    areaScores[sh]=aSumW>0?aWSum/aSumW:0;
+    if(!NV[sh]){const w=AW[sh]||0; totalScore+=areaScores[sh]*w; totalW+=w;}
+  });
+  const total=totalW>0?totalScore/totalW:0;
+  // Críticos
+  const crits={};
+  qs.forEach(q=>{if(q.critico){if(!crits[q.critico])crits[q.critico]=[]; crits[q.critico].push(String(q.comp_num));}});
+  let critMet=0;
+  const critStatus={};
+  Object.entries(crits).forEach(([tag,comps])=>{
+    const allSi=comps.every(c=>answers[c]==='si');
+    const anyNo=comps.some(c=>answers[c]==='no');
+    critStatus[tag]=allSi?'met':anyNo?'unmet':'pending';
+    if(allSi) critMet++;
+  });
+  const totalCrits=Object.keys(crits).length;
+  const pct=Math.round(total*1000)/10;
+  // Categoría (umbrales estándar)
+  let cat;
+  if(pct>=85&&critMet===totalCrits) cat='PROACTIVO';
+  else if(pct>=70) cat='ACTIVO';
+  else if(pct>=50) cat='REACTIVO';
+  else cat='INACTIVO';
+  return {total, areaScores, critMet, totalCrits, critStatus, cat, pct, answered};
+}
+
+function updateScorePanel(){
+  const sc=_calcPortalScore();
+  const strip=document.getElementById('sf-score-strip');
+  if(!strip) return;
+  if(!sc){strip.style.display='none'; return;}
+  const catColors={PROACTIVO:'#16a34a',ACTIVO:'#2563eb',REACTIVO:'#d97706',INACTIVO:'#dc2626'};
+  const col=catColors[sc.cat]||'#64748b';
+  const critColor=sc.critMet===sc.totalCrits?'#16a34a':sc.critMet>0?'#f59e0b':'#ef4444';
+  document.getElementById('sp-pct').textContent=sc.pct.toFixed(1)+'%';
+  document.getElementById('sp-pct').style.color=col;
+  const catEl=document.getElementById('sp-cat');
+  catEl.textContent=sc.cat; catEl.style.background=col+'22'; catEl.style.color=col;
+  if(sc.totalCrits>0){
+    document.getElementById('sp-crit').innerHTML='<span style="color:'+critColor+';font-weight:700;font-size:12px">🔴 '+sc.critMet+'/'+sc.totalCrits+' críticos</span>';
+    let d='';
+    Object.entries(sc.critStatus).forEach(([tag,st])=>{
+      const ico=st==='met'?'✅':st==='unmet'?'❌':'⏳';
+      const c=st==='met'?'#16a34a':st==='unmet'?'#ef4444':'#94a3b8';
+      d+='<span style="font-size:10px;color:'+c+';white-space:nowrap;margin-right:8px">'+ico+' '+tag+'</span>';
+    });
+    document.getElementById('sp-crits-detail').innerHTML=d;
+  } else {
+    document.getElementById('sp-crit').innerHTML='';
+    document.getElementById('sp-crits-detail').innerHTML='';
+  }
+  strip.style.display='block';
 }
 
 function scheduleSave(){
