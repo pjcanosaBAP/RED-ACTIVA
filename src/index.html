@@ -1718,14 +1718,15 @@ body.readonly .admin-only{display:none!important;}
         </div>
         <div class="cfg-bd">
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Código acceso</label>
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Programa / País / Año</label>
+              <select id="ae-struct-sel" class="cfg-input" style="min-width:200px" onchange="aeOnStructChange()">
+                <option value="">— Seleccioná el programa —</option>
+              </select></div>
+            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Código de acceso</label>
               <input type="text" id="ae-codigo" class="cfg-input" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700" placeholder="ej: CHILE2026" oninput="this.value=this.value.toUpperCase()"></div>
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Edición</label>
-              <input type="text" id="ae-edicion" class="cfg-input" style="width:100px" placeholder="ej: EV2026"></div>
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">País</label>
-              <input type="text" id="ae-pais" class="cfg-input" style="width:90px;text-transform:uppercase" placeholder="ej: CHILE" oninput="this.value=this.value.toUpperCase()"></div>
-            <div class="fg"><label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase">Año</label>
-              <input type="number" id="ae-anio" class="cfg-input" style="width:70px" placeholder="2026"></div>
+            <input type="hidden" id="ae-pais">
+            <input type="hidden" id="ae-anio">
+            <input type="hidden" id="ae-edicion">
             <button class="btn btn-blue btn-sm" onclick="aeSaveCampaign()">💾 Guardar campaña</button>
             <button class="btn btn-sm btn-out" onclick="aeCopyLink()">📋 Copiar link</button>
           </div>
@@ -3603,25 +3604,63 @@ async function persist(){
 let _aeCampaignId = null;
 let _aeAccessRows = []; // [{distribuidor, pin, submitted, unlock_requested, unlock_granted}]
 
+function aeRebuildStructDropdown(){
+  const sel = document.getElementById('ae-struct-sel'); if(!sel) return;
+  const structs = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith('bpl_struct_')) continue;
+    const rest=k.slice('bpl_struct_'.length);
+    const lastUs=rest.lastIndexOf('_');
+    if(lastUs<1) continue;
+    const pais=rest.slice(0,lastUs), anio=parseInt(rest.slice(lastUs+1))||0;
+    if(pais&&anio) structs.push({pais,anio,key:k});
+  }
+  structs.sort((a,b)=>a.pais.localeCompare(b.pais)||b.anio-a.anio);
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Seleccioná el programa —</option>' +
+    structs.map(s=>`<option value="${s.pais}|${s.anio}">${s.pais} · ${s.anio}</option>`).join('');
+  if(prev && sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+}
+
+function aeOnStructChange(){
+  const sel = document.getElementById('ae-struct-sel'); if(!sel||!sel.value) return;
+  const [pais,anio] = sel.value.split('|');
+  document.getElementById('ae-pais').value = pais;
+  document.getElementById('ae-anio').value = anio;
+  // Auto-suggest código based on pais+anio if empty
+  const ci = document.getElementById('ae-codigo');
+  if(ci && !ci.value) ci.value = pais+anio;
+  // Load existing campaign for this pais/anio
+  aeLoadCampaignForPaisAnio(pais, parseInt(anio));
+}
+
 async function aeLoadCampaign(){
   if(!_sbc||!_sbOnline) return;
-  // Pre-fill pais/anio from cfg
-  const pi=document.getElementById('ae-pais'), ai=document.getElementById('ae-anio');
-  if(pi&&!pi.value&&cfg.pais) pi.value=cfg.pais;
-  if(ai&&!ai.value&&cfg.anio) ai.value=cfg.anio;
-  const pais=(pi&&pi.value)||cfg.pais||''; const anio=parseInt((ai&&ai.value)||cfg.anio)||0;
-  if(!pais||!anio){ aeSetStatus('Configurá País y Año para cargar la campaña','warn'); return; }
+  aeRebuildStructDropdown();
+  // Try to match active cfg pais/anio in dropdown
+  const sel = document.getElementById('ae-struct-sel');
+  if(sel && cfg.pais && cfg.anio){
+    const val = cfg.pais+'|'+cfg.anio;
+    if(sel.querySelector(`option[value="${val}"]`)){ sel.value=val; aeOnStructChange(); }
+  }
+}
+
+async function aeLoadCampaignForPaisAnio(pais, anio){
+  if(!_sbc||!_sbOnline||!pais||!anio) return;
+  _aeCampaignId = null;
+  aeSetStatus('Buscando campaña para '+pais+' '+anio+'...','warn');
   const {data,error} = await _sbc.from('ae_campaigns').select('*').eq('pais',pais).eq('anio',anio).maybeSingle();
-  if(error){ console.warn('[AE] load campaign:', error); return; }
+  if(error){ aeSetStatus('Error: '+error.message,'err'); return; }
   if(data){
     _aeCampaignId = data.id;
     const ci=document.getElementById('ae-codigo'); if(ci) ci.value=data.codigo_acceso||'';
-    const ei=document.getElementById('ae-edicion'); if(ei) ei.value=data.edicion||'';
-    aeSetStatus('✅ Campaña cargada — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio,'ok');
+    aeSetStatus('✅ Campaña existente — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio,'ok');
+    await aeRefreshStatus();
   } else {
-    aeSetStatus('No hay campaña guardada para '+pais+' '+anio+'. Completá el formulario y guardá.','warn');
+    aeSetStatus('No hay campaña para '+pais+' '+anio+'. Ingresá un código y guardá.','warn');
+    renderAETable([]);
   }
-  await aeRefreshStatus();
 }
 
 async function aeRefreshStatus(){
@@ -3688,12 +3727,12 @@ function aeSetStatus(msg, type){
 async function aeSaveCampaign(){
   if(!_sbc||!_sbOnline){ showToast('⚠️ Sin conexión Supabase'); return; }
   const codigo = (document.getElementById('ae-codigo').value||'').trim().toUpperCase();
+  const sel = document.getElementById('ae-struct-sel');
+  const pais = (document.getElementById('ae-pais').value||'').trim().toUpperCase();
+  const anio = parseInt(document.getElementById('ae-anio').value)||0;
   const edicion = (document.getElementById('ae-edicion').value||'').trim();
-  const pais = ((document.getElementById('ae-pais').value||cfg.pais||'')).trim().toUpperCase();
-  const anio = parseInt(document.getElementById('ae-anio').value||cfg.anio)||0;
   if(!codigo){ aeSetStatus('Ingresá un código de acceso','err'); return; }
-  if(!pais){ aeSetStatus('Ingresá el país','err'); return; }
-  if(!anio){ aeSetStatus('Ingresá el año','err'); return; }
+  if(!pais||!anio){ aeSetStatus('Seleccioná el programa (País/Año) del dropdown','err'); return; }
   aeSetStatus('Guardando...','warn');
   const payload = {pais, anio, edicion, codigo_acceso:codigo, questions_snapshot:Q, area_names:AN, area_colors:AC};
   let res;
