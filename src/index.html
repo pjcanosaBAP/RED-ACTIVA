@@ -3796,6 +3796,28 @@ function _calcAEScore(answers, qArr, aw, nv){
   return {total, areas, critMet, critStatus, totalCrits, category, answered};
 }
 
+function _recalcAEScores(){
+  if(!autoevals.length) return;
+  _rebuildCritList();
+  const toUpd=[];
+  autoevals.filter(a=>{
+    if(!Object.keys(a.answers||{}).length) return false;
+    const ap=(a.pais||'').toUpperCase(), cp=(cfg.pais||'').toUpperCase();
+    return !ap || !cp || ap===cp; // incluye AEs sin país asignado
+  }).forEach(ae=>{
+    try{
+      const _sc=computeScores(ae.answers);
+      ae.scores={total:_sc.total,areas:_sc.areas,critMet:_sc.critMet,critStatus:_sc.critStatus,category:_sc.category,answered:_sc.answered};
+      toUpd.push({id:String(ae.id),scores:ae.scores});
+    }catch(e){ console.warn('[AE recalc]',e); }
+  });
+  if(_sbc&&_sbOnline) toUpd.forEach(row=>{
+    _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
+      .then(({error})=>{if(error)console.warn('[AE score upd]',error.message);});
+  });
+  try{ renderCmpColumns(); }catch(e){}
+}
+
 function _rebuildCritList(){
   Object.keys(CRIT).forEach(k=>delete CRIT[k]);
   Q.forEach(q=>{
@@ -4456,19 +4478,10 @@ async function loadFromSupabase(){
         pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{},
         source:r.source||'excel'
       }));
-      // Recalcular scores con estructura activa (computeScores exacto igual que auditorias)
-      _rebuildCritList();
-      const _aeToUpdate=[];
-      autoevals.filter(a=>Object.keys(a.answers||{}).length>0&&(a.pais||'').toUpperCase()===(cfg.pais||'').toUpperCase()).forEach(ae=>{
-        const _sc=computeScores(ae.answers);
-        ae.scores={total:_sc.total,areas:_sc.areas,critMet:_sc.critMet,critStatus:_sc.critStatus,category:_sc.category,answered:_sc.answered};
-        _aeToUpdate.push({id:String(ae.id),scores:ae.scores});
-      });
-      _aeToUpdate.forEach(row=>{
-        _sbc.from('autoevals').update({scores:row.scores}).eq('id',row.id)
-          .then(({error})=>{if(error)console.warn('[AE init score]',error.message);});
-      });
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
+      // Si NO es primera carga, la estructura ya está cargada → recalcular ahora
+      // En primera carga, se recalcula después de _sbApplyRemoteConfig
+      if(!isFirstLoad) _recalcAEScores();
     } else if(autoevals.length > 0){
       const rows = autoevals.map(a=>({
         id:String(a.id), distribuidor:a.distribuidor, edicion:a.edicion,
@@ -4479,7 +4492,11 @@ async function loadFromSupabase(){
     }
 
     // ── Load config + structures ─────────────────────────────
-    if(isFirstLoad) await _sbApplyRemoteConfig();
+    if(isFirstLoad){
+      await _sbApplyRemoteConfig();
+      // Ahora la estructura correcta está cargada → recalcular scores AE
+      _recalcAEScores();
+    }
 
     // Fallback: apply restriction in case auth completed before Supabase load
     _applyPaisRestriction();
@@ -4524,18 +4541,23 @@ function _setupSBRealtime(){
 
 // ── COMPARACIÓN: helpers ────────────────────────────────────
 function _getAEFor(distribuidor, edicion){
-  const edNum = (edicion||'').replace(/\D/g,'');
-  // Candidatos: match exacto o fuzzy por dígitos
-  const candidates = autoevals.filter(a=>{
-    if(a.distribuidor!==distribuidor) return false;
+  const edNum=(edicion||'').replace(/\D/g,'');
+  // Prefix-swap: EV26→AE26, AE26→EV26
+  const altEdicion=edicion
+    ? (/^EV/i.test(edicion)?edicion.replace(/^EV/i,'AE'):edicion.replace(/^AE/i,'EV'))
+    : '';
+  const distNorm=(distribuidor||'').trim().toUpperCase();
+  const candidates=autoevals.filter(a=>{
+    if(!a.distribuidor) return false;
+    if(a.distribuidor.trim().toUpperCase()!==distNorm) return false;
     if(a.edicion===edicion) return true;
+    if(altEdicion&&a.edicion===altEdicion) return true;
     if(edNum&&(a.edicion||'').replace(/\D/g,'')===edNum) return true;
     return false;
   });
   if(!candidates.length) return null;
-  // Preferir portal sobre excel cuando hay ambos
-  const portal = candidates.find(a=>a.source==='portal');
-  return portal || candidates[0];
+  const portal=candidates.find(a=>a.source==='portal');
+  return portal||candidates[0];
 }
 function _getPrevAudit(distribuidor, edicion, overrideEdicion){
   if(overrideEdicion) return saved.find(a=>a.distribuidor===distribuidor&&a.edicion===overrideEdicion)||null;
