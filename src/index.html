@@ -3964,10 +3964,16 @@ async function aeDeleteDistAE(dist){
 async function aeDeleteCampaign(){
   if(!_aeCampaignId){ showToast('⚠️ Seleccioná una campaña primero'); return; }
   const codigo = (document.getElementById('ae-codigo').value||'');
-  if(!confirm('¿Eliminar la campaña "'+codigo+'" y todos sus registros de acceso?\n\nEsto NO elimina las autoevaluaciones ya cargadas en Auditorías.')) return;
+  if(!confirm('¿Eliminar la campaña "'+codigo+'" y todos sus registros?\n\nSe eliminarán: accesos, puntajes y respuestas del portal. Las auditorías cargadas en Evaluaciones NO se borran.')) return;
   if(!_sbc||!_sbOnline){ showToast('⚠️ Sin conexión Supabase'); return; }
+  const edicion = _aeCampaignEdicion;
   await _sbc.from('ae_access').delete().eq('campaign_id',_aeCampaignId);
   await _sbc.from('ae_campaigns').delete().eq('id',_aeCampaignId);
+  if(edicion){
+    await _sbc.from('autoevals').delete().eq('edicion',edicion);
+    autoevals = autoevals.filter(a=>a.edicion!==edicion);
+    persist();
+  }
   _aeCampaignId=null; _aeCampaignEdicion=''; _aeCampaignTotalQ=0; _aeAccessRows=[];
   document.getElementById('ae-codigo').value='';
   document.getElementById('ae-edicion').value='';
