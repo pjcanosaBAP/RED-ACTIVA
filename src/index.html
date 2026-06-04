@@ -4602,7 +4602,7 @@ function renderDashResumen(){
   const deltaRow=document.getElementById('dash-delta-row');
   const deltaCnt=document.getElementById('dash-delta-content');
   if(deltaRow&&deltaCnt&&audit){
-    const ae=autoevals.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;});
+    const ae=_getAEFor(dist,edicion);
     const prevAudits=saved.filter(function(a){return a.distribuidor===dist&&a.edicion<edicion;}).sort(function(a,b){return b.edicion.localeCompare(a.edicion);});
     const prev=prevAudits[0]||null;
     if(ae||prev){
@@ -4658,7 +4658,7 @@ function renderDashAreaCmp(){
   if(!wrap) return;
   const audit=dist&&edicion?saved.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;}):null;
   if(!audit||!audit.scores){wrap.innerHTML='<div style="color:var(--g400);font-size:11px;padding:10px 0">Cargá una auditoría primero.</div>';return;}
-  const ae=autoevals.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;});
+  const ae=_getAEFor(dist,edicion);
   const prevAudits=saved.filter(function(a){return a.distribuidor===dist&&a.edicion<edicion;}).sort(function(a,b){return b.edicion.localeCompare(a.edicion);});
   const prev=prevAudits[0]||null;
   const sheets=SHEETS();
@@ -4698,7 +4698,7 @@ function renderDashCritDetail(){
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   const audit=dist&&edicion?saved.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;}):null;
   if(!audit){wrap.innerHTML='<div style="color:var(--g400);font-size:11px;padding:10px 0">Cargá una auditoría primero.</div>';return;}
-  const ae=autoevals.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;});
+  const ae=_getAEFor(dist,edicion);
   const answers=audit.answers||{};
   const aeAnswers=ae?ae.answers||{}:{};
   let h='';
@@ -4755,7 +4755,7 @@ function renderDashBrecha(){
   const dist=(document.getElementById('sel-dist')||{}).value||'';
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
   const audit=dist&&edicion?saved.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;}):null;
-  const ae=dist&&edicion?autoevals.find(function(a){return a.distribuidor===dist&&a.edicion===edicion;}):null;
+  const ae=dist&&edicion?_getAEFor(dist,edicion):null;
   if(!audit||!ae){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🟣 Importá el archivo AE de este distribuidor y edición para ver el análisis de brecha.</div>';
     return;
@@ -7535,7 +7535,7 @@ async function generateDistPPTX(){
       s.addText((delta>=0?'▲ +':'▼ ')+delta.toFixed(1)+'%  vs Ed. '+prevAudit.edicion,{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:delta>=0?'1D9E6F':'C0392B',align:'center',valign:'middle'});
       _dy+=0.32;
     }
-    const curAE=autoevals.find(a=>a.distribuidor===dist&&a.edicion===ed);
+    const curAE=_getAEFor(dist,ed);
     if(curAE&&curAE.scores){
       const deltaAE=((sc.total||0)-(curAE.scores.total||0))*100;
       s.addText((deltaAE>=0?'▲ +':'▼ ')+deltaAE.toFixed(1)+'%  vs Autoevaluación',{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:deltaAE>=0?'7C3AED':'C97A00',align:'center',valign:'middle'});
@@ -8732,7 +8732,7 @@ function renderM1(){
   const m1ShowAE=(document.getElementById('m1-btn-ae')||{}).classList?.contains('on')??true;
 
   // AE data for this dist + edition
-  const aeAudit=m1ShowAE?autoevals.find(a=>a.distribuidor===dist&&a.edicion===audit.edicion)||null:null;
+  const aeAudit=m1ShowAE?_getAEFor(dist,audit.edicion):null;
   const aeAt=(aeAudit?.scores||{}).areas||{};
   const aeTotal=(aeAudit?.scores||{}).total||null;
 
