@@ -3795,15 +3795,17 @@ async function aeSaveCampaign(){
   }
   if(res.error){ aeSetStatus('❌ Error al guardar: '+res.error.message,'err'); console.error('[AE] save campaign:', res.error); return; }
   _aeCampaignId = res.data.id;
-  // Upsert ae_access for each distributor
+  // Upsert ae_access — usar distribuidores del país seleccionado (de saved[])
   let accessErr = null;
-  if(DISTRIBUTORS.length){
-    const rows = DISTRIBUTORS.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:(_aeAccessRows.find(r=>r.distribuidor===d)||{}).pin||''}));
-    const {error:ae} = await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor', ignoreDuplicates:true});
+  const paisDistSet = new Set(saved.filter(a=>(a.pais||'').toUpperCase()===pais).map(a=>a.distribuidor).filter(Boolean));
+  DISTRIBUTORS.forEach(d=>paisDistSet.add(d)); // también incluir los de DISTRIBUTORS
+  const allDists = [...paisDistSet].filter(Boolean);
+  if(allDists.length){
+    const rows = allDists.map(d=>({campaign_id:_aeCampaignId, distribuidor:d, pin:(_aeAccessRows.find(r=>r.distribuidor===d)||{}).pin||''}));
+    const {error:ae} = await _sbc.from('ae_access').upsert(rows, {onConflict:'campaign_id,distribuidor'});
     accessErr = ae;
   }
-  const distCount = DISTRIBUTORS.length;
-  aeSetStatus('✅ Campaña guardada — código: '+codigo+' · '+pais+' '+anio+' · '+distCount+' distribuidores'+(accessErr?' (⚠️ error en access: '+accessErr.message+')':''),'ok');
+  aeSetStatus('✅ Período AE guardado — código: '+codigo+' · '+pais+' '+anio+' · '+allDists.length+' distribuidores'+(accessErr?' ⚠️ '+accessErr.message:''),'ok');
   showToast('✅ Campaña AE guardada');
   await aeRefreshStatus();
 }
