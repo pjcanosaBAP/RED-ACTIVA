@@ -871,9 +871,15 @@ async function loadAdminView(){
   const camp = data.campaign;
   const accRows = data.access || [];
   const answersMap = {};
-  accRows.forEach(r=>{
-    if(r.answers && Object.keys(r.answers).length) answersMap[r.distribuidor] = r.answers;
-  });
+  await Promise.all(accRows.filter(r=>r.pin&&String(r.pin).trim()).map(async r=>{
+    try{
+      const {data:ans} = await sbc.rpc('ae_load_answers',{
+        p_codigo:S.codigo, p_distribuidor:r.distribuidor, p_pin:String(r.pin)
+      });
+      if(ans&&ans.answers&&Object.keys(ans.answers).length)
+        answersMap[r.distribuidor]=ans.answers;
+    }catch(e){}
+  }));
 
   _adminData = {camp, accRows, answersMap};
   renderAdminView();
