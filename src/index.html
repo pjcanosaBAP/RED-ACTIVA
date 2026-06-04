@@ -3764,7 +3764,7 @@ function renderAETable(rows, edicion){
     const r = distMap[d]||{};
     const aeRow = edicionKey
       ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
-      : autoevals.find(a=>a.distribuidor===d);
+      : null;
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
     // Score ponderado usando estructura de la campaña
     let scoreHtml = '—';
