@@ -3680,7 +3680,7 @@ function aeOnStructChange(){
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
   const ei = document.getElementById('ae-edicion');
-  if(ei && !ei.value) ei.value = 'EV'+anio;
+  if(ei && !ei.value) ei.value = 'AE'+anio;
   // Mostrar distribuidores del país desde saved[] inmediatamente
   _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0; _aeCampaignAW = {}; _aeCampaignNV = {}; _aeCampaignQ = [];
   renderAETable([], '');
@@ -3806,20 +3806,23 @@ function renderAETable(rows, edicion){
         scoreHtml = `<span style="font-weight:700;color:${col}">${pct}%</span> <span style="font-size:10px;color:${col}">${cat}</span>`;
       }
     }
-    const statusHtml = r.submitted
-      ? (r.unlock_granted
-          ? '<span style="color:#8b5cf6;font-weight:700">🔓 Rehabilitada</span>'
-          : r.unlock_requested
-            ? '<span style="color:#f59e0b;font-weight:700">🔔 Solicita corrección</span>'
-            : '<span style="color:#10b981;font-weight:700">✅ Enviada</span>')
-      : (answered>0
-          ? '<span style="color:#3b82f6;font-weight:700">⏳ En curso</span>'
-          : '<span style="color:#94a3b8">⬜ Pendiente</span>');
+    const hasAccessRow = d in distMap; // solo muestra En curso si hay registro en ae_access
+    const statusHtml = !hasAccessRow
+      ? '<span style="color:#94a3b8">⬜ Pendiente</span>'
+      : r.submitted
+        ? (r.unlock_granted
+            ? '<span style="color:#8b5cf6;font-weight:700">🔓 Rehabilitada</span>'
+            : r.unlock_requested
+              ? '<span style="color:#f59e0b;font-weight:700">🔔 Solicita corrección</span>'
+              : '<span style="color:#10b981;font-weight:700">✅ Enviada</span>')
+        : (answered>0
+            ? '<span style="color:#3b82f6;font-weight:700">⏳ En curso</span>'
+            : '<span style="color:#94a3b8">⬜ Pendiente</span>');
     const dSafe = d.replace(/'/g,"\\'");
-    const unlockBtn = r.submitted && !r.unlock_granted
+    const unlockBtn = hasAccessRow && r.submitted && !r.unlock_granted
       ? `<button onclick="aeGrantUnlock('${dSafe}');return false" style="font-size:10px;padding:2px 8px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer">🔓 Rehab.</button>`
       : '';
-    const deleteBtn = answered>0 || r.submitted
+    const deleteBtn = hasAccessRow && (answered>0 || r.submitted)
       ? `<button onclick="aeDeleteDistAE('${dSafe}');return false" style="font-size:10px;padding:2px 7px;background:transparent;border:1px solid #ef4444;color:#ef4444;border-radius:4px;cursor:pointer" title="Borrar AE y volver a Pendiente">✕</button>`
       : '';
     return `<tr style="border-bottom:1px solid var(--g100)">
