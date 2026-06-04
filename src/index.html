@@ -3669,7 +3669,7 @@ function aeOnStructChange(){
   const ci = document.getElementById('ae-codigo');
   if(ci && !ci.value) ci.value = pais+anio;
   // Mostrar distribuidores del país desde saved[] inmediatamente
-  _aeCampaignId = null; _aeAccessRows = [];
+  _aeCampaignId = null; _aeAccessRows = []; _aeCampaignEdicion = ''; _aeCampaignTotalQ = 0;
   renderAETable([], '');
   // Cargar campaña existente si hay Supabase
   aeLoadCampaignForPaisAnio(pais, parseInt(anio));
