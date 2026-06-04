@@ -6,6 +6,7 @@
 <title>RED Activa — Autoevaluación BPL</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="logos.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -59,15 +60,40 @@ select.inp{cursor:pointer}
 .badge-ok{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,.15);
   color:#10b981;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;margin-bottom:16px}
 
+/* ── STEP 3 LAYOUT: sidebar + questions ── */
+.step3-body{display:flex;align-items:flex-start;min-height:calc(100vh - 57px - 54px)}
+.score-sidebar{width:240px;flex-shrink:0;position:sticky;top:57px;
+  max-height:calc(100vh - 57px - 54px);overflow-y:auto;
+  padding:14px 12px;background:#111827;border-right:1px solid rgba(255,255,255,.07);
+  display:none}
+.q-column{flex:1;min-width:0;padding:12px 12px 16px}
+@media(max-width:700px){
+  .step3-body{flex-direction:column}
+  .score-sidebar{width:100%;position:static;max-height:none;border-right:none;
+    border-bottom:1px solid rgba(255,255,255,.07)}
+}
+/* Sidebar score content */
+.sb-pct{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;line-height:1;margin-bottom:4px}
+.sb-cat{font-size:12px;font-weight:700;border-radius:6px;padding:3px 10px;display:inline-block;margin-bottom:12px}
+.sb-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:#475569;margin:10px 0 5px}
+.sb-crit{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px}
+.sb-area-row{margin-bottom:5px}
+.sb-area-lbl{display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px}
+.sb-bar-bg{background:rgba(255,255,255,.08);border-radius:3px;height:5px}
+.sb-bar-fill{height:5px;border-radius:3px;transition:width .4s}
+
 /* ── QUESTIONS ── */
-.area-block{margin-bottom:20px}
+.area-block{margin-bottom:12px}
 .area-header{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
-  color:#fff;padding:10px 14px;background:rgba(255,255,255,.04);border-radius:8px 8px 0 0;
-  border-left:4px solid #3b82f6;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
-.area-code{font-size:11px;background:rgba(255,255,255,.1);border-radius:4px;
-  padding:1px 6px;font-weight:700}
-.bpl-block{background:#162032;border-left:4px solid transparent;border-radius:0 0 0 0;
-  margin-bottom:1px}
+  color:#fff;padding:10px 14px;background:rgba(255,255,255,.05);border-radius:8px;
+  border-left:4px solid #3b82f6;letter-spacing:.3px;display:flex;align-items:center;gap:8px;
+  cursor:pointer;user-select:none;transition:background .15s}
+.area-header:hover{background:rgba(255,255,255,.08)}
+.area-content{border-radius:0 0 8px 8px;overflow:hidden}
+.area-code{font-size:11px;background:rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-weight:700}
+.area-prog{margin-left:auto;font-size:10px;color:rgba(255,255,255,.45);font-family:'Barlow',sans-serif;font-weight:400}
+.bpl-block{background:#162032;border-left:4px solid transparent;margin-bottom:1px}
 .bpl-block:last-child{border-radius:0 0 8px 8px}
 .bpl-header{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;
   letter-spacing:.8px;padding:8px 14px 4px;border-top:1px solid rgba(255,255,255,.04)}
@@ -88,12 +114,7 @@ select.inp{cursor:pointer}
 /* ── STICKY FOOTER ── */
 .sticky-footer{position:sticky;bottom:0;background:#1e293b;border-top:1px solid rgba(255,255,255,.08);
   padding:0;display:flex;flex-direction:column;z-index:100}
-.sf-score-strip{padding:8px 16px 6px;border-bottom:1px solid rgba(255,255,255,.06);display:none}
-.sf-score-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.sf-score-pct{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800}
-.sf-score-cat{font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px}
-.sf-crits-detail{margin-top:3px;display:flex;flex-wrap:wrap;gap:2px}
-.sf-row{padding:10px 16px;display:flex;align-items:center;gap:12px}
+.sf-row{padding:10px 16px;display:flex;align-items:center;gap:10px}
 .sf-prog{flex:1;font-size:12px;color:#64748b}
 .sf-prog strong{color:#e2e8f0}
 .btn-submit{padding:10px 24px;background:#16a34a;border:none;border-radius:8px;
@@ -214,16 +235,29 @@ select.inp{cursor:pointer}
 
 <!-- ── STEP 3: PREGUNTAS ── -->
 <div id="step3" style="display:none">
-  <div class="page" id="q-container"></div>
-  <div class="sticky-footer">
-    <div class="sf-score-strip" id="sf-score-strip">
-      <div class="sf-score-main">
-        <span class="sf-score-pct" id="sp-pct"></span>
-        <span class="sf-score-cat" id="sp-cat"></span>
-        <span id="sp-crit"></span>
+  <div class="step3-body">
+    <!-- Sidebar score (left) -->
+    <aside class="score-sidebar" id="score-sidebar">
+      <div id="sb-pct" class="sb-pct" style="color:#64748b">—</div>
+      <div id="sb-cat" class="sb-cat" style="background:rgba(255,255,255,.08);color:#64748b">PENDIENTE</div>
+      <div id="sb-crits-wrap" style="display:none">
+        <div class="sb-section">Condicionales Críticos</div>
+        <div id="sb-crits"></div>
       </div>
-      <div class="sf-crits-detail" id="sp-crits-detail"></div>
+      <div id="sb-areas-wrap" style="display:none">
+        <div class="sb-section">Áreas</div>
+        <div id="sb-areas"></div>
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="exportAEExcel()" style="width:100%;padding:8px;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);border-radius:7px;color:#93c5fd;font-size:11px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif">📊 Exportar Excel</button>
+      </div>
+    </aside>
+    <!-- Questions (right) -->
+    <div class="q-column">
+      <div id="q-container"></div>
     </div>
+  </div>
+  <div class="sticky-footer">
     <div class="sf-row">
       <div class="sf-prog">Respondidas: <strong id="sf-count">0 / 0</strong></div>
       <button class="btn-save" onclick="saveDraft()">💾 Guardar</button>
@@ -387,6 +421,15 @@ function goStep1(){
 }
 
 // ── BUILD QUESTIONS UI ────────────────────────────────────────────────────────
+function toggleArea(sh){
+  const content=document.getElementById('ac-'+sh);
+  const arrow=document.getElementById('aw-'+sh);
+  if(!content) return;
+  const open=content.style.display!=='none';
+  content.style.display=open?'none':'';
+  if(arrow) arrow.textContent=open?'▶':'▼';
+}
+
 function buildQuestionsUI(){
   const Q = S.questions;
   if(!Q.length){ document.getElementById('q-container').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">No hay preguntas disponibles.</div>'; return; }
@@ -405,10 +448,14 @@ function buildQuestionsUI(){
   order.forEach(sh=>{
     const color = S.AC[sh] || '#3b82f6';
     const name  = S.AN[sh] || sh;
+    const total = Q.filter(q=>q.sheet===sh).length;
     html += `<div class="area-block">
-      <div class="area-header" style="border-left-color:${color}">
+      <div class="area-header" style="border-left-color:${color}" onclick="toggleArea('${sh}')">
+        <span id="aw-${sh}" style="font-size:10px;color:${color};flex-shrink:0">▶</span>
         <span class="area-code" style="color:${color}">${sh}</span>${name}
-      </div>`;
+        <span class="area-prog" id="aprog-${sh}">0/${total}</span>
+      </div>
+      <div class="area-content" id="ac-${sh}" style="display:none">`;
     Object.entries(grouped[sh]).forEach(([bk, qs])=>{
       const bplName = bk.split('|')[1] || bk.split('|')[0];
       html += `<div class="bpl-block">
@@ -426,7 +473,7 @@ function buildQuestionsUI(){
       });
       html += '</div>';
     });
-    html += '</div>';
+      html += '</div></div>'; // close area-content + area-block
   });
 
   document.getElementById('q-container').innerHTML = html;
@@ -460,6 +507,14 @@ function updateProgress(){
   btn.disabled = false;
   btn.textContent = done === total ? 'Enviar AE ✓' : 'Enviar AE ('+done+'/'+total+')';
   btn.style.background = done === total ? '' : '#b45309';
+  // Actualizar contadores por área en headers
+  const sheets=[...new Set(S.questions.map(q=>q.sheet))];
+  sheets.forEach(sh=>{
+    const shQs=S.questions.filter(q=>q.sheet===sh);
+    const shDone=shQs.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
+    const el=document.getElementById('aprog-'+sh);
+    if(el) el.textContent=shDone+'/'+shQs.length;
+  });
   updateScorePanel();
 }
 
@@ -481,10 +536,12 @@ function _calcPortalScore(){
         seen[key]=true;
         let sumW=0,siW=0;
         shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
-          const a=answers[String(x.comp_num)],cw=x.weight_attr||1;
-          if(a!=='na'){sumW+=cw; if(a==='si') siW+=cw;}
+          const a=answers[String(x.comp_num)];
+          const cw=typeof x.weight_attr==='number'?x.weight_attr:1;
+          if(a!=='na'&&cw>0){sumW+=cw; if(a==='si') siW+=cw;}
         });
-        saScores[key]={score:sumW>0?siW/sumW:0, bplW:q.peso_bpl||1};
+        const bw=typeof q.peso_bpl==='number'?q.peso_bpl:1;
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:bw};
       }
     });
     const bplKeys=[...new Set(shQs.map(q=>q.bpl_num))];
@@ -494,14 +551,14 @@ function _calcPortalScore(){
       let bSum=0,bW=0;
       gs.forEach(([,v])=>{bSum+=v.score*v.bplW; bW+=v.bplW;});
       const bplSc=bW>0?bSum/bW:0;
-      const atW=(shQs.find(q=>q.bpl_num===bk)||{}).bpl_weight||1;
+      const _aq=shQs.find(q=>q.bpl_num===bk)||{};
+      const atW=typeof _aq.bpl_weight==='number'?_aq.bpl_weight:1;
       aWSum+=bplSc*atW; aSumW+=atW;
     });
     areaScores[sh]=aSumW>0?aWSum/aSumW:0;
-    if(!NV[sh]){const w=AW[sh]||0; totalScore+=areaScores[sh]*w; totalW+=w;}
+    if(!NV[sh]){const w=AW[sh]||0; if(w>0){totalScore+=areaScores[sh]*w; totalW+=w;}}
   });
   const total=totalW>0?totalScore/totalW:0;
-  // Críticos
   const crits={};
   qs.forEach(q=>{if(q.critico){if(!crits[q.critico])crits[q.critico]=[]; crits[q.critico].push(String(q.comp_num));}});
   let critMet=0;
@@ -514,9 +571,8 @@ function _calcPortalScore(){
   });
   const totalCrits=Object.keys(crits).length;
   const pct=Math.round(total*1000)/10;
-  // Categoría (umbrales estándar)
   let cat;
-  if(pct>=85&&critMet===totalCrits) cat='PROACTIVO';
+  if(pct>=85&&(totalCrits===0||critMet===totalCrits)) cat='PROACTIVO';
   else if(pct>=70) cat='ACTIVO';
   else if(pct>=50) cat='REACTIVO';
   else cat='INACTIVO';
@@ -525,30 +581,112 @@ function _calcPortalScore(){
 
 function updateScorePanel(){
   const sc=_calcPortalScore();
-  const strip=document.getElementById('sf-score-strip');
-  if(!strip) return;
-  if(!sc){strip.style.display='none'; return;}
+  const sidebar=document.getElementById('score-sidebar');
+  if(!sidebar) return;
+  if(!sc){ sidebar.style.display='none'; return; }
+  sidebar.style.display='block';
   const catColors={PROACTIVO:'#16a34a',ACTIVO:'#2563eb',REACTIVO:'#d97706',INACTIVO:'#dc2626'};
   const col=catColors[sc.cat]||'#64748b';
-  const critColor=sc.critMet===sc.totalCrits?'#16a34a':sc.critMet>0?'#f59e0b':'#ef4444';
-  document.getElementById('sp-pct').textContent=sc.pct.toFixed(1)+'%';
-  document.getElementById('sp-pct').style.color=col;
-  const catEl=document.getElementById('sp-cat');
+  document.getElementById('sb-pct').textContent=sc.pct.toFixed(1)+'%';
+  document.getElementById('sb-pct').style.color=col;
+  const catEl=document.getElementById('sb-cat');
   catEl.textContent=sc.cat; catEl.style.background=col+'22'; catEl.style.color=col;
+  // Críticos
+  const critsWrap=document.getElementById('sb-crits-wrap');
   if(sc.totalCrits>0){
-    document.getElementById('sp-crit').innerHTML='<span style="color:'+critColor+';font-weight:700;font-size:12px">🔴 '+sc.critMet+'/'+sc.totalCrits+' críticos</span>';
-    let d='';
+    critsWrap.style.display='block';
+    let ch='';
     Object.entries(sc.critStatus).forEach(([tag,st])=>{
       const ico=st==='met'?'✅':st==='unmet'?'❌':'⏳';
       const c=st==='met'?'#16a34a':st==='unmet'?'#ef4444':'#94a3b8';
-      d+='<span style="font-size:10px;color:'+c+';white-space:nowrap;margin-right:8px">'+ico+' '+tag+'</span>';
+      ch+=`<div class="sb-crit"><span>${ico}</span><span style="color:${c}">${tag}</span></div>`;
     });
-    document.getElementById('sp-crits-detail').innerHTML=d;
-  } else {
-    document.getElementById('sp-crit').innerHTML='';
-    document.getElementById('sp-crits-detail').innerHTML='';
-  }
-  strip.style.display='block';
+    document.getElementById('sb-crits').innerHTML=ch;
+  } else { critsWrap.style.display='none'; }
+  // Áreas
+  const areasWrap=document.getElementById('sb-areas-wrap');
+  if(Object.keys(sc.areaScores).length){
+    areasWrap.style.display='block';
+    let ah='';
+    Object.entries(sc.areaScores).forEach(([sh,v])=>{
+      const pct=Math.round(v*100);
+      const c=pct>=85?'#16a34a':pct>=70?'#2563eb':pct>=50?'#d97706':'#dc2626';
+      ah+=`<div class="sb-area-row">
+        <div class="sb-area-lbl"><span style="color:${S.AC[sh]||'#94a3b8'};font-weight:700;font-size:10px">${sh}</span><span style="color:${c};font-size:10px;font-weight:700">${pct}%</span></div>
+        <div class="sb-bar-bg"><div class="sb-bar-fill" style="width:${pct}%;background:${c}"></div></div>
+      </div>`;
+    });
+    document.getElementById('sb-areas').innerHTML=ah;
+  } else { areasWrap.style.display='none'; }
+}
+
+async function exportAEExcel(){
+  if(typeof ExcelJS==='undefined'){ toast('⚠️ ExcelJS no cargó aún'); return; }
+  const sc=_calcPortalScore();
+  if(!sc){ toast('⚠️ Respondé al menos una pregunta primero'); return; }
+  toast('⏳ Generando Excel...');
+  const NAVY='FF0F172A',WHITE='FFFFFFFF',LGRAY='FFF8FAFC';
+  const AR=hex=>'FF'+(hex||'607d8b').replace('#','').toUpperCase();
+  const pctStr=v=>((v||0)*100).toFixed(1)+'%';
+  const scoreARGB=v=>v>=0.85?'FF00A854':v>=0.70?'FF0078C8':v>=0.50?'FFE67E00':'FFD63030';
+  const solidFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
+  const thinB=(argb='FF94A3B8')=>({style:'thin',color:{argb}});
+  const cv=(h,v)=>({horizontal:h||'left',vertical:v||'middle'});
+  function sty(cell,font,fill,align){ if(font)cell.font=font; if(fill)cell.fill=fill; if(align)cell.alignment=align; }
+  const wb=new ExcelJS.Workbook(); wb.creator='RED Activa 2.0 · BAP Partners';
+  const catHex={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030'}[sc.cat]||'718096';
+
+  // ── HOJA 1: RESUMEN ──
+  const wsR=wb.addWorksheet('Resumen AE',{views:[{showGridLines:false}]});
+  wsR.columns=[{width:2},{width:40},{width:14}];
+  const r1=wsR.addRow(['','INFORME DE AUTOEVALUACIÓN BPL · RED ACTIVA 2.0']);
+  r1.height=32; wsR.mergeCells('B1:C1');
+  sty(r1.getCell(2),{name:'Calibri',bold:true,size:14,color:{argb:'FF0070C0'}},solidFill('FFF0F7FF'),{horizontal:'left',vertical:'middle'});
+  wsR.addRow(['',S.distribuidor]).height=22;
+  sty(wsR.lastRow.getCell(2),{name:'Calibri',bold:true,size:13},{},{horizontal:'left',vertical:'middle'});
+  wsR.addRow(['','Edición: '+S.edicion+'  ·  '+S.pais+' '+S.anio]).height=16;
+  wsR.addRow([]).height=8;
+  const rK=wsR.addRow(['','PUNTAJE','CATEGORÍA']); rK.height=30;
+  sty(rK.getCell(2),{name:'Calibri',bold:true,size:24,color:{argb:scoreARGB(sc.total)}},solidFill(LGRAY),cv('center'));
+  sty(rK.getCell(3),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill('FF'+catHex),cv('center'));
+  wsR.addRow([]).height=8;
+  const rCrit=wsR.addRow(['','Condicionales Críticos',sc.critMet+'/'+sc.totalCrits]); rCrit.height=18;
+  sty(rCrit.getCell(2),{name:'Calibri',bold:true,size:10},{},{horizontal:'left',vertical:'middle'});
+  wsR.addRow([]).height=4;
+  const rAH=wsR.addRow(['','ÁREA','PUNTAJE']); rAH.height=18;
+  [2,3].forEach(i=>sty(rAH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),cv('center')));
+  Object.entries(sc.areaScores).forEach(([sh,v],si)=>{
+    const bg=si%2===0?LGRAY:'FFFFFFFF';
+    const rA=wsR.addRow(['',sh,pctStr(v)]); rA.height=18;
+    sty(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:AR(S.AC[sh]||'#607d8b')}},solidFill(bg),{horizontal:'left',vertical:'middle'});
+    sty(rA.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill(bg),cv('center'));
+  });
+
+  // ── HOJA 2: DETALLE RESPUESTAS ──
+  const wsD=wb.addWorksheet('Detalle Respuestas',{views:[{showGridLines:false,state:'frozen',ySplit:1}]});
+  wsD.columns=[{width:2},{width:16},{width:24},{width:50},{width:8},{width:10}];
+  const dH=wsD.addRow(['','ÁREA','ATRIBUTO / BPL','PREGUNTA','CRÍTICO','RESPUESTA']);
+  dH.height=20;
+  [2,3,4,5,6].forEach(i=>sty(dH.getCell(i),{name:'Calibri',bold:true,size:9,color:{argb:WHITE}},solidFill(NAVY),cv('center')));
+  const ansLabel={si:'SÍ',no:'NO',na:'N/A','':''};
+  const ansArgb={si:'FF00A854',no:'FFD63030',na:'FF94A3B8','':'FF94A3B8'};
+  S.questions.forEach((q,qi)=>{
+    const bg=qi%2===0?LGRAY:'FFFFFFFF';
+    const ans=S.answers[String(q.comp_num)]||'';
+    const rQ=wsD.addRow(['',q.sheet||'',q.bpl_name||'',q.question||'',q.critico||'',ansLabel[ans]||ans]);
+    rQ.height=18;
+    sty(rQ.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:AR(S.AC[q.sheet]||'#607d8b')}},solidFill(bg),cv('center'));
+    sty(rQ.getCell(3),{name:'Calibri',size:9},solidFill(bg));
+    sty(rQ.getCell(4),{name:'Calibri',size:9},solidFill(bg),{horizontal:'left',vertical:'top',wrapText:true});
+    sty(rQ.getCell(5),{name:'Calibri',bold:true,size:9,color:{argb:q.critico?'FFEF4444':'FF94A3B8'}},solidFill(bg),cv('center'));
+    sty(rQ.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:ansArgb[ans]||'FF94A3B8'}},solidFill(bg),cv('center'));
+  });
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='AE_'+S.distribuidor+'_'+S.edicion+'.xlsx'; a.click();
+  toast('✅ Excel AE generado');
 }
 
 function scheduleSave(){

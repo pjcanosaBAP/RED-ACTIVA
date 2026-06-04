@@ -1740,6 +1740,11 @@ body.readonly .admin-only{display:none!important;}
               <span style="font-size:13px;font-weight:700">Actualizar estados</span>
               <span style="font-size:10px;opacity:.8">Recarga estados, progreso y puntajes desde Supabase</span>
             </button>
+            <button onclick="exportAECampaignExcel()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:var(--g700);border:none;border-radius:10px;color:#fff;cursor:pointer;text-align:left">
+              <span style="font-size:18px">📊</span>
+              <span style="font-size:13px;font-weight:700">Exportar Excel AE</span>
+              <span style="font-size:10px;opacity:.8">Descarga respuestas y puntajes de todos los distribuidores</span>
+            </button>
             <button onclick="aeDeleteCampaign()" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:10px;color:#fca5a5;cursor:pointer;text-align:left">
               <span style="font-size:18px">🗑</span>
               <span style="font-size:13px;font-weight:700">Borrar campaña</span>
@@ -3740,10 +3745,10 @@ function _calcAEScore(answers, qArr, aw, nv){
         seen[key]=true;
         let sumW=0, siW=0;
         shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
-          const a=answers[String(x.comp_num)], cw=x.weight_attr||1;
-          if(a!=='na'){sumW+=cw; if(a==='si') siW+=cw;}
+          const a=answers[String(x.comp_num)], cw=typeof x.weight_attr==='number'?x.weight_attr:1;
+          if(a!=='na'&&cw>0){sumW+=cw; if(a==='si') siW+=cw;}
         });
-        saScores[key]={score:sumW>0?siW/sumW:0, bplW:q.peso_bpl||1};
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:typeof q.peso_bpl==='number'?q.peso_bpl:1};
       }
     });
     // Nivel 2: atributos
@@ -3754,7 +3759,8 @@ function _calcAEScore(answers, qArr, aw, nv){
       let bSum=0, bW=0;
       gs.forEach(([,v])=>{bSum+=v.score*v.bplW; bW+=v.bplW;});
       const bplSc=bW>0?bSum/bW:0;
-      const atW=(shQs.find(q=>q.bpl_num===bk)||{}).bpl_weight||1;
+      const _aq=shQs.find(q=>q.bpl_num===bk)||{};
+      const atW=typeof _aq.bpl_weight==='number'?_aq.bpl_weight:1;
       aWSum+=bplSc*atW; aSumW+=atW;
     });
     areas[sh]=aSumW>0?aWSum/aSumW:0;
@@ -3841,44 +3847,14 @@ function renderAETable(rows, edicion){
       ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
       : null;
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
-    // Score ponderado usando estructura de la campaña
+    // Score ponderado usando estructura de la campaña (misma lógica que _calcAEScore)
     let scoreHtml = '—';
-    if(aeRow&&aeRow.answers&&_aeCampaignQ.length){
-      const ans = aeRow.answers;
-      const qArr = _aeCampaignQ;
-      const aw = _aeCampaignAW;
-      const nv = _aeCampaignNV;
-      // Calcular score por área
-      const areaScores = {};
-      const sheets = [...new Set(qArr.map(q=>q.sheet))];
-      sheets.forEach(sh=>{
-        const shQ = qArr.filter(q=>q.sheet===sh);
-        let wSi=0, wTot=0;
-        shQ.forEach(q=>{
-          const v = ans[String(q.comp_num)];
-          const w = q.weight_attr||1;
-          if(v==='si'){ wSi+=w; wTot+=w; }
-          else if(v==='no'){ wTot+=w; }
-          // na: no cuenta
-        });
-        areaScores[sh] = wTot>0 ? wSi/wTot : null;
-      });
-      // Promedio ponderado entre áreas (excluir NV)
-      let totalW=0, totalScore=0;
-      sheets.forEach(sh=>{
-        if(nv[sh]) return; // excluir no vinculantes
-        const w = aw[sh]||0;
-        if(w>0 && areaScores[sh]!==null && areaScores[sh]!==undefined){
-          totalScore += areaScores[sh]*w;
-          totalW += w;
-        }
-      });
-      if(totalW>0){
-        const pct = Math.round(totalScore/totalW*100);
-        const thr = THR||{pro:85,act:70,rea:50};
-        const cat = pct>=thr.pro?'PROACTIVO':pct>=thr.act?'ACTIVO':pct>=thr.rea?'REACTIVO':'INACTIVO';
-        const col = pct>=thr.pro?'#16a34a':pct>=thr.act?'#2563eb':pct>=thr.rea?'#d97706':'#dc2626';
-        scoreHtml = `<span style="font-weight:700;color:${col}">${pct}%</span> <span style="font-size:10px;color:${col}">${cat}</span>`;
+    if(aeRow && aeRow.answers && _aeCampaignQ.length){
+      const sc = _calcAEScore(aeRow.answers, _aeCampaignQ, _aeCampaignAW, _aeCampaignNV);
+      if(sc){
+        const pct = Math.round(sc.total*100);
+        const col = pct>=((THR||{}).pro||85)?'#16a34a':pct>=((THR||{}).act||70)?'#2563eb':pct>=((THR||{}).rea||50)?'#d97706':'#dc2626';
+        scoreHtml = `<span style="font-weight:700;color:${col}">${pct}%</span> <span style="font-size:10px;color:${col}">${sc.category}</span>`;
       }
     }
     const hasAccessRow = d in distMap; // solo muestra En curso si hay registro en ae_access
@@ -4055,6 +4031,80 @@ async function aeDeleteCampaign(){
   aeSetStatus('🗑 Campaña eliminada. Podés crear una nueva.','warn');
   renderAETable([]);
   showToast('✅ Campaña eliminada');
+}
+
+async function exportAECampaignExcel(){
+  if(!_aeCampaignId){ showToast('⚠️ Seleccioná una campaña primero'); return; }
+  if(typeof ExcelJS==='undefined'){ showToast('⚠️ ExcelJS no cargó aún'); return; }
+  const edicion=_aeCampaignEdicion||'AE';
+  const pais=(document.getElementById('ae-pais')||{}).value||'';
+  const qArr=_aeCampaignQ; if(!qArr.length){ showToast('⚠️ Sin preguntas en la campaña'); return; }
+  showToast('⏳ Generando Excel AE...');
+  const dists=[...new Set(saved.filter(a=>(a.pais||'').toUpperCase()===pais.toUpperCase()).map(a=>a.distribuidor).filter(Boolean))].sort();
+  const NAVY='FF0F172A',WHITE='FFFFFFFF',LGRAY='FFF8FAFC';
+  const AR=hex=>'FF'+(hex||'607d8b').replace('#','').toUpperCase();
+  const pctStr=v=>((v||0)*100).toFixed(1)+'%';
+  const scoreARGB=v=>v>=0.85?'FF00A854':v>=0.70?'FF0078C8':v>=0.50?'FFE67E00':'FFD63030';
+  const solidFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
+  const thinB=(argb='FF94A3B8')=>({style:'thin',color:{argb}});
+  const allB=()=>({top:thinB(),bottom:thinB(),left:thinB(),right:thinB()});
+  const c=(h,v,b)=>({horizontal:h||'left',vertical:v||'middle',wrapText:!!b});
+  function sty(cell,font,fill,align,border){ if(font)cell.font=font; if(fill)cell.fill=fill; if(align)cell.alignment=align; if(border)cell.border=border; }
+  const wb=new ExcelJS.Workbook(); wb.creator='RED Activa 2.0 · BAP Partners';
+  const sheets=[...new Set(qArr.map(q=>q.sheet))];
+
+  // ── HOJA 1: RESUMEN ──
+  const wsR=wb.addWorksheet('Resumen AE',{views:[{showGridLines:false}]});
+  wsR.columns=[{width:2},{width:38},{width:14},...sheets.map(()=>({width:12})),{width:14},{width:16},{width:10}];
+  const hdrCols=[2,3,...sheets.map((_,i)=>4+i),4+sheets.length,5+sheets.length,6+sheets.length];
+  const rH=wsR.addRow(['','DISTRIBUIDOR','PUNTAJE',...sheets,'CRITICOS MET','CATEGORIA','RESPONDIDAS']);
+  rH.height=22;
+  hdrCols.forEach(i=>sty(rH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),c('center')));
+  dists.forEach((dist,di)=>{
+    const ae=autoevals.find(a=>a.distribuidor===dist&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
+    const sc=ae?_calcAEScore(ae.answers||{},qArr,_aeCampaignAW,_aeCampaignNV):null;
+    const bg=di%2===0?LGRAY:'FFFFFFFF';
+    const row=['',(dist.length>50?dist.slice(0,50)+'…':dist),sc?pctStr(sc.total):'—',...sheets.map(sh=>sc?pctStr((sc.areas||{})[sh]||0):'—'),sc?sc.critMet+'/'+sc.totalCrits:'—',sc?sc.category:'PENDIENTE',sc?sc.answered:'—'];
+    const rD=wsR.addRow(row); rD.height=20;
+    sty(rD.getCell(2),{name:'Calibri',bold:true,size:10},{},{horizontal:'left',vertical:'middle'});
+    if(sc){
+      sty(rD.getCell(3),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(sc.total)}},solidFill(bg),c('center'));
+      sheets.forEach((sh,si)=>sty(rD.getCell(4+si),{name:'Calibri',size:10,color:{argb:scoreARGB((sc.areas||{})[sh]||0)}},solidFill(bg),c('center')));
+      const catHex={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030',PENDIENTE:'718096'}[sc.category]||'718096';
+      sty(rD.getCell(4+sheets.length),{name:'Calibri',size:10},solidFill(bg),c('center'));
+      sty(rD.getCell(5+sheets.length),{name:'Calibri',bold:true,size:10,color:{argb:'FF'+catHex}},solidFill(bg),c('center'));
+      sty(rD.getCell(6+sheets.length),{name:'Calibri',size:10},solidFill(bg),c('center'));
+    }
+  });
+
+  // ── HOJA 2: DETALLE RESPUESTAS ──
+  const wsD=wb.addWorksheet('Detalle Respuestas',{views:[{showGridLines:false,state:'frozen',xSplit:4,ySplit:1}]});
+  wsD.columns=[{width:2},{width:18},{width:22},{width:30},{width:8},...dists.map(()=>({width:10}))];
+  const dH=wsD.addRow(['','ÁREA','ATRIBUTO / BPL','PREGUNTA','CRÍTICO',...dists]);
+  dH.height=22;
+  [2,3,4,5,...dists.map((_,i)=>6+i)].forEach(i=>sty(dH.getCell(i),{name:'Calibri',bold:true,size:9,color:{argb:WHITE}},solidFill(NAVY),c('center')));
+  const ansLabel={si:'SÍ',no:'NO',na:'N/A','':''};
+  const ansArgb={si:'FF00A854',no:'FFD63030',na:'FF94A3B8','':'FF94A3B8'};
+  qArr.forEach((q,qi)=>{
+    const bg=qi%2===0?LGRAY:'FFFFFFFF';
+    const distAnswers=dists.map(dist=>{
+      const ae=autoevals.find(a=>a.distribuidor===dist&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
+      return ae?(ae.answers||{})[String(q.comp_num)]||'':'-';
+    });
+    const rQ=wsD.addRow(['',q.sheet||'',q.bpl_name||'',q.question||'',q.critico||'',...distAnswers.map(v=>ansLabel[v]||v)]);
+    rQ.height=18;
+    sty(rQ.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:AR(AC[q.sheet]||'#607d8b')}},solidFill(bg),c('center'));
+    sty(rQ.getCell(3),{name:'Calibri',size:9},{},solidFill(bg));
+    sty(rQ.getCell(4),{name:'Calibri',size:9},{},{horizontal:'left',vertical:'top',wrapText:true});
+    sty(rQ.getCell(5),{name:'Calibri',bold:true,size:9,color:{argb:q.critico?'FFEF4444':'FF94A3B8'}},solidFill(bg),c('center'));
+    distAnswers.forEach((v,di)=>sty(rQ.getCell(6+di),{name:'Calibri',bold:true,size:9,color:{argb:ansArgb[v]||'FF94A3B8'}},solidFill(bg),c('center')));
+  });
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='AE_'+pais+'_'+edicion+'.xlsx'; a.click();
+  showToast('✅ Excel AE generado');
 }
 
 function aeCopyLink(){
@@ -5398,7 +5448,7 @@ function updateAudCnt(){
   const sbAudBadge=document.getElementById('sb-aud-badge');
   if(sbAudBadge) sbAudBadge.textContent=saved.length;
   const aeBadge=document.getElementById('ae-cnt-badge');
-  if(aeBadge) aeBadge.textContent=autoevals.length;
+  if(aeBadge) aeBadge.textContent=autoevals.filter(a=>a.source!=='portal').length;
 }
 
 // ── GLOBAL ──
@@ -10630,10 +10680,11 @@ function clearAEByEdPais(pais,ed){
 }
 function renderAEList(){
   const el=document.getElementById('ae-list'); if(!el) return;
-  if(!autoevals.length){ el.innerHTML='<span style="color:var(--g400)">Sin autoevaluaciones importadas.</span>'; return; }
+  const excelAEs=autoevals.filter(a=>a.source!=='portal');
+  if(!excelAEs.length){ el.innerHTML='<span style="color:var(--g400)">Sin autoevaluaciones importadas.</span>'; return; }
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
   const groups={};
-  autoevals.forEach(ae=>{
+  excelAEs.forEach(ae=>{
     const k=(ae.pais||'—')+'|||'+(ae.edicion||'—');
     if(!groups[k]) groups[k]={pais:ae.pais||'—',ed:ae.edicion||'—',list:[]};
     groups[k].list.push(ae);
