@@ -122,6 +122,15 @@ select.inp{cursor:pointer}
   border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ── DIST LIST ── */
+.dist-item{padding:11px 14px;cursor:pointer;font-size:13px;color:#cbd5e1;
+  border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;display:flex;align-items:center;gap:8px}
+.dist-item:last-child{border-bottom:none}
+.dist-item:hover{background:rgba(59,130,246,.15);color:#fff}
+.dist-item.selected{background:rgba(59,130,246,.25);color:#fff;font-weight:600}
+.dist-item-check{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.dist-item.selected .dist-item-check{background:#3b82f6;border-color:#3b82f6}
+
 /* ── RESPONSIVE ── */
 @media(max-width:480px){
   .card{padding:20px}
@@ -167,25 +176,33 @@ select.inp{cursor:pointer}
 
 <!-- ── STEP 2: DISTRIBUIDOR + PIN ── -->
 <div class="page" id="step2" style="display:none">
-  <div class="card" style="margin-top:40px">
+  <div class="card" style="margin-top:24px">
     <div class="badge-ok">✓ <span id="badge-codigo"></span></div>
     <div class="step-title">Identificate</div>
-    <div class="step-sub">Seleccioná tu empresa e ingresá tu PIN de 4 dígitos</div>
-    <div style="margin-bottom:14px">
-      <label class="inp-label">Tu empresa</label>
-      <select id="sel-dist" class="inp">
-        <option value="">— Seleccioná —</option>
-      </select>
-    </div>
-    <div>
-      <label class="inp-label">PIN (4 dígitos)</label>
+    <div class="step-sub">Buscá tu empresa en la lista y hacé clic para seleccionarla</div>
+
+    <!-- Buscador -->
+    <input type="text" id="dist-search" class="inp" placeholder="🔍  Buscá tu empresa..."
+      style="margin-bottom:10px" oninput="filterDistList(this.value)">
+
+    <!-- Lista visible de distribuidores -->
+    <div id="dist-list" style="max-height:280px;overflow-y:auto;border:1.5px solid rgba(255,255,255,.1);
+      border-radius:8px;margin-bottom:14px"></div>
+
+    <!-- PIN (aparece al seleccionar empresa) -->
+    <div id="pin-wrap" style="display:none">
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">
+        Empresa seleccionada: <strong id="sel-dist-name" style="color:#fff"></strong>
+      </div>
+      <label class="inp-label">PIN de acceso (4 dígitos)</label>
       <input type="password" id="inp-pin" class="inp inp-pin" maxlength="4"
         inputmode="numeric" pattern="[0-9]*" placeholder="••••"
         onkeydown="if(event.key==='Enter')step2Next()">
+      <div class="err-msg" id="err2"></div>
+      <button class="btn-primary" onclick="step2Next()" id="btn2">Ingresar →</button>
     </div>
-    <div class="err-msg" id="err2"></div>
-    <button class="btn-primary" onclick="step2Next()" id="btn2">Ingresar</button>
-    <button class="btn-sec" onclick="goStep1()">← Volver</button>
+
+    <button class="btn-sec" onclick="goStep1()" style="margin-top:8px">← Volver</button>
   </div>
 </div>
 
@@ -261,20 +278,52 @@ async function step1Next(){
       return;
     }
     S.codigo = code;
-    const sel = document.getElementById('sel-dist');
-    sel.innerHTML = '<option value="">— Seleccioná tu empresa —</option>' +
-      valid.map(d=>`<option value="${d.distribuidor}">${d.distribuidor}${d.submitted?' ✓':''}</option>`).join('');
-    document.getElementById('badge-codigo').textContent = code+' ('+valid.length+' empresas)';
+    S._allDists = valid;
+    document.getElementById('badge-codigo').textContent = code+' · '+valid.length+' empresas';
+    document.getElementById('dist-search').value = '';
+    renderDistList(valid);
+    document.getElementById('pin-wrap').style.display = 'none';
+    document.getElementById('inp-pin').value = '';
+    S.distribuidor = '';
     showStep(2);
   }catch(e){ setErr('err1','Error de conexión. Intentá de nuevo.'); }
   finally{ setBtn('btn1', false); }
 }
 
+function renderDistList(dists){
+  const wrap = document.getElementById('dist-list'); if(!wrap) return;
+  if(!dists.length){ wrap.innerHTML='<div style="padding:16px;font-size:12px;color:#64748b;text-align:center">No se encontraron empresas</div>'; return; }
+  wrap.innerHTML = dists.map(d=>{
+    const sel = S.distribuidor === d.distribuidor;
+    return `<div class="dist-item${sel?' selected':''}" onclick="selectDist('${d.distribuidor.replace(/'/g,"\\'")}')" title="${d.distribuidor}">
+      <div class="dist-item-check">${sel?'✓':''}</div>
+      <span>${d.distribuidor}${d.submitted?' <span style="color:#10b981;font-size:10px">✓ ya enviada</span>':''}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterDistList(q){
+  const filtered = (S._allDists||[]).filter(d=>d.distribuidor.toLowerCase().includes(q.toLowerCase()));
+  renderDistList(filtered);
+}
+
+function selectDist(dist){
+  S.distribuidor = dist;
+  document.getElementById('sel-dist-name').textContent = dist;
+  document.getElementById('pin-wrap').style.display = '';
+  document.getElementById('inp-pin').focus();
+  renderDistList((S._allDists||[]).filter(d=>{
+    const q = document.getElementById('dist-search').value;
+    return !q || d.distribuidor.toLowerCase().includes(q.toLowerCase());
+  }));
+  setErr('err2','');
+}
+
 // ── STEP 2 ───────────────────────────────────────────────────────────────────
 async function step2Next(){
-  const dist = document.getElementById('sel-dist').value;
+  const dist = S.distribuidor;
   const pin  = document.getElementById('inp-pin').value;
-  if(!dist){ setErr('err2','Seleccioná tu empresa'); return; }
+  if(!dist){ setErr('err2','Seleccioná tu empresa de la lista'); return; }
   if(!pin || pin.length !== 4){ setErr('err2','El PIN debe tener 4 dígitos'); return; }
   setBtn('btn2', true);
   setErr('err2','');
