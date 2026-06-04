@@ -864,27 +864,18 @@ async function adminLogin(){
 }
 
 async function loadAdminView(){
-  const {data:camp, error:campErr} = await sbc.from('ae_campaigns')
-    .select('id,codigo_acceso,edicion,pais,anio,area_weights,nv,questions_snapshot')
-    .eq('codigo_acceso', S.codigo).maybeSingle();
-  if(campErr||!camp) throw new Error('No se encontró la campaña');
+  const {data, error} = await sbc.rpc('ae_admin_view', {p_codigo: S.codigo});
+  if(error) throw new Error('RPC error: '+error.message);
+  if(!data || data.error) throw new Error('Campaña no encontrada para código: '+S.codigo);
 
-  const {data:accRows, error:accErr} = await sbc.from('ae_access')
-    .select('*').eq('campaign_id', camp.id);
-  if(accErr) throw new Error('Error al cargar accesos: '+accErr.message);
-
+  const camp = data.campaign;
+  const accRows = data.access || [];
   const answersMap = {};
-  await Promise.all((accRows||[]).filter(r=>r.pin&&String(r.pin).trim()).map(async r=>{
-    try{
-      const {data} = await sbc.rpc('ae_load_answers',{
-        p_codigo:S.codigo, p_distribuidor:r.distribuidor, p_pin:String(r.pin)
-      });
-      if(data&&data.answers&&Object.keys(data.answers).length)
-        answersMap[r.distribuidor]=data.answers;
-    }catch(e){}
-  }));
+  accRows.forEach(r=>{
+    if(r.answers && Object.keys(r.answers).length) answersMap[r.distribuidor] = r.answers;
+  });
 
-  _adminData = {camp, accRows:accRows||[], answersMap};
+  _adminData = {camp, accRows, answersMap};
   renderAdminView();
   showStep(5);
 }
