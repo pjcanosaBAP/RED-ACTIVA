@@ -434,7 +434,10 @@ function updateProgress(){
   document.getElementById('prog-fill').style.width = pct+'%';
   document.getElementById('prog-txt').textContent  = done+' / '+total+' respondidas ('+pct+'%)';
   document.getElementById('sf-count').textContent  = done+' / '+total;
-  document.getElementById('btn-submit').disabled = done < total;
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = false;
+  btn.textContent = done === total ? 'Enviar AE ✓' : 'Enviar AE ('+done+'/'+total+')';
+  btn.style.background = done === total ? '' : '#b45309';
 }
 
 function scheduleSave(){
@@ -456,8 +459,11 @@ async function saveDraft(){
 async function confirmSubmit(){
   const total = S.questions.length;
   const done  = S.questions.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
-  if(done < total){ toast('Respondé todas las preguntas antes de enviar'); return; }
-  if(!confirm('¿Confirmás el envío de tu autoevaluación?\n\nUna vez enviada quedará bloqueada para edición. Podés solicitar corrección al administrador si es necesario.')) return;
+  const pending = total - done;
+  const msg = pending > 0
+    ? 'Tenés '+pending+' pregunta'+(pending>1?'s':'')+'  sin responder.\n\n¿Querés enviar de todas formas? Las preguntas sin respuesta quedarán en blanco.'
+    : '¿Confirmás el envío de tu autoevaluación?';
+  if(!confirm(msg+'\n\nUna vez enviada quedará bloqueada. Podés solicitar corrección al administrador.')) return;
   document.getElementById('btn-submit').disabled = true;
   try{
     const {data, error} = await sbc.rpc('ae_save_answers',{
