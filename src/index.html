@@ -3838,12 +3838,14 @@ async function aeRefreshStatus(){
     if(pais&&anio){ await aeLoadCampaignForPaisAnio(pais,anio); return; }
     renderAETable([]); return;
   }
-  // Leer ae_access con answers (ahí guarda ae_save_answers RPC)
-  const {data:acc} = await _sbc.from('ae_access').select('id,distribuidor,pin,submitted,unlock_requested,unlock_granted,answers').eq('campaign_id',_aeCampaignId);
-  _aeAccessRows = acc||[];
-  // Mapa distribuidor → answers desde ae_access
+  // Leer ae_access — usar select('*') para no fallar si no existe columna answers
+  const {data:accRaw, error:accErr} = await _sbc.from('ae_access').select('*').eq('campaign_id',_aeCampaignId);
+  if(accErr){ console.warn('[AE] ae_access select:',accErr.message); }
+  const acc = accRaw||[];
+  _aeAccessRows = acc;
+  // Mapa distribuidor → answers (si ae_access tiene columna answers)
   const accAnswersMap={};
-  (acc||[]).forEach(row=>{ if(row.answers&&Object.keys(row.answers).length>0) accAnswersMap[row.distribuidor]=row.answers; });
+  acc.forEach(row=>{ if(row.answers&&Object.keys(row.answers).length>0) accAnswersMap[row.distribuidor]=row.answers; });
 
   if(_aeCampaignEdicion){
     const {data:aeData} = await _sbc.from('autoevals').select('*').eq('edicion',_aeCampaignEdicion);
