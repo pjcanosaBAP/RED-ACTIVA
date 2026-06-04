@@ -3707,7 +3707,14 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
 }
 
 async function aeRefreshStatus(){
-  if(!_sbc||!_sbOnline||!_aeCampaignId){ renderAETable([]); return; }
+  if(!_sbc||!_sbOnline){ renderAETable([]); return; }
+  // Si no hay campaña cargada, intentar cargarla del dropdown actual
+  if(!_aeCampaignId){
+    const pais=(document.getElementById('ae-pais')||{}).value||'';
+    const anio=parseInt((document.getElementById('ae-anio')||{}).value)||0;
+    if(pais&&anio){ await aeLoadCampaignForPaisAnio(pais,anio); return; }
+    renderAETable([]); return;
+  }
   // Get access rows
   const {data:acc} = await _sbc.from('ae_access').select('distribuidor,pin,submitted,unlock_requested,unlock_granted').eq('campaign_id',_aeCampaignId);
   _aeAccessRows = acc||[];
@@ -3718,7 +3725,7 @@ async function aeRefreshStatus(){
 
 function renderAETable(rows, edicion){
   const wrap = document.getElementById('ae-table-wrap'); if(!wrap) return;
-  const totalQ = _aeCampaignTotalQ || Q.length;
+  const totalQ = _aeCampaignTotalQ || 0;
   const edicionKey = edicion || _aeCampaignEdicion || '';
   const selPais = ((document.getElementById('ae-pais')||{}).value||'').toUpperCase();
   // Fuente de verdad: saved[] filtrado por país. Los ae_access rows solo aportan PIN/estado.
@@ -3748,8 +3755,8 @@ function renderAETable(rows, edicion){
       <td style="padding:6px 8px;text-align:center"><input type="text" value="${r.pin||''}" maxlength="4" data-dist="${d}" placeholder="—"
         style="width:52px;text-align:center;border:1px solid var(--g200);border-radius:4px;padding:3px 6px;font-size:13px;letter-spacing:3px;font-weight:700"></td>
       <td style="padding:6px 8px">${statusHtml}</td>
-      <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered===totalQ&&totalQ>0?'var(--green)':'var(--g500)'}">
-        ${answered}/${totalQ}</td>
+      <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered>0&&answered===totalQ?'var(--green)':'var(--g500)'}">
+        ${totalQ>0 ? answered+'/'+totalQ : (answered>0 ? answered+'/?' : '—')}</td>
       <td style="padding:6px 8px">${unlockBtn}</td>
     </tr>`;
   }).join('');
