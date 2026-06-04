@@ -1536,7 +1536,7 @@ body.readonly .admin-only{display:none!important;}
 
       <!-- Distributors -->
       <div class="cfg-section" id="cfg-sec-dist">
-        <div class="cfg-hd">🏭 Gestión de Distribuidores
+        <div class="cfg-hd">🏭 Distribuidores · <span id="cfg-dist-pais-lbl" style="color:var(--blue2);font-weight:800"></span>
           <button class="cfg-reset-btn" onclick="resetDistributors()">Restablecer</button>
         </div>
         <div class="cfg-bd">
@@ -2159,6 +2159,7 @@ function switchStruct(pais, anio){
   if(_userPais&&pais!==_userPais){ showToast('⚠️ No tenés acceso a estructuras de '+pais); return; }
   if(cfg.pais===pais&&cfg.anio===anio) return; // already active
   cfg.pais=pais; cfg.anio=anio;
+  _syncDistributors(pais);
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   try{ rebuildSbStructSel(); }catch(e){}
   const sel=document.getElementById('sel-edicion'); if(sel) sel.value=anio;
@@ -2282,6 +2283,7 @@ function _applyPaisRestriction(){
     const best=matching[0];
     if(cfg.pais!==best.pais||cfg.anio!==best.anio){
       cfg.pais=best.pais; cfg.anio=best.anio;
+      _syncDistributors(best.pais);
       localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
       loadStructure(best.pais,best.anio);
       try{ rebuildAll(); }catch(e){ console.warn('[PR] rebuildAll:',e); }
@@ -2549,12 +2551,45 @@ let THR = {pro:85,act:70,rea:50};
 let DISTRIBUTORS = [...DIST_BASE];
 let Q = [...Q_BASE]; // can be extended
 
+// ── DISTRIBUTORS per-country helpers ─────────────────────────────────────────
+function _distsObj(){
+  // cfg.dists es { PAIS: [...] }. Migra automáticamente desde el array legacy.
+  if(!cfg.dists) return {};
+  if(Array.isArray(cfg.dists)){
+    const obj={};
+    cfg.dists.forEach(d=>{
+      const countries=[...new Set(saved.filter(a=>a.distribuidor===d&&a.pais).map(a=>a.pais.toUpperCase()))];
+      if(countries.length) countries.forEach(c=>{if(!obj[c])obj[c]=[];if(!obj[c].includes(d))obj[c].push(d);});
+      else { const cp=(cfg.pais||'').toUpperCase(); if(cp){if(!obj[cp])obj[cp]=[];if(!obj[cp].includes(d))obj[cp].push(d);} }
+    });
+    cfg.dists=obj;
+    localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  }
+  return cfg.dists;
+}
+function _distsForPais(pais){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  return p?[...(_distsObj()[p]||[])]:[];
+}
+function _saveDistsForPais(arr,pais){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  if(!p) return;
+  _distsObj();
+  if(!cfg.dists||Array.isArray(cfg.dists)) cfg.dists={};
+  cfg.dists[p]=[...arr];
+}
+function _syncDistributors(pais){
+  const arr=_distsForPais(pais||cfg.pais);
+  DISTRIBUTORS.length=0;
+  arr.forEach(d=>DISTRIBUTORS.push(d));
+}
+
 // Load cfg
 function loadCfg(){
   // FIX 1a: merge AW en vez de reemplazar — evita borrar áreas recién creadas
   if(cfg.aw) Object.assign(AW, cfg.aw);
   if(cfg.thr) THR = {...cfg.thr};
-  if(cfg.dists && DISTRIBUTORS.length===0) DISTRIBUTORS = [...cfg.dists];
+  if(cfg.dists) _syncDistributors();
   // Set UI
   SHEETS().forEach(sh=>{
     const el=document.getElementById('cfg-w-'+sh);
@@ -2577,7 +2612,7 @@ function saveCfg(){
   if(elAct) THR.act = parseInt(elAct.value)||70;
   if(elRea) THR.rea = parseInt(elRea.value)||50;
   cfg.thr = {...THR};
-  cfg.dists = [...DISTRIBUTORS];
+  _saveDistsForPais(DISTRIBUTORS);
   cfg.aw = {...AW};
   localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
   // Supabase: push config + structures (fire-and-forget)
@@ -2613,40 +2648,37 @@ function updateAreaWeights(){
 }
 function resetAreaWeights(){ AW={...AW_DEFAULT}; rebuildCfgWeightRows(); saveCfg(); showToast('✅ Pesos restablecidos'); updateAreaWeights(); rebuildDashAreaBars(); }
 function resetThresholds(){ THR={pro:85,act:70,rea:50}; document.getElementById('cfg-thr-pro').value=85; document.getElementById('cfg-thr-act').value=70; document.getElementById('cfg-thr-rea').value=50; saveCfg(); showToast('✅ Umbrales restablecidos'); }
-function resetDistributors(){ DISTRIBUTORS=[...DIST_BASE]; renderCfgDists(); rebuildDistSelect(); saveCfg(); showToast('✅ Distribuidores restablecidos'); }
+function resetDistributors(){
+  _saveDistsForPais([],cfg.pais); _syncDistributors();
+  renderCfgDists(); rebuildDistSelect(); saveCfg();
+  showToast('✅ Distribuidores de '+(cfg.pais||'este país')+' restablecidos');
+}
 
 function renderCfgDists(){
   const w=document.getElementById('cfg-dist-list');
+  const lbl=document.getElementById('cfg-dist-pais-lbl');
+  if(lbl) lbl.textContent=cfg.pais||'—';
   if(!w) return;
-  const rp=document.body.dataset.rp||_userPais||'';
-  const paisDists=rp?new Set(saved.filter(a=>a.pais===rp).map(a=>a.distribuidor).filter(Boolean)):null;
-  const allAuditDists=rp?new Set(saved.map(a=>a.distribuidor).filter(Boolean)):null;
-  w.innerHTML=DISTRIBUTORS.map((d,i)=>{
-    if(rp && allAuditDists.has(d) && !paisDists.has(d)) return '';
-    return `<div class="cfg-dist-tag">${d}<span class="cfg-dist-del" onclick="removeDist(${i})">✕</span></div>`;
-  }).join('');
+  w.innerHTML=DISTRIBUTORS.length
+    ? DISTRIBUTORS.map((d,i)=>`<div class="cfg-dist-tag">${d}<span class="cfg-dist-del" onclick="removeDist(${i})">✕</span></div>`).join('')
+    : '<div style="font-size:11px;color:var(--g400);padding:4px 0">Sin distribuidores para '+(cfg.pais||'este país')+'. Agregá uno abajo.</div>';
 }
 function addDistributor(){
   const inp=document.getElementById('cfg-new-dist'); const v=inp.value.trim();
   if(!v) return;
-  if(DISTRIBUTORS.includes(v)){showToast('⚠️ Ya existe');return;}
+  if(DISTRIBUTORS.includes(v)){showToast('⚠️ Ya existe en '+(cfg.pais||'este país'));return;}
   DISTRIBUTORS.push(v); inp.value='';
-  renderCfgDists(); rebuildDistSelect(); saveCfg(); showToast('✅ Agregado: '+v);
+  renderCfgDists(); rebuildDistSelect(); saveCfg(); showToast('✅ Agregado en '+(cfg.pais||'')+': '+v);
 }
 function removeDist(i){
-  if(!confirm('¿Eliminar '+DISTRIBUTORS[i]+'?')) return;
+  if(!confirm('¿Eliminar '+DISTRIBUTORS[i]+' de '+(cfg.pais||'este país')+'?')) return;
   DISTRIBUTORS.splice(i,1);
   renderCfgDists(); rebuildDistSelect(); saveCfg();
 }
 function rebuildDistSelect(){
   const sel=document.getElementById('sel-dist'); if(!sel) return;
   const cur=sel.value;
-  let dists=[...DISTRIBUTORS];
-  if(_userPais){
-    const paisSet=new Set(saved.filter(a=>a.pais===_userPais).map(a=>a.distribuidor).filter(Boolean));
-    const allAuditDists=new Set(saved.map(a=>a.distribuidor).filter(Boolean));
-    dists=dists.filter(d=>paisSet.has(d)||!allAuditDists.has(d));
-  }
+  const dists=[...DISTRIBUTORS];
   sel.innerHTML='<option value="">— Seleccionar —</option>'+dists.map(d=>`<option value="${d}">${d}</option>`).join('');
   if(dists.includes(cur)) sel.value=cur;
 }
@@ -4349,10 +4381,14 @@ async function _sbApplyRemoteConfig(){
         localStorage.setItem(key, JSON.stringify(val));
       });
     }
-    // Distribuidores
-    if(remote.dists && remote.dists.length > 0){
-      DISTRIBUTORS.length = 0;
-      remote.dists.forEach(d=>DISTRIBUTORS.push(d));
+    // Distribuidores (soporta tanto dict {PAIS:[...]} como array legacy)
+    if(remote.dists){
+      if(typeof remote.dists==='object'&&!Array.isArray(remote.dists)){
+        cfg.dists=remote.dists;
+      } else if(Array.isArray(remote.dists)&&remote.dists.length>0){
+        cfg.dists=remote.dists; // se migrará en el próximo _distsObj()
+      }
+      _syncDistributors();
       try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
     }
     // Umbrales y pesos
@@ -4403,7 +4439,7 @@ async function _sbPushConfig(){
     const data = {
       pais: cfg.pais||'URUGUAY',
       anio: cfg.anio||2025,
-      dists: [...DISTRIBUTORS],
+      dists: _distsObj(),
       thr: {...THR},
       aw: {...AW},
       structures
@@ -5549,9 +5585,10 @@ function importEVFile(input){
       edYear=document.getElementById('ev-import-anio').value||'2025';
     }
 
-    // ── Auto-crear distribuidor si no existe ──
+    // ── Auto-crear distribuidor en el país activo si no existe ──
     if(distName && !DISTRIBUTORS.includes(distName)){
       DISTRIBUTORS.push(distName);
+      _saveDistsForPais(DISTRIBUTORS);
       try{ renderCfgDists(); }catch(e){}
       rebuildDistSelect(); saveCfg();
     }
@@ -6292,6 +6329,7 @@ function savePaisAnio(){
   const pais=(document.getElementById('cfg-pais').value||'').trim().toUpperCase()||'URUGUAY';
   const anio=parseInt(document.getElementById('cfg-anio').value)||2025;
   cfg.pais=pais; cfg.anio=anio;
+  _syncDistributors(pais);
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   _sbPushConfig();
   try{ rebuildSbStructSel(); }catch(e){}
@@ -10003,7 +10041,7 @@ function renderHistPanel(){
       if(d.distributors && d.distributors.length){
         DISTRIBUTORS.length=0;
         d.distributors.forEach(x=>{ if(!DISTRIBUTORS.includes(x)) DISTRIBUTORS.push(x); });
-        cfg.dists=[...DISTRIBUTORS];
+        _saveDistsForPais(DISTRIBUTORS);
       }
       if(d.aw)    Object.assign(AW, d.aw);
       if(d.wcfg)  WCfg = d.wcfg;
