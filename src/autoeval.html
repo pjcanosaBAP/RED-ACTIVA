@@ -230,6 +230,19 @@ select.inp{cursor:pointer}
     </div>
 
     <button class="btn-sec" onclick="goStep1()" style="margin-top:8px">← Volver</button>
+
+    <!-- Admin access -->
+    <div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
+      <button style="background:none;border:none;color:#475569;font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;padding:4px 10px;border-radius:6px;transition:color .2s" onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'" onclick="showAdminPin()">🔐 Acceso administrador</button>
+    </div>
+    <div id="admin-pin-wrap" style="display:none;margin-top:10px;padding:16px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:10px">
+      <label class="inp-label" style="color:#a78bfa">PIN de administrador</label>
+      <input type="password" id="inp-admin-pin" class="inp inp-pin" maxlength="8"
+        inputmode="numeric" placeholder="••••"
+        onkeydown="if(event.key==='Enter')adminLogin()">
+      <div class="err-msg" id="err-admin"></div>
+      <button class="btn-primary" onclick="adminLogin()" id="btn-admin" style="margin-top:10px;background:#7c3aed">Ingresar como admin →</button>
+    </div>
   </div>
 </div>
 
@@ -282,10 +295,27 @@ select.inp{cursor:pointer}
   </div>
 </div>
 
+<!-- ── STEP 5: ADMIN DASHBOARD ── -->
+<div id="step5" style="display:none;min-height:100vh;background:#0f172a">
+  <div style="max-width:900px;margin:0 auto;padding:16px 16px 60px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-top:20px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#fff;letter-spacing:.3px">Vista Administrador</div>
+        <div id="admin-camp-info" style="font-size:11px;color:#64748b;margin-top:3px;letter-spacing:.3px"></div>
+      </div>
+      <button class="btn-sec" style="width:auto;padding:7px 18px;font-size:12px" onclick="goStep1()">← Salir</button>
+    </div>
+    <div id="admin-stats-row" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+    <div id="admin-table-wrap"></div>
+    <div id="admin-detail" style="display:none;margin-top:18px"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
+const ADMIN_PIN = '1234'; // Cambiar este valor para modificar el PIN de admin
 const SBURL = 'https://fkyifkbfgdxgmwbgnhud.supabase.co';
 const SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZreWlma2JmZ2R4Z213YmduaHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTkxMDYsImV4cCI6MjA5NTQ3NTEwNn0.lHuJ3onWCd0v2LWp5Sftzc_kdWR59ar_7oRqsgwYA8M';
 const sbc = supabase.createClient(SBURL, SBKEY);
@@ -801,7 +831,7 @@ async function requestUnlock(){
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
 function showStep(n){
-  [1,2,3,4].forEach(i=>{
+  [1,2,3,4,5].forEach(i=>{
     const el = document.getElementById('step'+i);
     if(el) el.style.display = i===n ? '' : 'none';
   });
@@ -809,6 +839,243 @@ function showStep(n){
   const prog = document.getElementById('prog-wrap');
   if(hdr)  hdr.style.display  = n===3 ? '' : 'none';
   if(prog) prog.style.display = n===3 ? '' : 'none';
+}
+
+// ── ADMIN ────────────────────────────────────────────────────────────────────
+let _adminData = null;
+
+function showAdminPin(){
+  const wrap = document.getElementById('admin-pin-wrap');
+  if(wrap){ wrap.style.display=''; document.getElementById('inp-admin-pin').focus(); }
+}
+
+async function adminLogin(){
+  const pin = (document.getElementById('inp-admin-pin').value||'').trim();
+  if(pin !== ADMIN_PIN){ setErr('err-admin','PIN incorrecto'); return; }
+  setErr('err-admin','');
+  const btn = document.getElementById('btn-admin');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>'; }
+  try{
+    await loadAdminView();
+  }catch(e){
+    setErr('err-admin','Error al cargar: '+e.message);
+    if(btn){ btn.disabled=false; btn.innerHTML='Ingresar como admin →'; }
+  }
+}
+
+async function loadAdminView(){
+  const {data:camp, error:campErr} = await sbc.from('ae_campaigns')
+    .select('id,codigo_acceso,edicion,pais,anio,area_weights,nv,questions_snapshot')
+    .eq('codigo_acceso', S.codigo).maybeSingle();
+  if(campErr||!camp) throw new Error('No se encontró la campaña');
+
+  const {data:accRows, error:accErr} = await sbc.from('ae_access')
+    .select('*').eq('campaign_id', camp.id);
+  if(accErr) throw new Error('Error al cargar accesos: '+accErr.message);
+
+  const answersMap = {};
+  await Promise.all((accRows||[]).filter(r=>r.pin&&String(r.pin).trim()).map(async r=>{
+    try{
+      const {data} = await sbc.rpc('ae_load_answers',{
+        p_codigo:S.codigo, p_distribuidor:r.distribuidor, p_pin:String(r.pin)
+      });
+      if(data&&data.answers&&Object.keys(data.answers).length)
+        answersMap[r.distribuidor]=data.answers;
+    }catch(e){}
+  }));
+
+  _adminData = {camp, accRows:accRows||[], answersMap};
+  renderAdminView();
+  showStep(5);
+}
+
+function _calcAdminScore(answers, questions, AW, NV){
+  if(!questions||!questions.length) return null;
+  const answered=Object.keys(answers).filter(k=>answers[k]&&answers[k]!=='').length;
+  if(!answered) return null;
+  const sheets=[...new Set(questions.map(q=>q.sheet))];
+  const areaScores={};
+  let totalScore=0, totalW=0;
+  sheets.forEach(sh=>{
+    const shQs=questions.filter(q=>q.sheet===sh);
+    const saScores={}, seen={};
+    shQs.forEach(q=>{
+      const sk=(q.subattr||'').replace(/[^\w]/g,'_');
+      const key=sh+'_'+q.bpl_num+'_'+sk;
+      if(!seen[key]){
+        seen[key]=true;
+        let sumW=0,siW=0;
+        shQs.filter(x=>x.bpl_num===q.bpl_num&&(x.subattr||'').replace(/[^\w]/g,'_')===sk).forEach(x=>{
+          const a=answers[String(x.comp_num)];
+          const cw=typeof x.weight_attr==='number'?x.weight_attr:1;
+          if(a!=='na'&&cw>0){sumW+=cw; if(a==='si') siW+=cw;}
+        });
+        const bw=typeof q.peso_bpl==='number'?q.peso_bpl:1;
+        saScores[key]={score:sumW>0?siW/sumW:0, bplW:bw};
+      }
+    });
+    const bplKeys=[...new Set(shQs.map(q=>q.bpl_num))];
+    let aWSum=0,aSumW=0;
+    bplKeys.forEach(bk=>{
+      const gs=Object.entries(saScores).filter(([k])=>k.startsWith(sh+'_'+bk+'_'));
+      let bSum=0,bW=0;
+      gs.forEach(([,v])=>{bSum+=v.score*v.bplW; bW+=v.bplW;});
+      const bplSc=bW>0?bSum/bW:0;
+      const _aq=shQs.find(q=>q.bpl_num===bk)||{};
+      const atW=typeof _aq.bpl_weight==='number'?_aq.bpl_weight:1;
+      aWSum+=bplSc*atW; aSumW+=atW;
+    });
+    areaScores[sh]=aSumW>0?aWSum/aSumW:0;
+    if(!NV[sh]){const w=AW[sh]||0; if(w>0){totalScore+=areaScores[sh]*w; totalW+=w;}}
+  });
+  const total=totalW>0?totalScore/totalW:0;
+  const pct=Math.round(total*1000)/10;
+  const cat=pct>=85?'PROACTIVO':pct>=70?'ACTIVO':pct>=50?'REACTIVO':'INACTIVO';
+  return {total, areaScores, pct, cat, answered};
+}
+
+function renderAdminView(){
+  if(!_adminData) return;
+  const {camp, accRows, answersMap}=_adminData;
+  const qs=camp.questions_snapshot||[];
+  const AW=camp.area_weights||{};
+  const NV=camp.nv||{};
+  const sheets=[...new Set(qs.map(q=>q.sheet))];
+  const catColors={PROACTIVO:'#16a34a',ACTIVO:'#2563eb',REACTIVO:'#d97706',INACTIVO:'#dc2626'};
+
+  const infoEl=document.getElementById('admin-camp-info');
+  if(infoEl) infoEl.textContent=camp.codigo_acceso+' · '+camp.pais+' '+camp.anio+' · '+camp.edicion+' · '+accRows.length+' distribuidores';
+
+  const rows=accRows.map(r=>{
+    const answers=answersMap[r.distribuidor]||{};
+    const sc=Object.keys(answers).length?_calcAdminScore(answers,qs,AW,NV):null;
+    return {dist:r.distribuidor, submitted:r.submitted, answers, sc, hasPin:!!r.pin};
+  });
+  rows.sort((a,b)=>{
+    if(a.submitted&&!b.submitted) return -1;
+    if(!a.submitted&&b.submitted) return 1;
+    return (b.sc?b.sc.pct:-1)-(a.sc?a.sc.pct:-1);
+  });
+
+  const subCount=rows.filter(r=>r.submitted).length;
+  const withAns=rows.filter(r=>r.sc).length;
+  const statsEl=document.getElementById('admin-stats-row');
+  if(statsEl) statsEl.innerHTML=[
+    {lbl:'Total',val:rows.length,c:'#fff',bc:'rgba(255,255,255,.1)'},
+    {lbl:'Enviadas',val:subCount,c:'#10b981',bc:'rgba(16,185,129,.3)'},
+    {lbl:'Con respuestas',val:withAns,c:'#93c5fd',bc:'rgba(147,197,253,.2)'},
+    {lbl:'Pendientes',val:rows.length-subCount,c:'#94a3b8',bc:'rgba(255,255,255,.08)'}
+  ].map(s=>`<div style="background:#1e293b;border:1px solid ${s.bc};border-radius:10px;padding:12px 18px;min-width:110px">
+    <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px">${s.lbl}</div>
+    <div style="font-size:26px;font-weight:800;color:${s.c};font-family:'Barlow Condensed',sans-serif">${s.val}</div>
+  </div>`).join('');
+
+  let html=`<div style="background:#1e293b;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px">
+      <thead><tr style="background:#0f172a">
+        <th style="padding:10px 14px;text-align:left;color:#64748b;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Distribuidor</th>
+        <th style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Estado</th>
+        <th style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Puntaje</th>
+        <th style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Categoría</th>
+        ${sheets.map(sh=>`<th style="padding:10px 6px;text-align:center;color:#64748b;font-weight:600;font-size:10px;letter-spacing:.5px">${sh}</th>`).join('')}
+        <th style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px">Resp.</th>
+      </tr></thead><tbody>`;
+
+  rows.forEach((r,i)=>{
+    const bg=i%2===0?'transparent':'rgba(255,255,255,.02)';
+    const sc=r.sc;
+    const statColor=r.submitted?'#10b981':'#64748b';
+    const statTxt=r.submitted?'✓ Enviada':r.hasPin?'En curso':'Sin PIN';
+    const scoreTxt=sc?sc.pct.toFixed(1)+'%':'—';
+    const scoreColor=sc?(sc.pct>=85?'#16a34a':sc.pct>=70?'#2563eb':sc.pct>=50?'#d97706':'#dc2626'):'#475569';
+    const catColor=sc?(catColors[sc.cat]||'#475569'):'#475569';
+    const areaCells=sheets.map(sh=>{
+      const v=sc?(sc.areaScores[sh]||0):null;
+      const c=v!==null?(v>=0.85?'#16a34a':v>=0.70?'#2563eb':v>=0.50?'#d97706':'#dc2626'):'#475569';
+      return `<td style="padding:8px 6px;text-align:center;color:${c};font-weight:700">${v!==null?(v*100).toFixed(0)+'%':'—'}</td>`;
+    }).join('');
+    const answCount=Object.keys(r.answers).filter(k=>r.answers[k]&&r.answers[k]!=='').length;
+    const distEsc=r.dist.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html+=`<tr style="background:${bg};cursor:pointer;transition:background .12s"
+      onclick="showAdminDetail('${distEsc}')"
+      onmouseover="this.style.background='rgba(99,102,241,.1)'"
+      onmouseout="this.style.background='${bg}'">
+      <td style="padding:9px 14px;color:#e2e8f0;font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.dist}</td>
+      <td style="padding:9px 8px;text-align:center;color:${statColor};font-weight:600;font-size:11px">${statTxt}</td>
+      <td style="padding:9px 8px;text-align:center;color:${scoreColor};font-weight:800;font-family:'Barlow Condensed',sans-serif;font-size:17px">${scoreTxt}</td>
+      <td style="padding:9px 8px;text-align:center;color:${catColor};font-weight:700;font-size:11px">${sc?sc.cat:'—'}</td>
+      ${areaCells}
+      <td style="padding:9px 8px;text-align:center;color:#94a3b8;font-size:11px">${answCount||'—'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  const wrap=document.getElementById('admin-table-wrap');
+  if(wrap) wrap.innerHTML=html;
+}
+
+function showAdminDetail(dist){
+  if(!_adminData) return;
+  const {camp, accRows, answersMap}=_adminData;
+  const answers=answersMap[dist]||{};
+  const qs=camp.questions_snapshot||[];
+  const AW=camp.area_weights||{};
+  const NV=camp.nv||{};
+  const sc=Object.keys(answers).length?_calcAdminScore(answers,qs,AW,NV):null;
+  const accRow=accRows.find(r=>r.distribuidor===dist)||{};
+  const sheets=[...new Set(qs.map(q=>q.sheet))];
+  const catColors={PROACTIVO:'#16a34a',ACTIVO:'#2563eb',REACTIVO:'#d97706',INACTIVO:'#dc2626'};
+  const detail=document.getElementById('admin-detail');
+  if(!detail) return;
+  detail.style.display='';
+
+  const distEsc=dist.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let html=`<div style="background:#1e293b;border:1.5px solid rgba(124,58,237,.3);border-radius:12px;padding:20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#fff">${distEsc}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">
+          ${accRow.submitted?'<span style="color:#10b981">✓ Enviada</span>':'<span style="color:#94a3b8">En curso / Pendiente</span>'}
+          ${sc?' · <span style="font-weight:700;color:'+(sc.pct>=85?'#16a34a':sc.pct>=70?'#2563eb':sc.pct>=50?'#d97706':'#dc2626')+'">'+sc.pct.toFixed(1)+'%</span> · <span style="color:'+(catColors[sc.cat]||'#fff')+'">'+sc.cat+'</span>':' · Sin respuestas aún'}
+        </div>
+      </div>
+      <button class="btn-sec" style="width:auto;padding:5px 14px;font-size:11px" onclick="document.getElementById('admin-detail').style.display='none'">✕ Cerrar</button>
+    </div>`;
+
+  if(sc){
+    html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">`;
+    sheets.forEach(sh=>{
+      const v=sc.areaScores[sh]||0;
+      const c=v>=0.85?'#16a34a':v>=0.70?'#2563eb':v>=0.50?'#d97706':'#dc2626';
+      html+=`<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase">${sh}</div>
+        <div style="font-size:20px;font-weight:800;color:${c};font-family:'Barlow Condensed',sans-serif">${(v*100).toFixed(0)}%</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  sheets.forEach(sh=>{
+    const shQs=qs.filter(q=>q.sheet===sh);
+    html+=`<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;padding:6px 0 5px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:4px">${sh}</div>`;
+    shQs.forEach(q=>{
+      const v=answers[String(q.comp_num)]||'';
+      const vColor=v==='si'?'#10b981':v==='no'?'#ef4444':v==='na'?'#64748b':'#334155';
+      const vBg=v==='si'?'rgba(16,185,129,.12)':v==='no'?'rgba(239,68,68,.12)':v==='na'?'rgba(100,116,139,.1)':'rgba(255,255,255,.03)';
+      const vTxt=v==='si'?'SÍ':v==='no'?'NO':v==='na'?'N/A':'—';
+      const critBadge=q.critico?'<span style="font-size:9px;color:#ef4444;font-weight:700;margin-right:3px">🔴</span>':'';
+      html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.04)">
+        <span style="font-size:9px;color:#475569;min-width:38px;flex-shrink:0;padding-top:2px">${q.comp_num}</span>
+        <span style="flex:1;font-size:11px;color:#cbd5e1;line-height:1.4">${critBadge}${q.question}</span>
+        <span style="min-width:34px;text-align:center;font-size:11px;font-weight:700;color:${vColor};background:${vBg};border-radius:4px;padding:2px 5px;flex-shrink:0">${vTxt}</span>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+
+  html+=`</div>`;
+  detail.innerHTML=html;
+  detail.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function setErr(id, msg){ const el=document.getElementById(id); if(el) el.textContent=msg; }
