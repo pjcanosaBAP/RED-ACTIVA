@@ -3627,7 +3627,9 @@ async function persist(){
 
 // ── AE PORTAL ADMIN ──────────────────────────────────────────────────────────
 let _aeCampaignId = null;
-let _aeAccessRows = []; // [{distribuidor, pin, submitted, unlock_requested, unlock_granted}]
+let _aeAccessRows = [];
+let _aeCampaignEdicion = '';
+let _aeCampaignTotalQ = 0;
 
 function aeRebuildStructDropdown(){
   const sel = document.getElementById('ae-struct-sel'); if(!sel) return;
@@ -3693,8 +3695,10 @@ async function aeLoadCampaignForPaisAnio(pais, anio){
   if(error){ aeSetStatus('Error: '+error.message,'err'); return; }
   if(data){
     _aeCampaignId = data.id;
+    _aeCampaignEdicion = data.edicion||'';
+    _aeCampaignTotalQ = (data.questions_snapshot||[]).length;
     const ci=document.getElementById('ae-codigo'); if(ci) ci.value=data.codigo_acceso||'';
-    aeSetStatus('✅ Campaña existente — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio,'ok');
+    aeSetStatus('✅ Campaña existente — código: '+data.codigo_acceso+' · '+data.pais+' '+data.anio+' · '+_aeCampaignTotalQ+' preguntas','ok');
     await aeRefreshStatus();
   } else {
     aeSetStatus('No hay campaña para '+pais+' '+anio+'. Ingresá un código y guardá.','warn');
@@ -3714,7 +3718,8 @@ async function aeRefreshStatus(){
 
 function renderAETable(rows, edicion){
   const wrap = document.getElementById('ae-table-wrap'); if(!wrap) return;
-  const totalQ = Q.length;
+  const totalQ = _aeCampaignTotalQ || Q.length;
+  const edicionKey = edicion || _aeCampaignEdicion || '';
   const selPais = ((document.getElementById('ae-pais')||{}).value||'').toUpperCase();
   // Fuente de verdad: saved[] filtrado por país. Los ae_access rows solo aportan PIN/estado.
   const distMap = {}; rows.forEach(r=>distMap[r.distribuidor]=r);
@@ -3725,7 +3730,9 @@ function renderAETable(rows, edicion){
 
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
-    const aeRow = edicion ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicion) : null;
+    const aeRow = edicionKey
+      ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
+      : autoevals.find(a=>a.distribuidor===d);
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
     const statusHtml = r.submitted
       ? (r.unlock_requested
@@ -3786,6 +3793,8 @@ async function aeSaveCampaign(){
   }
   if(res.error){ aeSetStatus('❌ Error al guardar: '+res.error.message,'err'); console.error('[AE] save campaign:', res.error); return; }
   _aeCampaignId = res.data.id;
+  _aeCampaignEdicion = edicion;
+  _aeCampaignTotalQ = Q.length;
   // Distribuidores del país — fuente de verdad: saved[]
   let accessErr = null;
   const allDists = [...new Set(
