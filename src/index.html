@@ -4889,7 +4889,7 @@ function renderDashResumen(){
   // Update sub-tab availability
   const dist2=(document.getElementById('sel-dist')||{}).value||'';
   const ed2=(document.getElementById('sel-edicion')||{}).value||'';
-  const hasAE=dist2&&ed2&&autoevals.some(function(a){return a.distribuidor===dist2&&a.edicion===ed2;});
+  const hasAE=dist2&&ed2&&!!_getAEFor(dist2,ed2);
   const hasEvol=dist2&&saved.filter(function(a){return a.distribuidor===dist2;}).length>1;
   const brechaBtn=document.getElementById('dash-tab-brecha');
   const evolBtn=document.getElementById('dash-tab-evol');
