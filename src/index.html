@@ -4356,8 +4356,17 @@ async function _sbApplyRemoteConfig(){
     const {data:cfgRow} = await _sbc.from('app_config').select('*').eq('id',1).maybeSingle();
     if(!cfgRow || !cfgRow.data) return false;
     const remote = cfgRow.data;
-    // Escribir todas las estructuras en localStorage
+    // Sincronizar estructuras: primero borrar locales que ya no existen en remoto
     if(remote.structures && typeof remote.structures === 'object'){
+      const remoteKeys = new Set(Object.keys(remote.structures));
+      // Borrar estructuras locales que fueron eliminadas en otro dispositivo
+      const localStructKeys = [];
+      for(let i=0; i<localStorage.length; i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith('bpl_struct_')) localStructKeys.push(k);
+      }
+      localStructKeys.forEach(k=>{ if(!remoteKeys.has(k)) localStorage.removeItem(k); });
+      // Escribir/actualizar estructuras remotas
       Object.entries(remote.structures).forEach(([key, val])=>{
         localStorage.setItem(key, JSON.stringify(val));
       });
