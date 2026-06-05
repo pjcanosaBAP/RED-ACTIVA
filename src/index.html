@@ -3647,6 +3647,18 @@ async function persist(){
   } catch(e){ console.warn('[SB] persist error:', e); }
 }
 
+// ── AE SOURCE PREFERENCE (portal vs excel por distribuidor) ──────────────────
+let _aeSourcePref=(function(){try{const s=localStorage.getItem('bpl_ae_src_pref');return s?JSON.parse(s):{};}catch(e){return {};}})();
+function _saveAESrcPref(){try{localStorage.setItem('bpl_ae_src_pref',JSON.stringify(_aeSourcePref));}catch(e){}}
+function aeToggleAESrc(dist,edicion,src){
+  const key=dist.trim().toUpperCase()+'|||'+(edicion||'');
+  _aeSourcePref[key]=src;
+  _saveAESrcPref();
+  renderAETable(_aeAccessRows,_aeCampaignEdicion);
+  try{renderCmpColumns();}catch(e){}
+  showToast('✅ Comparación AE: '+(src==='excel'?'AE Excel':'AE Portal'));
+}
+
 // ── AE PORTAL ADMIN ──────────────────────────────────────────────────────────
 let _aeCampaignId = null;
 let _aeAccessRows = [];
@@ -3896,11 +3908,23 @@ function renderAETable(rows, edicion){
   )].sort();
   if(!dists.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--g500);padding:12px 0">No se encontraron distribuidores para "'+selPais+'". Verificá que hay auditorías cargadas para ese país.</div>'; return; }
 
+  const _nyLocal=n=>n&&n.length===4?n.slice(-2):n;
+  const edNumLocal=(edicionKey||'').replace(/\D/g,'');
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
     const aeRow = edicionKey
-      ? autoevals.find(a=>a.distribuidor===d&&a.edicion===edicionKey)
+      ? autoevals.find(a=>a.distribuidor===d&&(a.edicion===edicionKey||(()=>{const en=(a.edicion||'').replace(/\D/g,'');return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);})()))
       : null;
+    // AE Excel para este distribuidor
+    const excelAE = autoevals.find(a=>{
+      if(a.source==='portal') return false;
+      if(a.distribuidor.trim().toUpperCase()!==d.trim().toUpperCase()) return false;
+      if(a.edicion===edicionKey) return true;
+      const en=(a.edicion||'').replace(/\D/g,'');
+      return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);
+    });
+    const prefKey=d.trim().toUpperCase()+'|||'+edicionKey;
+    const pref=_aeSourcePref[prefKey]||'portal';
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
     // Score ponderado usando estructura de la campaña (misma lógica que _calcAEScore)
     let scoreHtml = '—';
@@ -3931,6 +3955,23 @@ function renderAETable(rows, edicion){
     const deleteBtn = hasAccessRow && (answered>0 || r.submitted)
       ? `<button onclick="aeDeleteDistAE('${dSafe}');return false" style="font-size:10px;padding:2px 7px;background:transparent;border:1px solid #ef4444;color:#ef4444;border-radius:4px;cursor:pointer" title="Borrar AE y volver a Pendiente">✕</button>`
       : '';
+    // Toggle portal/excel (solo si existe AE Excel para este distribuidor)
+    const cmpCellHtml = excelAE ? `
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px">Comparar con</div>
+        <div style="display:flex;gap:3px">
+          <button onclick="aeToggleAESrc('${dSafe}','${edicionKey}','portal');return false"
+            style="font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;
+            background:${pref==='portal'?'#2563eb':'transparent'};
+            color:${pref==='portal'?'#fff':'#64748b'};
+            border:1px solid ${pref==='portal'?'#2563eb':'#d1d5db'};font-weight:${pref==='portal'?700:400}">Portal</button>
+          <button onclick="aeToggleAESrc('${dSafe}','${edicionKey}','excel');return false"
+            style="font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;
+            background:${pref==='excel'?'#7c3aed':'transparent'};
+            color:${pref==='excel'?'#fff':'#64748b'};
+            border:1px solid ${pref==='excel'?'#7c3aed':'#d1d5db'};font-weight:${pref==='excel'?700:400}">Excel</button>
+        </div>
+      </div>` : '<span style="font-size:10px;color:#d1d5db">—</span>';
     return `<tr style="border-bottom:1px solid var(--g100)">
       <td style="padding:6px 8px;font-size:12px">${d}</td>
       <td style="padding:6px 8px;text-align:center"><input type="text" value="${r.pin||''}" maxlength="4" data-dist="${d}" placeholder="—"
@@ -3939,6 +3980,7 @@ function renderAETable(rows, edicion){
       <td style="padding:6px 8px;text-align:center;font-size:12px;color:${answered>0&&answered===totalQ?'var(--green)':'var(--g500)'}">
         ${totalQ>0 ? answered+'/'+totalQ : (answered>0 ? answered+'/?' : '—')}</td>
       <td style="padding:6px 8px">${scoreHtml}</td>
+      <td style="padding:6px 8px">${cmpCellHtml}</td>
       <td style="padding:6px 4px;display:flex;gap:4px;align-items:center">
         ${unlockBtn}
         ${aeRow?`<button onclick="exportDistAEExcel('${dSafe}');return false" style="font-size:10px;padding:2px 7px;background:transparent;border:1px solid #3b82f6;color:#3b82f6;border-radius:4px;cursor:pointer" title="Exportar Excel AE">📊</button>`:''}
@@ -3954,6 +3996,7 @@ function renderAETable(rows, edicion){
       <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Estado AE</th>
       <th style="padding:6px 8px;text-align:center;border-bottom:1.5px solid var(--g200)">Respondidas</th>
       <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Puntaje AE</th>
+      <th style="padding:6px 8px;text-align:left;border-bottom:1.5px solid var(--g200)">Comparación</th>
       <th style="padding:6px 8px;border-bottom:1.5px solid var(--g200)"></th>
     </tr></thead>
     <tbody>${trs}</tbody>
@@ -4571,12 +4614,10 @@ function _setupSBRealtime(){
 // ── COMPARACIÓN: helpers ────────────────────────────────────
 function _getAEFor(distribuidor, edicion){
   const edNum=(edicion||'').replace(/\D/g,'');
-  // Prefix-swap: EV26→AE26, AE26→EV26
   const altEdicion=edicion
     ? (/^EV/i.test(edicion)?edicion.replace(/^EV/i,'AE'):edicion.replace(/^AE/i,'EV'))
     : '';
   const distNorm=(distribuidor||'').trim().toUpperCase();
-  // Normalize year: 4-digit "2025" → "25", 2-digit "25" stays "25"
   const _ny=n=>n&&n.length===4?n.slice(-2):n;
   const candidates=autoevals.filter(a=>{
     if(!a.distribuidor) return false;
@@ -4588,6 +4629,14 @@ function _getAEFor(distribuidor, edicion){
     return false;
   });
   if(!candidates.length) return null;
+  // Respetar preferencia del usuario (portal vs excel)
+  const prefKey=distNorm+'|||'+(edicion||'');
+  const pref=_aeSourcePref[prefKey];
+  if(pref==='excel'){
+    const excel=candidates.find(a=>a.source!=='portal');
+    return excel||candidates[0];
+  }
+  // Default: portal primero (o lo que haya si no hay portal)
   const portal=candidates.find(a=>a.source==='portal');
   return portal||candidates[0];
 }
