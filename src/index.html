@@ -1041,7 +1041,7 @@ body.readonly .admin-only{display:none!important;}
     <!-- Spacer -->
     <div style="flex:1"></div>
     <!-- Portal AE button -->
-    <button class="btn btn-out admin-only" onclick="toggleAEPanel()" title="Portal Autoevaluación" style="gap:5px;border-color:rgba(124,58,237,.5);color:#a78bfa;font-size:11px;padding:4px 10px">🟣 Portal AE</button>
+    <button class="btn admin-only" onclick="toggleAEPanel()" title="Portal Autoevaluación" style="gap:5px;background:rgba(124,58,237,.25);border:1.5px solid rgba(124,58,237,.6);color:#fff;font-weight:700;font-size:11px;padding:4px 11px">🟣 Portal AE</button>
     <!-- Supabase dot -->
     <div id="sb-dot" title="Supabase: iniciando... (clic = re-sincronizar)" style="width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;cursor:pointer;transition:background .4s;margin-right:4px" onclick="loadFromSupabase()"></div>
     <button class="btn btn-out" onclick="toggleSaved()" style="gap:4px">📋 <span id="aud-cnt-badge" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 6px;font-size:10px">0</span></button>
@@ -2458,7 +2458,11 @@ let devData = (function(){ try{ const d=localStorage.getItem('ra2_devdata'); ret
 function persistDevData(){ try{ localStorage.setItem('ra2_devdata',JSON.stringify(devData)); }catch(e){} }
 function _devKey(dist,ed){ return (dist||'')+'__'+(ed||''); }
 let autoevals = __IS_SNAPSHOT_BROWSER ? [] : (function(){
-  try{ const s=localStorage.getItem('bpl_ra2_autoevals'); return s?JSON.parse(s):[]; }catch(e){ return []; }
+  try{
+    const s=localStorage.getItem('bpl_ra2_autoevals');
+    const arr=s?JSON.parse(s):[];
+    return arr.map(a=>({...a,source:a.source||(String(a.id||'').startsWith('portal_')?'portal':'excel')}));
+  }catch(e){ return []; }
 })(); // Autoevaluaciones — mismo formato que saved[], clave bpl_ra2_autoevals
 let cmpShowAE = true;   // Mostrar columna Autoevaluación en formulario
 let cmpShowPrev = true; // Mostrar columna Edición Anterior en formulario
@@ -4501,7 +4505,7 @@ async function loadFromSupabase(){
       autoevals = aeData.map(r=>({
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
         pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{},
-        source:r.source||'excel'
+        source:r.source||(String(r.id||'').startsWith('portal_')?'portal':'excel')
       }));
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
       // Si NO es primera carga, la estructura ya está cargada → recalcular ahora
