@@ -2461,7 +2461,8 @@ let autoevals = __IS_SNAPSHOT_BROWSER ? [] : (function(){
   try{
     const s=localStorage.getItem('bpl_ra2_autoevals');
     const arr=s?JSON.parse(s):[];
-    return arr.map(a=>({...a,source:a.source||(String(a.id||'').startsWith('portal_')?'portal':'excel')}));
+    // Normalizar source: solo 'excel' si fue importado explícitamente; todo lo demás es portal
+    return arr.map(a=>({...a,source:a.source==='excel'?'excel':(a.source==='portal'||String(a.id||'').startsWith('portal_')?'portal':'portal')}));
   }catch(e){ return []; }
 })(); // Autoevaluaciones — mismo formato que saved[], clave bpl_ra2_autoevals
 let cmpShowAE = true;   // Mostrar columna Autoevaluación en formulario
@@ -3917,7 +3918,7 @@ function renderAETable(rows, edicion){
       : null;
     // AE Excel para este distribuidor
     const excelAE = autoevals.find(a=>{
-      if(a.source==='portal') return false;
+      if(a.source!=='excel') return false;
       if(a.distribuidor.trim().toUpperCase()!==d.trim().toUpperCase()) return false;
       if(a.edicion===edicionKey) return true;
       const en=(a.edicion||'').replace(/\D/g,'');
@@ -4633,7 +4634,7 @@ function _getAEFor(distribuidor, edicion){
   const prefKey=distNorm+'|||'+(edicion||'');
   const pref=_aeSourcePref[prefKey];
   if(pref==='excel'){
-    const excel=candidates.find(a=>a.source!=='portal');
+    const excel=candidates.find(a=>a.source==='excel');
     return excel||candidates[0];
   }
   // Default: portal primero (o lo que haya si no hay portal)
@@ -5658,9 +5659,9 @@ function importEVFile(input){
           if(_evIdx>=0) saved[_evIdx]=audit; else saved.push(audit);
           totalEV++;
         } else {
-          const _aeIdx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
+          const _aeIdx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear&&a.source!=='portal';});
           const _aeId=_aeIdx>=0?autoevals[_aeIdx].id:String(Date.now()+Math.random());
-          const ae={id:_aeId,distribuidor:distName,fecha,edicion:edYear,answers,scores:sc};
+          const ae={id:_aeId,distribuidor:distName,fecha,edicion:edYear,pais:cfg.pais||'',answers,scores:sc,source:'excel'};
           if(_aeIdx>=0) autoevals[_aeIdx]=ae; else autoevals.push(ae);
           totalAE++;
         }
@@ -5734,7 +5735,7 @@ function updateAudCnt(){
   const sbAudBadge=document.getElementById('sb-aud-badge');
   if(sbAudBadge) sbAudBadge.textContent=saved.length;
   const aeBadge=document.getElementById('ae-cnt-badge');
-  if(aeBadge) aeBadge.textContent=autoevals.filter(a=>a.source!=='portal').length;
+  if(aeBadge) aeBadge.textContent=autoevals.filter(a=>a.source==='excel').length;
 }
 
 // ── GLOBAL ──
@@ -10968,7 +10969,7 @@ function clearAEByEdPais(pais,ed){
 }
 function renderAEList(){
   const el=document.getElementById('ae-list'); if(!el) return;
-  const excelAEs=autoevals.filter(a=>a.source!=='portal');
+  const excelAEs=autoevals.filter(a=>a.source==='excel');
   if(!excelAEs.length){ el.innerHTML='<span style="color:var(--g400)">Sin autoevaluaciones importadas.</span>'; return; }
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
   const groups={};
