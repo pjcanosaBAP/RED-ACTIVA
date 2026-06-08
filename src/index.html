@@ -2458,13 +2458,13 @@ let devData = (function(){ try{ const d=localStorage.getItem('ra2_devdata'); ret
 function persistDevData(){ try{ localStorage.setItem('ra2_devdata',JSON.stringify(devData)); }catch(e){} }
 function _devKey(dist,ed){ return (dist||'')+'__'+(ed||''); }
 function _normalizeAESource(a){
-  if(a.source==='excel') return 'excel';
-  if(a.source==='portal') return 'portal';
   const id=String(a.id||'');
+  // El formato del ID es definitivo (la fuente puede estar corrupta por bugs previos)
   if(id.startsWith('portal_')) return 'portal';
-  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)) return 'portal'; // UUID → ae_save_answers → portal
-  if(/^\d+(\.\d+)?$/.test(id)) return 'excel'; // timestamp numérico → importado desde Excel
-  return 'portal';
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)) return 'portal'; // UUID de ae_save_answers → portal
+  if(/^\d+(\.\d+)?$/.test(id)) return 'excel';  // timestamp numérico → importado desde Excel
+  // Si el ID no tiene formato reconocible, confiar en el campo source
+  return a.source==='excel' ? 'excel' : 'portal';
 }
 let autoevals = __IS_SNAPSHOT_BROWSER ? [] : (function(){
   try{
@@ -4643,8 +4643,10 @@ function _getAEFor(distribuidor, edicion){
   // Respetar preferencia del usuario (portal vs excel)
   const prefKey=distNorm+'|||'+_prefEdKey(edicion);
   const pref=_aeSourcePref[prefKey];
+  console.log('[AEFor]',distNorm,'ed='+edicion,'pref='+pref,'candidates='+candidates.length,candidates.map(c=>c.source+'@'+c.edicion));
   if(pref==='excel'){
     const excel=candidates.find(a=>a.source==='excel');
+    console.log('[AEFor] excel candidate:',excel?excel.distribuidor+' '+excel.edicion+' src:'+excel.source:'NOT FOUND');
     return excel||candidates[0];
   }
   // Default: portal primero (o lo que haya si no hay portal)
@@ -4722,7 +4724,10 @@ function renderCmpBar(dist, edicion, ae, prev){
     if(ae){
       const aeScore=(ae.scores||{}).total||0;
       const aeAnsCount=Object.keys(ae.answers||{}).length;
-      html+=`<div class="cmp-score-pill csp-ae"><span class="csp-lbl">Autoevaluación ${ae.edicion||edicion}</span><span class="csp-val">${(aeScore*100).toFixed(1)}%</span><span style="font-size:9px;margin-left:4px;color:#a78bfa">${aeAnsCount} resp.</span></div>`;
+      const aeSrcTag=ae.source==='excel'
+        ?'<span style="font-size:9px;background:#7c3aed;color:#fff;border-radius:3px;padding:1px 5px;margin-left:5px">Excel</span>'
+        :'<span style="font-size:9px;background:#2563eb;color:#fff;border-radius:3px;padding:1px 5px;margin-left:5px">Portal</span>';
+      html+=`<div class="cmp-score-pill csp-ae"><span class="csp-lbl">Autoevaluación ${ae.edicion||edicion}</span>${aeSrcTag}<span class="csp-val">${(aeScore*100).toFixed(1)}%</span><span style="font-size:9px;margin-left:4px;color:#a78bfa">${aeAnsCount} resp.</span></div>`;
     } else {
       html+=`<div class="cmp-score-pill csp-ae" style="opacity:.45;border-style:dashed"><span class="csp-lbl">Autoevaluación ${edicion}</span><span class="csp-val" style="font-size:10px;color:var(--g400)">Sin datos</span></div>`;
     }
