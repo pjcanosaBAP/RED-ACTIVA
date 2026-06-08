@@ -4643,15 +4643,25 @@ function _getAEFor(distribuidor, edicion){
   // Respetar preferencia del usuario (portal vs excel)
   const prefKey=distNorm+'|||'+_prefEdKey(edicion);
   const pref=_aeSourcePref[prefKey];
-  console.log('[AEFor]',distNorm,'ed='+edicion,'pref='+pref,'candidates='+candidates.length,candidates.map(c=>c.source+'@'+c.edicion));
   if(pref==='excel'){
+    // 1. Coincidencia exacta de edición (ej: '2026' == '2026' → el importado por Excel)
+    const exactMatch=candidates.find(a=>a.edicion===edicion);
+    if(exactMatch) return exactMatch;
+    // 2. Edición numérica pura (4 dígitos: '2026' antes que 'AE26')
+    const pureYear=candidates.find(a=>/^\d{4}$/.test(a.edicion||''));
+    if(pureYear) return pureYear;
+    // 3. Source explícito excel
     const excel=candidates.find(a=>a.source==='excel');
-    console.log('[AEFor] excel candidate:',excel?excel.distribuidor+' '+excel.edicion+' src:'+excel.source:'NOT FOUND');
     return excel||candidates[0];
   }
-  // Default: portal primero (o lo que haya si no hay portal)
+  // Default portal:
+  // 1. Source explícito portal
   const portal=candidates.find(a=>a.source==='portal');
-  return portal||candidates[0];
+  if(portal) return portal;
+  // 2. Edición en formato campaña (AE26, EV26 → portal)
+  const campaignFmt=candidates.find(a=>/^(AE|EV)\d+$/i.test(a.edicion||''));
+  if(campaignFmt) return campaignFmt;
+  return candidates[0];
 }
 function _getPrevAudit(distribuidor, edicion, overrideEdicion){
   if(overrideEdicion) return saved.find(a=>a.distribuidor===distribuidor&&a.edicion===overrideEdicion)||null;
