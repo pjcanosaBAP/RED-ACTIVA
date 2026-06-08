@@ -7964,71 +7964,7 @@ async function generateDistPPTX(){
     });
   }
 
-  // ── SLIDE 6: ÁREA NO VINCULANTE (si existe) ─────────────
-  const nvSheets=SHEETS_NV();
-  if(nvSheets.length>0){
-    const s=pptx.addSlide(); _bgC(s); _ttl(s,'ÁREA NO VINCULANTE');
-    s.addText('Informativas — no inciden en el resultado global',{x:0.80,y:0.95,w:9.0,h:0.26,fontFace:'Calibri',fontSize:12,color:'7A90A8',valign:'middle'});
-    // Columnas centradas: ATRIBUTO | TOTAL | SI ✓ | NO ✗ | % CUMPL.
-    const nvCols=[
-      {l:'ATRIBUTO',   x:0.80, w:4.80},
-      {l:'TOTAL',      x:5.65, w:1.20},
-      {l:'SI ✓',       x:6.90, w:1.30},
-      {l:'NO ✗',       x:8.25, w:1.30},
-      {l:'% CUMPL.',   x:9.60, w:2.80},
-    ];
-    const NV_X=0.80; const NV_W=11.60;
-    let ty=1.30;
-    nvSheets.forEach(sh=>{
-      const aScore=(sc.areas||{})[sh]||0;
-      const aColor=(AC[sh]||'#607d8b').replace('#','');
-      // Título área destacado
-      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.40,fill:{color:aColor},line:{color:aColor,width:0}});
-      s.addText((AN[sh]||sh),{x:NV_X+0.15,y:ty,w:NV_W-3.20,h:0.40,fontFace:'Calibri',fontSize:15,bold:true,color:'FFFFFF',valign:'middle'});
-      // % alcance destacado a la derecha del header
-      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.06});
-      s.addText('Alcance: '+(aScore*100).toFixed(1)+'%',{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fontFace:'Calibri',fontSize:12,bold:true,color:aColor,align:'center',valign:'middle'});
-      ty+=0.44;
-      // Header columnas
-      nvCols.forEach(c=>{
-        s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-        s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-      });
-      ty+=0.28;
-      // Filas + acumuladores para totales
-      const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
-      let sumTotal=0,sumSi=0,sumNo=0;
-      bplNums.forEach((bk,ri)=>{
-        const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
-        const aqs=Q.filter(q=>q.sheet===sh&&q.bpl_num===bk);
-        const total=aqs.length;
-        const siC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='si').length;
-        const noC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='no').length;
-        const answered=siC+noC; const bpct=answered>0?Math.round(siC/answered*100):0;
-        sumTotal+=total; sumSi+=siC; sumNo+=noC;
-        s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.26,fill:{color:ri%2===0?'F8FAFC':'FFFFFF'},line:{color:'E8EDF3',width:0.5}});
-        s.addText(bName,{x:NV_X+0.10,y:ty,w:4.65,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'3D5573',valign:'middle'});
-        s.addText(String(total),{x:5.65,y:ty,w:1.20,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'243D5E',align:'center',valign:'middle'});
-        s.addText(String(siC),{x:6.90,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
-        s.addText(String(noC),{x:8.25,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
-        const pctColor=_sC(answered>0?siC/answered:0);
-        s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.65,y:ty+0.03,w:2.70,h:0.20,fill:{color:pctColor},line:{color:pctColor,width:0},rectRadius:0.05});
-        s.addText(bpct+'%',{x:9.65,y:ty+0.03,w:2.70,h:0.20,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-        ty+=0.27;
-      });
-      // Fila totales
-      const sumAnswered=sumSi+sumNo; const sumPct=sumAnswered>0?Math.round(sumSi/sumAnswered*100):0;
-      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.28,fill:{color:'E8EDF3'},line:{color:'D1DAE6',width:0.5}});
-      s.addText('TOTAL',{x:NV_X+0.10,y:ty,w:4.65,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',valign:'middle'});
-      s.addText(String(sumTotal),{x:5.65,y:ty,w:1.20,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
-      s.addText(String(sumSi),{x:6.90,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
-      s.addText(String(sumNo),{x:8.25,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
-      // % total omitido intencional
-      ty+=0.38;
-    });
-  }
-
-  // ── SLIDE 7: CONDICIONALES CRÍTICOS ─────────────────────
+  // ── SLIDE 6: CONDICIONALES CRÍTICOS ─────────────────────
   {const s=pptx.addSlide(); _bgC(s); _ttl(s,'CONDICIONALES CRÍTICOS');
     const critStatus=sc.critStatus||{};
     const _isMet=tag=>(critStatus[tag]?.st||critStatus[tag])==='met';
@@ -8122,6 +8058,70 @@ async function generateDistPPTX(){
           fontFace:'Calibri',fontSize:isActive?10:9,bold:true,
           color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
       });
+    });
+  }
+
+  // ── SLIDE 7: ÁREA NO VINCULANTE (si existe) ─────────────
+  const nvSheets=SHEETS_NV();
+  if(nvSheets.length>0){
+    const s=pptx.addSlide(); _bgC(s); _ttl(s,'ÁREA NO VINCULANTE');
+    s.addText('Informativas — no inciden en el resultado global',{x:0.80,y:0.95,w:9.0,h:0.26,fontFace:'Calibri',fontSize:12,color:'7A90A8',valign:'middle'});
+    // Columnas centradas: ATRIBUTO | TOTAL | SI ✓ | NO ✗ | % CUMPL.
+    const nvCols=[
+      {l:'ATRIBUTO',   x:0.80, w:4.80},
+      {l:'TOTAL',      x:5.65, w:1.20},
+      {l:'SI ✓',       x:6.90, w:1.30},
+      {l:'NO ✗',       x:8.25, w:1.30},
+      {l:'% CUMPL.',   x:9.60, w:2.80},
+    ];
+    const NV_X=0.80; const NV_W=11.60;
+    let ty=1.30;
+    nvSheets.forEach(sh=>{
+      const aScore=(sc.areas||{})[sh]||0;
+      const aColor=(AC[sh]||'#607d8b').replace('#','');
+      // Título área destacado
+      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.40,fill:{color:aColor},line:{color:aColor,width:0}});
+      s.addText((AN[sh]||sh),{x:NV_X+0.15,y:ty,w:NV_W-3.20,h:0.40,fontFace:'Calibri',fontSize:15,bold:true,color:'FFFFFF',valign:'middle'});
+      // % alcance destacado a la derecha del header
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.06});
+      s.addText('Alcance: '+(aScore*100).toFixed(1)+'%',{x:NV_X+NV_W-2.80,y:ty+0.05,w:2.70,h:0.30,fontFace:'Calibri',fontSize:12,bold:true,color:aColor,align:'center',valign:'middle'});
+      ty+=0.44;
+      // Header columnas
+      nvCols.forEach(c=>{
+        s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+        s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      });
+      ty+=0.28;
+      // Filas + acumuladores para totales
+      const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
+      let sumTotal=0,sumSi=0,sumNo=0;
+      bplNums.forEach((bk,ri)=>{
+        const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
+        const aqs=Q.filter(q=>q.sheet===sh&&q.bpl_num===bk);
+        const total=aqs.length;
+        const siC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='si').length;
+        const noC=aqs.filter(q=>(curAudit.answers||{})[q.comp_num]==='no').length;
+        const answered=siC+noC; const bpct=answered>0?Math.round(siC/answered*100):0;
+        sumTotal+=total; sumSi+=siC; sumNo+=noC;
+        s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.26,fill:{color:ri%2===0?'F8FAFC':'FFFFFF'},line:{color:'E8EDF3',width:0.5}});
+        s.addText(bName,{x:NV_X+0.10,y:ty,w:4.65,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'3D5573',valign:'middle'});
+        s.addText(String(total),{x:5.65,y:ty,w:1.20,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'243D5E',align:'center',valign:'middle'});
+        s.addText(String(siC),{x:6.90,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
+        s.addText(String(noC),{x:8.25,y:ty,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
+        const pctColor=_sC(answered>0?siC/answered:0);
+        s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:9.65,y:ty+0.03,w:2.70,h:0.20,fill:{color:pctColor},line:{color:pctColor,width:0},rectRadius:0.05});
+        s.addText(bpct+'%',{x:9.65,y:ty+0.03,w:2.70,h:0.20,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+        ty+=0.27;
+      });
+      // Fila totales
+      const sumAnswered=sumSi+sumNo; const sumPct=sumAnswered>0?Math.round(sumSi/sumAnswered*100):0;
+      s.addShape(pptx.shapes.RECTANGLE,{x:NV_X,y:ty,w:NV_W,h:0.28,fill:{color:'E8EDF3'},line:{color:'D1DAE6',width:0.5}});
+      s.addText('TOTAL',{x:NV_X+0.10,y:ty,w:4.65,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',valign:'middle'});
+      s.addText(String(sumTotal),{x:5.65,y:ty,w:1.20,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
+      s.addText(String(sumSi),{x:6.90,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'1D9E6F',align:'center',valign:'middle'});
+      s.addText(String(sumNo),{x:8.25,y:ty,w:1.30,h:0.28,fontFace:'Calibri',fontSize:9.5,bold:true,color:'C0392B',align:'center',valign:'middle'});
+      // % total omitido intencional
+      ty+=0.38;
     });
   }
 
