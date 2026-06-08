@@ -5121,62 +5121,113 @@ function renderDashBrecha(){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🟣 Importá el archivo AE de este distribuidor y edición para ver el análisis de brecha.</div>';
     return;
   }
-  const evAns=audit.answers||{};
-  const aeAns=ae.answers||{};
-  const diffs=[];
+
+  // Scores por área (EV usa los guardados; AE se recalcula con los mismos pesos)
+  const aeScores=computeScores(ae.answers, audit.weights);
+  const evTotal=+((audit.scores.total||0)*100).toFixed(1);
+  const aeTotal=+((aeScores.total||0)*100).toFixed(1);
+  const deltaTotal=+(aeTotal-evTotal).toFixed(1);
+
+  const coreSheets=SHEETS_CORE();
+  const areaData=coreSheets.map(function(sh){
+    const evP=+((( audit.scores.areas||{})[sh]||0)*100).toFixed(1);
+    const aeP=+((aeScores.areas[sh]||0)*100).toFixed(1);
+    return{sh:sh,evPct:evP,aePct:aeP,delta:+(aeP-evP).toFixed(1),name:AN[sh]||sh,color:AC[sh]||'#7a90a8'};
+  });
+  const worstArea=[...areaData].sort(function(a,b){return Math.abs(b.delta)-Math.abs(a.delta);})[0];
+
+  // Preguntas discrepantes
+  const evAns=audit.answers||{}, aeAns=ae.answers||{};
+  const sobreval=[], autocrit=[], totalAnswered={c:0};
   Q.forEach(function(q){
-    const ev=evAns[q.comp_num];
-    const ae2=aeAns[q.comp_num];
-    if(!ev&&!ae2) return;
-    let type='match';
-    if(ev==='si'&&ae2==='no') type='over';
-    else if(ev==='no'&&ae2==='si') type='under';
-    else if(ev!==ae2&&ev&&ae2) type='diff';
-    diffs.push({q:q, ev:ev, ae:ae2, type:type, sh:q.sheet});
+    const ev=evAns[q.comp_num], ae2=aeAns[q.comp_num];
+    if(!ev||!ae2) return;
+    totalAnswered.c++;
+    if(ev==='no'&&ae2==='si') sobreval.push({q:q,sh:q.sheet});   // distrib. creyó cumplir, auditor dijo NO
+    else if(ev==='si'&&ae2==='no') autocrit.push({q:q,sh:q.sheet}); // distrib. fue más duro que el auditor
   });
-  const over=diffs.filter(function(d){return d.type==='over';});
-  const under=diffs.filter(function(d){return d.type==='under';});
-  const match=diffs.filter(function(d){return d.type==='match';});
-  const total=diffs.filter(function(d){return d.ev&&d.ae;}).length;
-  const matchPct=total>0?Math.round(match.length/total*100):0;
-  let h='<div class="dg4" style="margin-bottom:18px">'
-    +'<div class="kpi kpi-teal"><div class="kpi-lbl">Coincidencias</div><div class="kpi-val">'+matchPct+'%</div><div class="kpi-sub">'+match.length+' de '+total+' preguntas</div></div>'
-    +'<div class="kpi kpi-red"><div class="kpi-lbl">EV=SÍ / AE=NO</div><div class="kpi-val">'+over.length+'</div><div class="kpi-sub">sobreautoevaluación</div></div>'
-    +'<div class="kpi kpi-green"><div class="kpi-lbl">EV=NO / AE=SÍ</div><div class="kpi-val">'+under.length+'</div><div class="kpi-sub">subevaluación percibida</div></div>'
-    +'<div class="kpi kpi-blue"><div class="kpi-lbl">Brecha por área</div><div class="kpi-val" style="font-size:14px" id="dash-brecha-areas">—</div><div class="kpi-sub">área más discrepante</div></div>'
-    +'</div>';
-  const sheetDiffs={};
-  SHEETS().forEach(function(sh){sheetDiffs[sh]={over:0,under:0,total:0};});
-  diffs.forEach(function(d){if(d.ev&&d.ae){sheetDiffs[d.sh].total++;if(d.type==='over')sheetDiffs[d.sh].over++;else if(d.type==='under')sheetDiffs[d.sh].under++;}});
-  h+='<div class="sc-card" style="margin-bottom:14px"><div class="sc-h3">Brecha por Área</div><div style="display:flex;gap:10px;flex-wrap:wrap">';
-  SHEETS().forEach(function(sh){
-    const d=sheetDiffs[sh];
-    const total2=d.total;
-    const discr=d.over+d.under;
-    const pct=total2>0?Math.round((total2-discr)/total2*100):100;
-    const color=AC[sh]||'#666';
-    h+='<div style="flex:1;min-width:100px;padding:10px;border:1.5px solid var(--g200);border-radius:8px;text-align:center">'
-      +'<div style="font-size:9px;font-weight:700;color:'+color+';text-transform:uppercase;margin-bottom:4px">'+sh+'</div>'
-      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:'+(pct>=80?'#2e7d32':pct>=60?'#e65100':'#c62828')+'">'+pct+'%</div>'
-      +'<div style="font-size:9px;color:var(--g400)">coincidencia</div></div>';
+
+  // KPIs
+  const dColor=deltaTotal>5?'#d93025':deltaTotal<-5?'#1d9e6f':deltaTotal>2?'#e8920a':'#2f7dc8';
+  const dLabel=deltaTotal>0?'AE sobreestimó':'AE subestimó';
+  const dSign=deltaTotal>0?'+':'';
+  let h=`<div class="dg4" style="margin-bottom:18px">
+    <div class="kpi kpi-blue"><div class="kpi-lbl">Score EV</div><div class="kpi-val">${evTotal}%</div><div class="kpi-sub">evaluación externa</div></div>
+    <div class="kpi kpi-purple"><div class="kpi-lbl">Score AE</div><div class="kpi-val">${aeTotal}%</div><div class="kpi-sub">autoevaluación</div></div>
+    <div class="kpi kpi-amber"><div class="kpi-lbl">Brecha total AE−EV</div><div class="kpi-val" style="color:${dColor}">${dSign}${deltaTotal} pts</div><div class="kpi-sub">${Math.abs(deltaTotal)<1?'sin brecha significativa':dLabel}</div></div>
+    <div class="kpi kpi-red"><div class="kpi-lbl">Área más discrepante</div><div class="kpi-val" style="font-size:16px;color:${worstArea?AC[worstArea.sh]||'#7a90a8':'var(--g400)'}">${worstArea?worstArea.name:'—'}</div><div class="kpi-sub">${worstArea?(worstArea.delta>0?'+':'')+worstArea.delta+' pts':''}</div></div>
+  </div>`;
+
+  // Comparación EV vs AE por área
+  h+=`<div class="sc-card" style="margin-bottom:14px">
+    <div class="sc-h3">Score EV vs AE por Área</div>
+    <div style="margin-bottom:10px;font-size:10px;color:var(--g400);display:flex;gap:16px">
+      <span><span style="display:inline-block;width:14px;height:4px;background:#2f7dc8;border-radius:2px;vertical-align:middle;margin-right:4px"></span>EV — evaluación externa (auditor)</span>
+      <span><span style="display:inline-block;width:14px;height:4px;background:#2f7dc888;border-radius:2px;vertical-align:middle;margin-right:4px;border:1px dashed #2f7dc8"></span>AE — autoevaluación (distribuidor)</span>
+    </div>`;
+
+  areaData.forEach(function(a){
+    const absDelta=Math.abs(a.delta);
+    const dC=a.delta>5?'#d93025':a.delta<-5?'#1d9e6f':a.delta>2?'#e8920a':a.delta<-2?'#2f7dc8':'#7a90a8';
+    const dTxt=a.delta===0?'Sin diferencia':a.delta>0?`AE supera EV en +${a.delta} pts — posible sobreautoevaluación`:`EV supera AE en ${Math.abs(a.delta)} pts — distribuidor fue autocrítico`;
+    h+=`<div style="padding:10px 0;border-bottom:1px solid var(--g100)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+        <span style="font-size:12px;font-weight:700;color:${a.color}">${a.name}</span>
+        <span style="font-size:10px;font-weight:700;color:${dC}">${dTxt}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="font-size:10px;font-weight:700;color:var(--g600);min-width:20px">EV</span>
+        <div style="flex:1;height:9px;background:var(--g100);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${a.evPct}%;background:${a.color};border-radius:4px"></div>
+        </div>
+        <span style="font-size:14px;font-weight:700;color:${a.color};min-width:40px;text-align:right;font-family:'Barlow Condensed',sans-serif">${a.evPct}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;font-weight:700;color:var(--g400);min-width:20px">AE</span>
+        <div style="flex:1;height:9px;background:var(--g100);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${a.aePct}%;background:${a.color}66;border-radius:4px"></div>
+        </div>
+        <span style="font-size:14px;font-weight:700;color:${a.color}99;min-width:40px;text-align:right;font-family:'Barlow Condensed',sans-serif">${a.aePct}%</span>
+      </div>
+    </div>`;
   });
-  h+='</div></div>';
-  if(over.length){
-    h+='<div class="sc-card" style="margin-bottom:14px"><div class="sc-h3">EV=SÍ / AE=NO — Auditor dice SÍ, distribuidor dijo NO ('+over.length+' preguntas)</div>'
-      +'<div style="overflow-x:auto"><table class="brecha-table"><thead><tr><th>Área</th><th>#</th><th>Pregunta</th></tr></thead><tbody>';
-    over.slice(0,30).forEach(function(d){h+='<tr><td style="color:'+(AC[d.sh]||'#666')+';font-weight:700">'+d.q.sheet+'</td><td style="white-space:nowrap">'+d.q.comp_num+'</td><td>'+d.q.question.slice(0,120)+'</td></tr>';});
-    h+='</tbody></table></div></div>';
+  h+='</div>';
+
+  // Tabla sobreautoevaluación (AE=SÍ / EV=NO — más importante, va primero)
+  if(sobreval.length){
+    h+=`<div class="sc-card" style="margin-bottom:14px">
+      <div class="sc-h3">⚠️ Sobreautoevaluación — Distribuidor dijo SÍ, auditor evaluó NO (${sobreval.length} preguntas)</div>
+      <div style="font-size:11px;color:var(--g500);margin-bottom:8px;padding:6px 10px;background:#fce4ec;border-radius:6px;color:#c62828">
+        El distribuidor se autoevaluó como SÍ cumple en estas preguntas, pero el auditor determinó que NO cumple. Son los puntos de mayor riesgo de percepción.
+      </div>
+      <div style="overflow-x:auto"><table class="brecha-table">
+        <thead><tr><th>Área</th><th>#</th><th>Pregunta</th></tr></thead>
+        <tbody>${sobreval.slice(0,30).map(function(d){return'<tr><td style="color:'+(AC[d.sh]||'#666')+';font-weight:700">'+d.q.sheet+'</td><td style="white-space:nowrap;font-size:10px;color:var(--g400)">'+d.q.comp_num+'</td><td style="font-size:11px">'+d.q.question.slice(0,120)+'</td></tr>';}).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
   }
-  if(under.length){
-    h+='<div class="sc-card"><div class="sc-h3">EV=NO / AE=SÍ — Distribuidor dijo SÍ, auditor dice NO ('+under.length+' preguntas)</div>'
-      +'<div style="overflow-x:auto"><table class="brecha-table"><thead><tr><th>Área</th><th>#</th><th>Pregunta</th></tr></thead><tbody>';
-    under.slice(0,30).forEach(function(d){h+='<tr><td style="color:'+(AC[d.sh]||'#666')+';font-weight:700">'+d.q.sheet+'</td><td style="white-space:nowrap">'+d.q.comp_num+'</td><td>'+d.q.question.slice(0,120)+'</td></tr>';});
-    h+='</tbody></table></div></div>';
+
+  // Tabla autocrítico (EV=SÍ / AE=NO)
+  if(autocrit.length){
+    h+=`<div class="sc-card">
+      <div class="sc-h3">✓ Distribuidor autocrítico — Distribuidor dijo NO, auditor evaluó SÍ (${autocrit.length} preguntas)</div>
+      <div style="font-size:11px;margin-bottom:8px;padding:6px 10px;background:#e8f5e9;border-radius:6px;color:#2e7d32">
+        El distribuidor fue más exigente consigo mismo. El auditor determinó SÍ cumple, pero la AE dice NO. Generalmente indica buena cultura de mejora continua.
+      </div>
+      <div style="overflow-x:auto"><table class="brecha-table">
+        <thead><tr><th>Área</th><th>#</th><th>Pregunta</th></tr></thead>
+        <tbody>${autocrit.slice(0,30).map(function(d){return'<tr><td style="color:'+(AC[d.sh]||'#666')+';font-weight:700">'+d.q.sheet+'</td><td style="white-space:nowrap;font-size:10px;color:var(--g400)">'+d.q.comp_num+'</td><td style="font-size:11px">'+d.q.question.slice(0,120)+'</td></tr>';}).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
   }
+
+  if(!sobreval.length&&!autocrit.length){
+    h+='<div style="padding:16px;text-align:center;background:#e8f5e9;border-radius:8px;color:#2e7d32;font-weight:600;font-size:12px">✅ Sin discrepancias entre EV y AE en preguntas individuales</div>';
+  }
+
   wrap.innerHTML=h;
-  const worst=SHEETS().sort(function(a,b){return (sheetDiffs[b].over+sheetDiffs[b].under)-(sheetDiffs[a].over+sheetDiffs[a].under);})[0];
-  const bd=document.getElementById('dash-brecha-areas');
-  if(bd) bd.textContent=worst||'—';
 }
 
 // ══════════════════════════════════════════════════════════
