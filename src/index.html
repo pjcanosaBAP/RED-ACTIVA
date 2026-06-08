@@ -3923,16 +3923,19 @@ function renderAETable(rows, edicion){
   const edNumLocal=(edicionKey||'').replace(/\D/g,'');
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
+    // Portal AE: prioridad 1 = edicion exacta de campaña (ej: 'AE26'), prioridad 2 = fuzzy year
+    const _matchDist=a=>a.distribuidor.trim().toUpperCase()===d.trim().toUpperCase();
+    const _matchEd=a=>a.edicion===edicionKey||(()=>{const en=(a.edicion||'').replace(/\D/g,'');return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);})();
     const aeRow = edicionKey
-      ? autoevals.find(a=>a.distribuidor===d&&(a.edicion===edicionKey||(()=>{const en=(a.edicion||'').replace(/\D/g,'');return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);})()))
+      ? (autoevals.find(a=>_matchDist(a)&&a.edicion===edicionKey&&!_isExcelImportedAE(a)) ||
+         autoevals.find(a=>_matchDist(a)&&_matchEd(a)&&!_isExcelImportedAE(a)) ||
+         autoevals.find(a=>_matchDist(a)&&_matchEd(a)))
       : null;
     // AE Excel para este distribuidor
     const excelAE = autoevals.find(a=>{
-      if(a.source!=='excel') return false;
-      if(a.distribuidor.trim().toUpperCase()!==d.trim().toUpperCase()) return false;
-      if(a.edicion===edicionKey) return true;
-      const en=(a.edicion||'').replace(/\D/g,'');
-      return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);
+      if(!_isExcelImportedAE(a)) return false;
+      if(!_matchDist(a)) return false;
+      return _matchEd(a);
     });
     const prefKey=d.trim().toUpperCase()+'|||'+_prefEdKey(edicionKey);
     const pref=_aeSourcePref[prefKey]||'portal';
