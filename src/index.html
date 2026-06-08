@@ -10263,7 +10263,7 @@ function buildNetworkData(){
     const s=a.scores||{};const at=s.areas||{};const cat=recomputeCategory(a)||'PENDIENTE';
     const row={'Edición':a.edicion||'','Distribuidor':a.distribuidor,'Fecha':a.fecha||'','Auditor':a.auditor||'',
       'Total %':+((s.total||0)*100).toFixed(1),'Categoría':cat,'Crit.':(s.critMet||0)+'/'+CRIT_LIST.length};
-    SHEETS().forEach(sh=>{row[(AN[sh]||sh)+' %']=+((at[sh]||0)*100).toFixed(1);});
+    SHEETS().forEach(sh=>{const hasAns=Q.some(q=>q.sheet===sh&&(a.answers||{})[q.comp_num]!==undefined);row[(AN[sh]||sh)+' %']=hasAns?+((at[sh]||0)*100).toFixed(1):null;});
     return row;
   });
 
@@ -10390,8 +10390,10 @@ function dbScoreBy(data,key){const g={};data.forEach(r=>{const k=r[key];if(!k)re
 function dbRenderAreas(){
   const AREA_COLORS=dbAreaColorsMap(),d=dbG.detalle;
   const filterArea=(document.getElementById('nw-area-filter')||{}).value||'all';
-  const allAreas=SHEETS().map(sh=>AN[sh]||sh),coreAreas=SHEETS_CORE().map(sh=>AN[sh]||sh);
   const areaScores=dbScoreBy(d,'Área');
+  // Solo áreas con datos reales en el filtro activo (evita columnas/cards vacíos)
+  const allAreas=SHEETS().map(sh=>AN[sh]||sh).filter(a=>a in areaScores);
+  const coreAreas=SHEETS_CORE().map(sh=>AN[sh]||sh).filter(a=>a in areaScores);
   const dists=[...new Set(dbG.resumen.map(r=>r['Distribuidor']))];
   const totalByDist={};dbG.resumen.forEach(r=>{totalByDist[r['Distribuidor']]=r['Total %'];});
   const tableRows=[...dists].sort((a,b)=>(totalByDist[b]||0)-(totalByDist[a]||0)).map(dist=>{
@@ -10404,7 +10406,7 @@ function dbRenderAreas(){
       <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:${dbScoreColor(totalByDist[dist]||0)};font-weight:700;text-align:center">${totalByDist[dist]||'—'}%</td>
       ${areasCells}<td style="padding:7px 10px;border-bottom:1px solid #f0f4f8">${dbCatBadge(cat)}</td></tr>`;}).join('');
   const filtAreas=filterArea==='all'?allAreas:[filterArea];
-  const nvAreasArr=SHEETS_NV().map(sh=>AN[sh]||sh);
+  const nvAreasArr=SHEETS_NV().map(sh=>AN[sh]||sh).filter(a=>a in areaScores);
   const nvAreaNamesSet=new Set(nvAreasArr);
   const _areaCard=(a,isNV)=>{const score=areaScores[a]||0,color=AREA_COLORS[a]||'#7a90a8';
     return isNV
@@ -10477,7 +10479,7 @@ function dbRenderBPL(){
         <thead><tr style="background:#f0f4f8">${['Nº','BPL','Área','Score %','SI','NO','Total'].map(h=>`<th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;white-space:nowrap">${h}</th>`).join('')}</tr></thead>
         <tbody>${bplEntries.map(b=>`<tr><td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#9ca3af">${b.num===999?'—':b.num}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.key}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:${AREA_COLORS[b.area]||'#7a90a8'};font-size:11px;font-weight:600;${new Set(SHEETS_NV().map(s=>AN[s]||s)).has(b.area)?'font-style:italic;opacity:.7':''}">${b.area||'—'}${new Set(SHEETS_NV().map(s=>AN[s]||s)).has(b.area)?'<span style="font-size:8px;margin-left:4px;vertical-align:super">⚪</span>':''}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:${AREA_COLORS[b.area]||'#7a90a8'};font-size:11px;font-weight:600;${!!NV[SHEETS().find(s=>(AN[s]||s)===b.area)||'']?'font-style:italic;opacity:.7':''}">${b.area||'—'}${!!NV[SHEETS().find(s=>(AN[s]||s)===b.area)||'']?'<span style="font-size:8px;margin-left:4px;vertical-align:super">⚪</span>':''}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:600;color:${dbScoreColor(b.score)}">${b.score}%</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#1d9e6f">${b.si}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#d93025">${b.no}</td>
@@ -10703,12 +10705,16 @@ function dbRenderDistribuidores(){
   const AREA_COLORS=dbAreaColorsMap();
   const filterCat=(document.getElementById('nw-dist-cat')||{}).value||'all';
   const sortBy=(document.getElementById('nw-dist-sort')||{}).value||'total';
-  const allAreas=SHEETS().map(sh=>AN[sh]||sh),coreAreas=SHEETS_CORE().map(sh=>AN[sh]||sh);
+  const coreAreas=SHEETS_CORE().map(sh=>AN[sh]||sh);
   const sortKey=sortBy==='total'?'Total %':((coreAreas.find(a=>a.toLowerCase().includes(sortBy.toLowerCase()))||coreAreas[0])+' %');
   let dists=[...dbG.resumen];
   if(filterCat!=='all')dists=dists.filter(r=>r['Categoría']===filterCat);
   dists.sort((a,b)=>(b[sortKey]||0)-(a[sortKey]||0));
+  // Solo incluir áreas con datos reales en el filtro activo
+  const allAreas=SHEETS().map(sh=>AN[sh]||sh).filter(a=>dists.some(d=>d[a+' %']!=null));
   const cats=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
+  const _nvAllNames=new Set(SHEETS_NV().map(s=>AN[s]||s));
+  const nvWithDataSet=new Set([..._nvAllNames].filter(a=>allAreas.includes(a)));
   document.getElementById('nw-panel-distribuidores').innerHTML=`
     <div class="db-filter-bar">
       <span class="db-filter-lbl">Categoría:</span>
@@ -10722,7 +10728,7 @@ function dbRenderDistribuidores(){
       <div style="height:${Math.max(260,dists.length*22)}px;position:relative"><canvas id="nw-chart-dist-areas"></canvas></div></div>
     <div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Tabla Completa de Distribuidores</span></div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f0f4f8">${['#','Distribuidor','Total %',...allAreas,'Crit.','Categoría'].map(h=>{const isNVh=new Set(SHEETS_NV().map(s=>AN[s]||s)).has(h);return`<th style="padding:8px 10px;font-size:10px;color:${isNVh?'#a3b3c8':'#7a90a8'};font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;white-space:nowrap${isNVh?';font-style:italic':''}">${h}${isNVh?'<br><span style="font-size:7px;font-style:normal">⚪ NV</span>':''}</th>`;}).join('')}</tr></thead>
+        <thead><tr style="background:#f0f4f8">${['#','Distribuidor','Total %',...allAreas,'Crit.','Categoría'].map(h=>{const isNVh=nvWithDataSet.has(h);return`<th style="padding:8px 10px;font-size:10px;color:${isNVh?'#a3b3c8':'#7a90a8'};font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;white-space:nowrap${isNVh?';font-style:italic':''}">${h}${isNVh?'<br><span style="font-size:7px;font-style:normal">⚪ NV</span>':''}</th>`;}).join('')}</tr></thead>
         <tbody>${dists.map((d,i)=>`<tr style="${i%2?'background:#f9fafb':''}">
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#9ca3af;font-size:11px">${i+1}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d['Distribuidor']}</td>
@@ -10734,7 +10740,7 @@ function dbRenderDistribuidores(){
   const PALETTE=allAreas.map(a=>AREA_COLORS[a]||'#7a90a8');
   dbCharts['nw-chart-dist-areas']=new Chart(document.getElementById('nw-chart-dist-areas'),{type:'bar',
     data:{labels:dists.map(d=>d['Distribuidor'].length>22?d['Distribuidor'].substring(0,20)+'..':d['Distribuidor']),
-      datasets:allAreas.map((a,i)=>{const isNV=new Set(SHEETS_NV().map(s=>AN[s]||s)).has(a);return{label:a+(isNV?' ⚪':''),data:dists.map(d=>d[a+' %']!=null?d[a+' %']:null),backgroundColor:PALETTE[i]+(isNV?'1a':'44'),borderColor:PALETTE[i]+(isNV?'66':''),borderWidth:1,borderRadius:2};})},
+      datasets:allAreas.map((a,i)=>{const isNV=nvWithDataSet.has(a);return{label:a+(isNV?' ⚪':''),data:dists.map(d=>d[a+' %']!=null?d[a+' %']:null),backgroundColor:PALETTE[i]+(isNV?'1a':'44'),borderColor:PALETTE[i]+(isNV?'66':''),borderWidth:1,borderRadius:2};})},
     options:{responsive:true,maintainAspectRatio:false,scales:{x:{ticks:{font:{size:9},maxRotation:45},grid:{display:false}},y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#e8edf3'}}},plugins:{legend:{labels:{font:{size:10}}}}}
   });
 }
