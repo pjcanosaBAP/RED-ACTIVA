@@ -2457,12 +2457,20 @@ let saved = __IS_SNAPSHOT_BROWSER ? [] : (function(){
 let devData = (function(){ try{ const d=localStorage.getItem('ra2_devdata'); return d?JSON.parse(d):{};} catch(e){return {};} })();
 function persistDevData(){ try{ localStorage.setItem('ra2_devdata',JSON.stringify(devData)); }catch(e){} }
 function _devKey(dist,ed){ return (dist||'')+'__'+(ed||''); }
+function _normalizeAESource(a){
+  if(a.source==='excel') return 'excel';
+  if(a.source==='portal') return 'portal';
+  const id=String(a.id||'');
+  if(id.startsWith('portal_')) return 'portal';
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)) return 'portal'; // UUID → ae_save_answers → portal
+  if(/^\d+(\.\d+)?$/.test(id)) return 'excel'; // timestamp numérico → importado desde Excel
+  return 'portal';
+}
 let autoevals = __IS_SNAPSHOT_BROWSER ? [] : (function(){
   try{
     const s=localStorage.getItem('bpl_ra2_autoevals');
     const arr=s?JSON.parse(s):[];
-    // Normalizar source: solo 'excel' si fue importado explícitamente; todo lo demás es portal
-    return arr.map(a=>({...a,source:a.source==='excel'?'excel':(a.source==='portal'||String(a.id||'').startsWith('portal_')?'portal':'portal')}));
+    return arr.map(a=>({...a,source:_normalizeAESource(a)}));
   }catch(e){ return []; }
 })(); // Autoevaluaciones — mismo formato que saved[], clave bpl_ra2_autoevals
 let cmpShowAE = true;   // Mostrar columna Autoevaluación en formulario
@@ -3651,8 +3659,10 @@ async function persist(){
 // ── AE SOURCE PREFERENCE (portal vs excel por distribuidor) ──────────────────
 let _aeSourcePref=(function(){try{const s=localStorage.getItem('bpl_ae_src_pref');return s?JSON.parse(s):{};}catch(e){return {};}})();
 function _saveAESrcPref(){try{localStorage.setItem('bpl_ae_src_pref',JSON.stringify(_aeSourcePref));}catch(e){}}
+// Normalizar edición a dígitos (últimos 2) para que "AE25", "EV25", "2025" sean la misma clave
+function _prefEdKey(e){const n=(e||'').replace(/\D/g,'');return n.length===4?n.slice(-2):n;}
 function aeToggleAESrc(dist,edicion,src){
-  const key=dist.trim().toUpperCase()+'|||'+(edicion||'');
+  const key=dist.trim().toUpperCase()+'|||'+_prefEdKey(edicion);
   _aeSourcePref[key]=src;
   _saveAESrcPref();
   renderAETable(_aeAccessRows,_aeCampaignEdicion);
@@ -3924,7 +3934,7 @@ function renderAETable(rows, edicion){
       const en=(a.edicion||'').replace(/\D/g,'');
       return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);
     });
-    const prefKey=d.trim().toUpperCase()+'|||'+edicionKey;
+    const prefKey=d.trim().toUpperCase()+'|||'+_prefEdKey(edicionKey);
     const pref=_aeSourcePref[prefKey]||'portal';
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
     // Score ponderado usando estructura de la campaña (misma lógica que _calcAEScore)
@@ -4549,7 +4559,7 @@ async function loadFromSupabase(){
       autoevals = aeData.map(r=>({
         id:r.id, distribuidor:r.distribuidor, edicion:r.edicion,
         pais:r.pais||'', fecha:r.fecha||'', answers:r.answers||{}, scores:r.scores||{},
-        source:r.source||(String(r.id||'').startsWith('portal_')?'portal':'excel')
+        source:_normalizeAESource(r)
       }));
       localStorage.setItem('bpl_ra2_autoevals', JSON.stringify(autoevals));
       // Si NO es primera carga, la estructura ya está cargada → recalcular ahora
@@ -4631,7 +4641,7 @@ function _getAEFor(distribuidor, edicion){
   });
   if(!candidates.length) return null;
   // Respetar preferencia del usuario (portal vs excel)
-  const prefKey=distNorm+'|||'+(edicion||'');
+  const prefKey=distNorm+'|||'+_prefEdKey(edicion);
   const pref=_aeSourcePref[prefKey];
   if(pref==='excel'){
     const excel=candidates.find(a=>a.source==='excel');
