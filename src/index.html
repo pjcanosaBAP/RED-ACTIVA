@@ -3926,10 +3926,10 @@ function renderAETable(rows, edicion){
     // Portal AE: prioridad 1 = edicion exacta de campaña (ej: 'AE26'), prioridad 2 = fuzzy year
     const _matchDist=a=>a.distribuidor.trim().toUpperCase()===d.trim().toUpperCase();
     const _matchEd=a=>a.edicion===edicionKey||(()=>{const en=(a.edicion||'').replace(/\D/g,'');return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);})();
+    // aeRow = solo AE del portal (nunca mostrar AE Excel en el panel del portal)
     const aeRow = edicionKey
       ? (autoevals.find(a=>_matchDist(a)&&a.edicion===edicionKey&&!_isExcelImportedAE(a)) ||
-         autoevals.find(a=>_matchDist(a)&&_matchEd(a)&&!_isExcelImportedAE(a)) ||
-         autoevals.find(a=>_matchDist(a)&&_matchEd(a)))
+         autoevals.find(a=>_matchDist(a)&&_matchEd(a)&&!_isExcelImportedAE(a)))
       : null;
     // AE Excel para este distribuidor
     const excelAE = autoevals.find(a=>{
