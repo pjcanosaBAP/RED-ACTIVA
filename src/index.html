@@ -10971,30 +10971,40 @@ function _aeResetAccess(distribuidor, edicion){
         .then(()=>{ try{ aeRefreshStatus(); }catch(e){} });
     });
 }
+// AE "importada desde Excel" = source explícito 'excel' Y edición numérica (2025, 2026)
+// Las AEs del portal tienen edición tipo 'AE26', 'EV26' — no deben aparecer aquí
+function _isExcelImportedAE(a){
+  if(!a) return false;
+  const ed=String(a.edicion||'');
+  const id=String(a.id||'');
+  if(a.source==='portal') return false;
+  if(id.startsWith('portal_')||/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)) return false; // ID portal
+  if(/^(AE|EV)\d+/i.test(ed)) return false; // edición en formato campaña → portal
+  return a.source==='excel' || /^\d{4}$/.test(ed) || /^\d+(\.\d+)?$/.test(id);
+}
 function deleteAE(id){
   const ae=autoevals.find(a=>String(a.id)===String(id));
-  if(!ae||!confirm('¿Eliminar autoevaluación de '+ae.distribuidor+'?\nEsto la volverá a estado Pendiente en el portal.')) return;
+  if(!ae) return;
+  if(!_isExcelImportedAE(ae)){ showToast('⚠️ Esta AE es del portal y no se puede eliminar desde aquí'); return; }
+  if(!confirm('¿Eliminar autoevaluación de '+ae.distribuidor+'?')) return;
   autoevals=autoevals.filter(a=>String(a.id)!==String(id));
   if(_sbc&&_sbOnline) _sbc.from('autoevals').delete().eq('id',String(id)).then(({error})=>{if(error)console.warn('[SB] deleteAE:',error.message);});
-  _aeResetAccess(ae.distribuidor, ae.edicion||'');
   persist(); updateAudCnt(); renderAEList();
-  showToast('🗑 AE eliminada: '+ae.distribuidor+' → vuelve a Pendiente');
+  showToast('🗑 AE Excel eliminada: '+ae.distribuidor);
 }
 function clearAEByEdPais(pais,ed){
-  if(!confirm('¿Eliminar todas las AE de '+pais+' '+ed+'?\nVolverán a estado Pendiente en el portal.')) return;
-  const toDelete=autoevals.filter(a=>(a.pais||'—')===pais&&(a.edicion||'—')===ed);
+  if(!confirm('¿Eliminar todas las AE de '+pais+' '+ed+'?')) return;
+  const toDelete=autoevals.filter(a=>(a.pais||'—')===pais&&(a.edicion||'—')===ed&&_isExcelImportedAE(a));
   const ids=toDelete.map(a=>String(a.id));
-  autoevals=autoevals.filter(a=>!((a.pais||'—')===pais&&(a.edicion||'—')===ed));
+  if(!ids.length){ showToast('Sin AE Excel para eliminar'); return; }
+  autoevals=autoevals.filter(a=>!ids.includes(String(a.id)));
   if(_sbc&&_sbOnline&&ids.length) _sbc.from('autoevals').delete().in('id',ids).then(({error})=>{if(error)console.warn('[SB] clearAEByEdPais:',error.message);});
-  // Resetear ae_access para todos
-  if(_sbc&&_sbOnline) _sbc.from('ae_campaigns').select('id').eq('pais',pais).eq('edicion',ed).maybeSingle()
-    .then(({data:c})=>{ if(c) _sbc.from('ae_access').update({submitted:false,unlock_requested:false,unlock_granted:false}).eq('campaign_id',c.id).then(()=>{ try{aeRefreshStatus();}catch(e){} }); });
   persist(); updateAudCnt(); renderAEList();
-  showToast('🗑 AE '+pais+' '+ed+' eliminadas → vuelven a Pendiente');
+  showToast('🗑 AE Excel '+pais+' '+ed+' eliminadas');
 }
 function renderAEList(){
   const el=document.getElementById('ae-list'); if(!el) return;
-  const excelAEs=autoevals.filter(a=>a.source==='excel');
+  const excelAEs=autoevals.filter(_isExcelImportedAE);
   if(!excelAEs.length){ el.innerHTML='<span style="color:var(--g400)">Sin autoevaluaciones importadas.</span>'; return; }
   const flags={URUGUAY:'🇺🇾',ARGENTINA:'🇦🇷',CHILE:'🇨🇱',BRASIL:'🇧🇷',PARAGUAY:'🇵🇾',PERU:'🇵🇪',COLOMBIA:'🇨🇴',MEXICO:'🇲🇽'};
   const groups={};
