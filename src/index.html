@@ -10534,7 +10534,7 @@ function dbRenderCriticos(){
       ]
     },
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      layout:{padding:{left:12}},
+      layout:{padding:{left:30}},
       scales:{
         x:{stacked:true,grid:{color:'#e8edf3'},ticks:{font:{size:10}}},
         y:{stacked:true,grid:{display:false},ticks:{font:{size:11},crossAlign:'far'}}
@@ -10557,15 +10557,25 @@ function dbRenderCriticos(){
         const N=critStats.length;
         const rowH=N>1?Math.abs(scales.y.getPixelForTick(1)-scales.y.getPixelForTick(0)):30;
         const half=rowH*0.45;
-        // Build area groups and draw a colored vertical bar per group in the left padding
         let gs=0;
         for(let i=1;i<=N;i++){
           if(i===N||critStats[i].sheet!==critStats[gs].sheet){
-            const aColor=AC[critStats[gs].sheet]||'#7a90a8';
+            const sheet=critStats[gs].sheet;
+            const aColor=AC[sheet]||'#7a90a8';
+            const aName=(AN[sheet]||sheet).toUpperCase();
             const yTop=scales.y.getPixelForTick(gs)-half;
             const yBot=scales.y.getPixelForTick(i-1)+half;
-            ctx.save();ctx.fillStyle=aColor;
-            ctx.fillRect(2,yTop+2,5,yBot-yTop-4);
+            const yCenter=(yTop+yBot)/2;
+            const groupH=yBot-yTop;
+            // Barra de color (x=24, ancho=6)
+            ctx.save();ctx.fillStyle=aColor;ctx.fillRect(24,yTop+2,6,groupH-4);ctx.restore();
+            // Nombre del área rotado verticalmente (x=0..23)
+            ctx.save();
+            ctx.beginPath();ctx.rect(0,yTop,23,groupH);ctx.clip();
+            ctx.translate(12,yCenter);ctx.rotate(-Math.PI/2);
+            ctx.font="bold 9px 'Barlow Condensed',sans-serif";
+            ctx.fillStyle=aColor;ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText(aName,0,0);
             ctx.restore();
             gs=i;
           }
