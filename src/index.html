@@ -10672,16 +10672,19 @@ function dbRenderCriticos(){
               <th style="padding:8px 6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;white-space:nowrap">Cat.</th>
               ${critStats.map(c=>`<th style="padding:6px 4px;text-align:center;font-size:9px;color:${AC[c.sheet]||'#7a90a8'};font-weight:700;border-bottom:2px solid #d1dae6;white-space:nowrap;min-width:32px" title="${c.subattr||c.name.replace(/^C\d+ - /,'')}">C${c.num}</th>`).join('')}
               <th style="padding:8px 6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;border-left:2px solid #d1dae6;white-space:nowrap">Fallos</th>
+              <th style="padding:8px 6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;border-left:1px solid #e8edf3;white-space:nowrap">% cumpl.</th>
             </tr>
             <tr style="background:#fafbfc">
               <th colspan="2" style="padding:3px 10px;font-size:9px;color:#b0bcc8;font-weight:400;border-bottom:1px solid #e8edf3;text-align:left">ordenado por mayor cantidad de fallos ↓</th>
               ${critStats.map(c=>`<th style="padding:3px 2px;text-align:center;border-bottom:1px solid #e8edf3"><div style="width:5px;height:5px;border-radius:50%;background:${AC[c.sheet]||'#ccc'};margin:0 auto"></div></th>`).join('')}
               <th style="border-bottom:1px solid #e8edf3;border-left:2px solid #d1dae6"></th>
+              <th style="border-bottom:1px solid #e8edf3;border-left:1px solid #e8edf3"></th>
             </tr>
           </thead>
           <tbody>
             ${mRows.map((row,ri)=>{
               const fallos=critCols.filter(c=>row[c]==='NO CUMPLE').length;
+              const cumplePct=Math.round((critCols.length-fallos)/critCols.length*100);
               const fColor=fallos===0?'#1d9e6f':fallos<=2?'#2f7dc8':fallos<=5?'#e8920a':'#d93025';
               const bg=ri%2===0?'#fff':'#fafbfc';
               return`<tr style="background:${bg};border-bottom:1px solid #f0f4f8">
@@ -10694,9 +10697,22 @@ function dbRenderCriticos(){
                   return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px">·</td>`;
                 }).join('')}
                 <td style="text-align:center;padding:6px 6px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:${fColor};border-left:2px solid #e8edf3">${fallos}</td>
+                <td style="text-align:center;padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:${fColor};border-left:1px solid #e8edf3">${cumplePct}%</td>
               </tr>`;
             }).join('')}
           </tbody>
+          <tfoot>
+            <tr style="background:#f0f4f8;border-top:2px solid #d1dae6">
+              <td colspan="2" style="padding:7px 10px;font-size:10px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px">% cumpl. por BPL crítica</td>
+              ${critStats.map(c=>{
+                const pct=Math.round((total-c.nc)/total*100);
+                const col=pct>=70?'#1d9e6f':pct>=50?'#e8920a':'#d93025';
+                return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col}">${pct}%</td>`;
+              }).join('')}
+              <td style="border-left:2px solid #d1dae6"></td>
+              <td style="border-left:1px solid #e8edf3"></td>
+            </tr>
+          </tfoot>
         </table></div>`;
       })()}
     </div>`;
