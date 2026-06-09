@@ -10851,7 +10851,8 @@ function dbRenderNV(){
 
   // Per-BPL stats por área NV (desde dbG.detalle, filtrando por sheet code)
   const nvAreaBPLs=nvSheets.map(sh=>{
-    const areaDetail=dbG.detalle.filter(row=>row['Área']===sh);
+    const areaName=AN[sh]||sh;
+    const areaDetail=dbG.detalle.filter(row=>row['Área']===areaName);
     const bplMap={};
     areaDetail.forEach(row=>{
       const k=row['BPL'];if(!k||!k.trim())return;
