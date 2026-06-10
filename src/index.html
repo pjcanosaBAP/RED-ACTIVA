@@ -10932,7 +10932,7 @@ function dbRenderNV(){
     </div>`).join('')}
   </div>`;
 
-  nvAreaBPLs.forEach(({sh,name,color,bpls,bplQsMap,qStats,bplDistComply})=>{
+  nvAreaBPLs.forEach(({sh,name,color,bpls,bplQsMap,qStats,areaDetail,bplDistComply})=>{
     const chartId='nw-chart-nv-'+sh;
     const chartH=Math.max(180,bpls.length*30);
 
