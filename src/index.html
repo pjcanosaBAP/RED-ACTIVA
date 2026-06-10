@@ -10840,9 +10840,12 @@ function dbRenderNV(){
   const r=dbG.resumen;if(!r.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400)">No hay datos cargados.</div>';return;}
   const nvSheets=SHEETS_NV();
   if(!nvSheets.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400);font-size:12px">Esta edición no tiene áreas No Vinculantes.</div>';return;}
-  const edFilt=(document.getElementById('nw-filter-ed')||{}).value||'all';
+  // Same filters as buildNetworkData
+  const edFilt=(document.getElementById('nw-ed-filter')||{}).value||'';
+  const paisFilt=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
   const loadedDistNames=new Set(r.map(x=>x['Distribuidor']));
-  const loadedAudits=saved.filter(a=>loadedDistNames.has(a.distribuidor)&&(edFilt==='all'||a.edicion===edFilt));
+  const loadedAudits=saved.filter(a=>loadedDistNames.has(a.distribuidor)&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
+  loadedAudits.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const auditByDist={};loadedAudits.forEach(a=>{if(!auditByDist[a.distribuidor])auditByDist[a.distribuidor]=a;});
 
   const nvAreaData=nvSheets.map(sh=>{
@@ -10897,16 +10900,16 @@ function dbRenderNV(){
       return{idx:idx+1,comp_num:q.comp_num,question:q.question,bpl_name:q.bpl_name,bpl_key,bpl_num:q.bpl_num,si,no,total:tot,score:tot?+(si/tot*100).toFixed(1):null};
     });
 
-    // bplDistComply: % of distributors (with audits) where ALL questions in BPL are SÍ
+    // bplDistComply: % of distributors where ALL responses in this BPL are SÍ (from areaDetail — same source as BPL table)
     const bplDistComply={};
     bpls.forEach(b=>{
-      const qs=bplQsMap[b.bpl];
-      if(!qs||!qs.length||!distsWithAudit.length){bplDistComply[b.bpl]=null;return;}
-      const comply=distsWithAudit.filter(distRow=>{
-        const ans=auditByDist[distRow['Distribuidor']].answers||{};
-        return qs.every(q=>_isSI(ans[q.comp_num]));
+      const dWithData=sortedDists.filter(d=>areaDetail.some(row=>row['Distribuidor']===d['Distribuidor']&&row['BPL']===b.bpl));
+      if(!dWithData.length){bplDistComply[b.bpl]=null;return;}
+      const comply=dWithData.filter(d=>{
+        const rows=areaDetail.filter(row=>row['Distribuidor']===d['Distribuidor']&&row['BPL']===b.bpl);
+        return rows.length&&rows.every(row=>row['Respuesta']==='SI');
       }).length;
-      bplDistComply[b.bpl]=Math.round(comply/distsWithAudit.length*100);
+      bplDistComply[b.bpl]=Math.round(comply/dWithData.length*100);
     });
 
     return{sh,name:areaName,color,bpls,bplQsMap,qStats,areaDetail,bplDistComply};
@@ -10991,17 +10994,16 @@ function dbRenderNV(){
         </thead>
         <tbody>${sortedDists.map((distRow,ri)=>{
           const dist=distRow['Distribuidor'];
-          const audit=auditByDist[dist];
-          let cumple=0,hasSome=false;
+          let cumple=0,bplsConDatos=0;
           const cells=bpls.map(b=>{
-            const qs=bplQsMap[b.bpl];
-            if(!audit||!qs||!qs.length)return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px">·</td>`;
-            hasSome=true;
-            const allSI=qs.every(q=>_isSI((audit.answers||{})[q.comp_num]));
+            const rows=areaDetail.filter(row=>row['Distribuidor']===dist&&row['BPL']===b.bpl);
+            if(!rows.length)return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px">·</td>`;
+            bplsConDatos++;
+            const allSI=rows.every(row=>row['Respuesta']==='SI');
             if(allSI){cumple++;return`<td style="text-align:center;padding:5px 2px;color:#1d9e6f;font-size:15px">✓</td>`;}
             return`<td style="text-align:center;padding:5px 2px;color:#d93025;font-size:15px;background:#fce4ec44">✗</td>`;
           });
-          const pct=hasSome?Math.round(cumple/bpls.length*100):null;
+          const pct=bplsConDatos?Math.round(cumple/bpls.length*100):null;
           const pColor=pct==null?'#9ca3af':pct>=70?'#1d9e6f':pct>=50?'#e8920a':'#d93025';
           const bg=ri%2===0?'#fff':'#fafbfc';
           return`<tr style="background:${bg};border-bottom:1px solid #f0f4f8">
