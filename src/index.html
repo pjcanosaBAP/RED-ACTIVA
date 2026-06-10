@@ -10840,8 +10840,11 @@ function dbRenderNV(){
   const r=dbG.resumen;if(!r.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400)">No hay datos cargados.</div>';return;}
   const nvSheets=SHEETS_NV();
   if(!nvSheets.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400);font-size:12px">Esta edición no tiene áreas No Vinculantes.</div>';return;}
+  const edFilt=(document.getElementById('nw-filter-ed')||{}).value||'all';
+  const loadedDistNames=new Set(r.map(x=>x['Distribuidor']));
+  const loadedAudits=saved.filter(a=>loadedDistNames.has(a.distribuidor)&&(edFilt==='all'||a.edicion===edFilt));
+  const auditByDist={};loadedAudits.forEach(a=>{if(!auditByDist[a.distribuidor])auditByDist[a.distribuidor]=a;});
 
-  // Summary cards (score promedio por área NV)
   const nvAreaData=nvSheets.map(sh=>{
     const name=AN[sh]||sh,color=AC[sh]||'#7a90a8',key=name+' %';
     const vals=r.map(x=>x[key]).filter(v=>v!=null);
@@ -10849,27 +10852,72 @@ function dbRenderNV(){
   }).filter(Boolean);
   if(!nvAreaData.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--g400);font-size:12px">No hay datos NV para los distribuidores cargados.</div>';return;}
 
-  // Per-BPL stats por área NV (desde dbG.detalle, filtrando por sheet code)
+  const sortedDists=[...r].sort((a,b)=>(b['Total %']||0)-(a['Total %']||0));
+  const distsWithAudit=sortedDists.filter(d=>auditByDist[d['Distribuidor']]);
+
+  const _isSI=ans=>ans==='SI'||ans===1||ans===true||String(ans||'').toUpperCase()==='SI';
+
   const nvAreaBPLs=nvSheets.map(sh=>{
-    const areaName=AN[sh]||sh;
+    const areaName=AN[sh]||sh,color=AC[sh]||'#7a90a8';
     const areaDetail=dbG.detalle.filter(row=>row['Área']===areaName);
+
+    // Aggregate BPL scores from detalle (all responses across all distributors)
     const bplMap={};
     areaDetail.forEach(row=>{
       const k=row['BPL'];if(!k||!k.trim())return;
       if(!bplMap[k])bplMap[k]={si:0,no:0};
       if(row['Respuesta']==='SI')bplMap[k].si++;else bplMap[k].no++;
     });
-    const bpls=Object.entries(bplMap)
-      .map(([k,v])=>({bpl:k,score:+(v.si/(v.si+v.no)*100).toFixed(1),si:v.si,no:v.no,total:v.si+v.no,num:parseInt(k)||999}))
-      .sort((a,b)=>a.num-b.num);
-    return{sh,name:AN[sh]||sh,color:AC[sh]||'#7a90a8',bpls,areaDetail};
-  }).filter(x=>x.bpls.length);
 
-  const sortedDists=[...r].sort((a,b)=>(b['Total %']||0)-(a['Total %']||0));
+    // N questions per BPL from Q[]
+    const bplQCountMap={};
+    Q.filter(q=>q.sheet===sh).forEach(q=>{if(q.bpl_name)bplQCountMap[q.bpl_name]=(bplQCountMap[q.bpl_name]||0)+1;});
+
+    const bpls=Object.entries(bplMap).map(([k,v])=>{
+      const nPreg=bplQCountMap[k]||0;
+      const shortName=k.replace(/^\d+[\.\-\s]+/,'').trim()||k;
+      const disp=shortName.length>22?shortName.substring(0,20)+'..':shortName;
+      return{bpl:k,shortName,disp,score:+(v.si/(v.si+v.no)*100).toFixed(1),si:v.si,no:v.no,total:v.si+v.no,nPreg,num:parseInt(k)||999};
+    }).sort((a,b)=>a.num-b.num);
+
+    // Map bpl_name → Q[] questions for matrix logic
+    const bplQsMap={};
+    bpls.forEach(b=>{bplQsMap[b.bpl]=Q.filter(q=>q.sheet===sh&&q.bpl_name===b.bpl);});
+
+    // Per-question aggregated stats (from auditByDist)
+    const nvQs=Q.filter(q=>q.sheet===sh);
+    const qStats=nvQs.map((q,idx)=>{
+      let si=0,no=0;
+      distsWithAudit.forEach(distRow=>{
+        const ans=(auditByDist[distRow['Distribuidor']].answers||{})[q.comp_num];
+        if(_isSI(ans))si++;else if(ans!=null&&ans!=='')no++;
+      });
+      const tot=si+no;
+      return{idx:idx+1,comp_num:q.comp_num,question:q.question,bpl_name:q.bpl_name,bpl_num:q.bpl_num,si,no,total:tot,score:tot?+(si/tot*100).toFixed(1):null};
+    });
+
+    // bplDistComply: % of distributors (with audits) where ALL questions in BPL are SÍ
+    const bplDistComply={};
+    bpls.forEach(b=>{
+      const qs=bplQsMap[b.bpl];
+      if(!qs||!qs.length||!distsWithAudit.length){bplDistComply[b.bpl]=null;return;}
+      const comply=distsWithAudit.filter(distRow=>{
+        const ans=auditByDist[distRow['Distribuidor']].answers||{};
+        return qs.every(q=>_isSI(ans[q.comp_num]));
+      }).length;
+      bplDistComply[b.bpl]=Math.round(comply/distsWithAudit.length*100);
+    });
+
+    return{sh,name:areaName,color,bpls,bplQsMap,qStats,areaDetail,bplDistComply};
+  }).filter(x=>x.bpls.length||x.qStats.length);
 
   // ── Build HTML
-  let html=`<div style="padding:8px 0 14px;font-size:11px;color:#7a90a8;line-height:1.6;border-bottom:1px solid #e8edf3;margin-bottom:16px">
-    <b>⚪ Áreas No Vinculantes</b> — se evalúan igual que las demás áreas, pero <b>no se incluyen en el score total ni en la categoría</b> del distribuidor.
+  let html=`
+  <div style="background:#f0f7ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:11px;color:#2c5282;line-height:1.75">
+    <b>¿Qué se analiza aquí?</b> Las áreas No Vinculantes se auditan pero <b>no influyen en el score total ni en la categoría</b> del distribuidor.<br>
+    <b>• Score BPL:</b> % de respuestas SÍ sobre el total posible (N distrib. × N preguntas de esa BPL). La columna <em>N Preg.</em> muestra cuántas preguntas integran cada BPL.<br>
+    <b>• Matriz × BPL:</b> ✓ = el distribuidor respondió SÍ en <em>todas</em> las preguntas de esa BPL · ✗ = al menos una respuesta NO. % fila = BPLs cumplidas; % pie = % de distrib. que cumplen esa BPL.<br>
+    <b>• Matriz × Pregunta:</b> ✓/✗ por cada pregunta individual. P1, P2… en la cabecera — pasá el cursor para ver el texto completo de la pregunta.
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px">
     ${nvAreaData.map(({name,color,avg,count})=>`<div style="background:#fff;border-radius:10px;border:2px dashed ${color};padding:16px">
@@ -10880,88 +10928,170 @@ function dbRenderNV(){
     </div>`).join('')}
   </div>`;
 
-  nvAreaBPLs.forEach(({sh,name,color,bpls,areaDetail})=>{
+  nvAreaBPLs.forEach(({sh,name,color,bpls,bplQsMap,qStats,bplDistComply})=>{
     const chartId='nw-chart-nv-'+sh;
-    const chartH=Math.max(180,bpls.length*28);
+    const chartH=Math.max(180,bpls.length*30);
+
+    // BPL Chart
     html+=`
     <div class="db-card" style="margin-bottom:14px">
       <div class="db-card-hd">
         <span class="db-card-ttl" style="color:${color}">${name} — Score por BPL</span>
-        <span class="cit" data-tip="% de distribuidores que respondieron SÍ en cada BPL del área ${name}. Ordenado por número de BPL.">ℹ</span>
+        <span class="cit" data-tip="Score = total SÍ de todos los distrib. / (N distrib. × N preguntas de esa BPL). Mide cuánto cumple la red en cada BPL del área ${name}.">ℹ</span>
         <span class="db-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${bpls.length} BPL</span>
       </div>
       <div style="height:${chartH}px;position:relative"><canvas id="${chartId}"></canvas></div>
-    </div>
+    </div>`;
+
+    // BPL Table
+    html+=`
     <div class="db-card" style="margin-bottom:14px">
       <div class="db-card-hd">
         <span class="db-card-ttl">${name} — Tabla por BPL</span>
-        <span class="cit" data-tip="Detalle por BPL: score %, respuestas SÍ (verde), NO (rojo) y total entre todos los distribuidores.">ℹ</span>
+        <span class="cit" data-tip="Score = total SÍ / (N distrib. × N preguntas de esa BPL). N Preg. = preguntas que integran la BPL (denominador por distribuidor).">ℹ</span>
       </div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f0f4f8">${['Nº','BPL','Score %','SÍ','NO','Total'].map(h=>`<th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;white-space:nowrap">${h}</th>`).join('')}</tr></thead>
+        <thead><tr style="background:#f0f4f8">
+          <th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6">Nº</th>
+          <th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6">BPL</th>
+          <th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;text-align:center">N Preg.</th>
+          <th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;text-align:center">Score %</th>
+          <th style="padding:8px 10px;font-size:10px;color:#1d9e6f;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;text-align:center">SÍ</th>
+          <th style="padding:8px 10px;font-size:10px;color:#d93025;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;text-align:center">NO</th>
+          <th style="padding:8px 10px;font-size:10px;color:#7a90a8;font-weight:700;text-transform:uppercase;border-bottom:2px solid #d1dae6;text-align:center">Total</th>
+        </tr></thead>
         <tbody>${bpls.map(b=>`<tr>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#9ca3af">${b.num===999?'—':b.num}</td>
           <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.bpl}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:600;color:${dbScoreColor(b.score)}">${b.score}%</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#1d9e6f">${b.si}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#d93025">${b.no}</td>
-          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#7a90a8">${b.total}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;text-align:center;color:#7a90a8">${b.nPreg||'—'}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:600;color:${dbScoreColor(b.score)};text-align:center">${b.score}%</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#1d9e6f;text-align:center">${b.si}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#d93025;text-align:center">${b.no}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid #f0f4f8;color:#7a90a8;text-align:center">${b.total}</td>
         </tr>`).join('')}</tbody>
       </table></div>
-    </div>
-    <div class="db-card" style="margin-bottom:24px">
+    </div>`;
+
+    // BPL Matrix — ✓ si distribuidor respondió SÍ en TODAS las preguntas de esa BPL
+    html+=`
+    <div class="db-card" style="margin-bottom:14px">
       <div class="db-card-hd">
         <span class="db-card-ttl">${name} — Matriz Distribuidores × BPL</span>
-        <span class="cit" data-tip="Tabla de doble entrada: ✓ = respondió SÍ, ✗ = respondió NO. Ordenada por score CORE descendente. El pie muestra el % de SÍ por columna.">ℹ</span>
+        <span class="cit" data-tip="✓ = respondió SÍ en TODAS las preguntas de esa BPL · ✗ = al menos una NO. % fila = BPLs cumplidas / total. % pie = % distrib. que cumplen esa BPL.">ℹ</span>
       </div>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead>
           <tr style="background:#f0f4f8">
             <th style="padding:8px 10px;text-align:left;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;min-width:140px">Distribuidor</th>
             <th style="padding:8px 6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6">Cat.</th>
-            ${bpls.map(b=>`<th style="padding:6px 4px;text-align:center;font-size:9px;color:${color};font-weight:700;border-bottom:2px solid #d1dae6;white-space:nowrap;min-width:32px" title="${b.bpl}">${b.num===999?'?':b.num}</th>`).join('')}
+            ${bpls.map(b=>`<th style="padding:6px 4px;text-align:center;font-size:9px;color:${color};font-weight:700;border-bottom:2px solid #d1dae6;white-space:normal;max-width:70px;word-break:break-word;vertical-align:bottom;cursor:help" title="${b.bpl}">${b.disp}</th>`).join('')}
             <th style="padding:8px 6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;border-left:2px solid #d1dae6">%</th>
           </tr>
         </thead>
         <tbody>${sortedDists.map((distRow,ri)=>{
           const dist=distRow['Distribuidor'];
-          const dm={};areaDetail.filter(row=>row['Distribuidor']===dist).forEach(row=>{dm[row['BPL']]=row['Respuesta'];});
-          const cumple=bpls.filter(b=>dm[b.bpl]==='SI').length;
-          const hasSome=bpls.some(b=>dm[b.bpl]);
+          const audit=auditByDist[dist];
+          let cumple=0,hasSome=false;
+          const cells=bpls.map(b=>{
+            const qs=bplQsMap[b.bpl];
+            if(!audit||!qs||!qs.length)return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px">·</td>`;
+            hasSome=true;
+            const allSI=qs.every(q=>_isSI((audit.answers||{})[q.comp_num]));
+            if(allSI){cumple++;return`<td style="text-align:center;padding:5px 2px;color:#1d9e6f;font-size:15px">✓</td>`;}
+            return`<td style="text-align:center;padding:5px 2px;color:#d93025;font-size:15px;background:#fce4ec44">✗</td>`;
+          });
           const pct=hasSome?Math.round(cumple/bpls.length*100):null;
           const pColor=pct==null?'#9ca3af':pct>=70?'#1d9e6f':pct>=50?'#e8920a':'#d93025';
           const bg=ri%2===0?'#fff':'#fafbfc';
           return`<tr style="background:${bg};border-bottom:1px solid #f0f4f8">
             <td style="padding:6px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${dist}</td>
             <td style="padding:6px 6px;text-align:center">${dbCatBadge(distRow['Categoría'])}</td>
-            ${bpls.map(b=>{const v=dm[b.bpl];
-              if(v==='SI')return`<td style="text-align:center;padding:5px 2px;color:#1d9e6f;font-size:15px">✓</td>`;
-              if(v==='NO')return`<td style="text-align:center;padding:5px 2px;color:#d93025;font-size:15px;background:#fce4ec44">✗</td>`;
-              return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px">·</td>`;
-            }).join('')}
+            ${cells.join('')}
             <td style="text-align:center;padding:6px 6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:${pColor};border-left:2px solid #e8edf3">${pct!=null?pct+'%':'—'}</td>
           </tr>`;
         }).join('')}</tbody>
         <tfoot>
           <tr style="background:#f0f4f8;border-top:2px solid #d1dae6">
-            <td colspan="2" style="padding:7px 10px;font-size:10px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px">% cumpl. por BPL</td>
-            ${bpls.map(b=>{const col=b.score>=70?'#1d9e6f':b.score>=50?'#e8920a':'#d93025';return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col}">${b.score}%</td>`;}).join('')}
+            <td colspan="2" style="padding:7px 10px;font-size:10px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px">% cumplen BPL</td>
+            ${bpls.map(b=>{const v=bplDistComply[b.bpl];const col=v==null?'#9ca3af':v>=70?'#1d9e6f':v>=50?'#e8920a':'#d93025';return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col}">${v!=null?v+'%':'—'}</td>`;}).join('')}
             <td style="border-left:2px solid #d1dae6"></td>
           </tr>
         </tfoot>
       </table></div>
     </div>`;
+
+    // Question Matrix (Distribuidores × Pregunta)
+    if(qStats.length){
+      const bplGroups=[];let lastBpl=null;
+      qStats.forEach(q=>{
+        if(q.bpl_name!==lastBpl){bplGroups.push({bpl:q.bpl_name,count:1});lastBpl=q.bpl_name;}
+        else bplGroups[bplGroups.length-1].count++;
+      });
+      html+=`
+      <div class="db-card" style="margin-bottom:24px">
+        <div class="db-card-hd">
+          <span class="db-card-ttl">${name} — Matriz Distribuidores × Pregunta</span>
+          <span class="cit" data-tip="✓/✗ por cada pregunta individual. % fila = preguntas SÍ / total respondidas. % pie = % distrib. que responden SÍ en esa pregunta. Pasá el cursor sobre P1, P2… para ver el texto completo.">ℹ</span>
+        </div>
+        <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="background:#e8f0fe">
+              <th rowspan="2" style="padding:6px 10px;text-align:left;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;min-width:140px">Distribuidor</th>
+              <th rowspan="2" style="padding:6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6">Cat.</th>
+              ${bplGroups.map(g=>`<th colspan="${g.count}" style="padding:5px 4px;text-align:center;font-size:9px;color:${color};font-weight:700;border-bottom:1px solid #d1dae6;border-left:1px solid #d1dae6">${g.bpl}</th>`).join('')}
+              <th rowspan="2" style="padding:6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;border-left:2px solid #d1dae6">%</th>
+            </tr>
+            <tr style="background:#f0f4f8">
+              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;return`<th style="padding:5px 3px;text-align:center;font-size:10px;font-weight:700;color:#7a90a8;border-bottom:2px solid #d1dae6;cursor:help;${first?'border-left:1px solid #d1dae6':''}" title="${q.question}">P${q.idx}</th>`;}).join('')}
+            </tr>
+          </thead>
+          <tbody>${sortedDists.map((distRow,ri)=>{
+            const dist=distRow['Distribuidor'];
+            const audit=auditByDist[dist];
+            let rsi=0,rtot=0;
+            const cells=qStats.map((q,qi)=>{
+              const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;
+              const bStyle=first?'border-left:1px solid #e8edf3':'';
+              if(!audit)return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px;${bStyle}">·</td>`;
+              const ans=(audit.answers||{})[q.comp_num];
+              const isSI=_isSI(ans);
+              const isNO=ans!=null&&ans!==''&&!isSI;
+              if(isSI){rsi++;rtot++;}else if(isNO)rtot++;
+              if(isSI)return`<td style="text-align:center;padding:5px 2px;color:#1d9e6f;font-size:15px;${bStyle}">✓</td>`;
+              if(isNO)return`<td style="text-align:center;padding:5px 2px;color:#d93025;font-size:15px;background:#fce4ec44;${bStyle}">✗</td>`;
+              return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px;${bStyle}">·</td>`;
+            });
+            const pct=rtot?Math.round(rsi/rtot*100):null;
+            const pColor=pct==null?'#9ca3af':pct>=70?'#1d9e6f':pct>=50?'#e8920a':'#d93025';
+            const bg=ri%2===0?'#fff':'#fafbfc';
+            return`<tr style="background:${bg};border-bottom:1px solid #f0f4f8">
+              <td style="padding:6px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${dist}</td>
+              <td style="padding:6px 6px;text-align:center">${dbCatBadge(distRow['Categoría'])}</td>
+              ${cells.join('')}
+              <td style="text-align:center;padding:6px 6px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:${pColor};border-left:2px solid #e8edf3">${pct!=null?pct+'%':'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+          <tfoot>
+            <tr style="background:#f0f4f8;border-top:2px solid #d1dae6">
+              <td colspan="2" style="padding:7px 10px;font-size:10px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px">% cumpl. por preg.</td>
+              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;const col=q.score==null?'#9ca3af':q.score>=70?'#1d9e6f':q.score>=50?'#e8920a':'#d93025';return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col};${first?'border-left:1px solid #d1dae6':''}">${q.score!=null?q.score+'%':'—'}</td>`;}).join('')}
+              <td style="border-left:2px solid #d1dae6"></td>
+            </tr>
+          </tfoot>
+        </table></div>
+      </div>`;
+    }
   });
 
   wrap.innerHTML=html;
 
-  // Charts — one per NV area
+  // Render charts
   nvAreaBPLs.forEach(({sh,bpls,color})=>{
     const chartId='nw-chart-nv-'+sh;
     dbDestroyChart(chartId);
     dbCharts[chartId]=new Chart(document.getElementById(chartId),{type:'bar',
       data:{
-        labels:bpls.map(b=>b.bpl.length>38?b.bpl.substring(0,36)+'..':b.bpl),
+        labels:bpls.map(b=>b.shortName.length>38?b.shortName.substring(0,36)+'..':b.shortName),
         datasets:[{data:bpls.map(b=>b.score),backgroundColor:color+'44',borderColor:color,borderWidth:1.5,borderRadius:3}]
       },
       options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
