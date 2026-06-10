@@ -10869,9 +10869,9 @@ function dbRenderNV(){
       if(row['Respuesta']==='SI')bplMap[k].si++;else bplMap[k].no++;
     });
 
-    // N questions per BPL from Q[]
+    // N questions per BPL from Q[] — key matches detalle format: "bpl_num bpl_name"
     const bplQCountMap={};
-    Q.filter(q=>q.sheet===sh).forEach(q=>{if(q.bpl_name)bplQCountMap[q.bpl_name]=(bplQCountMap[q.bpl_name]||0)+1;});
+    Q.filter(q=>q.sheet===sh).forEach(q=>{const k=String(q.bpl_num)+' '+q.bpl_name;bplQCountMap[k]=(bplQCountMap[k]||0)+1;});
 
     const bpls=Object.entries(bplMap).map(([k,v])=>{
       const nPreg=bplQCountMap[k]||0;
@@ -10880,9 +10880,9 @@ function dbRenderNV(){
       return{bpl:k,shortName,disp,score:+(v.si/(v.si+v.no)*100).toFixed(1),si:v.si,no:v.no,total:v.si+v.no,nPreg,num:parseInt(k)||999};
     }).sort((a,b)=>a.num-b.num);
 
-    // Map bpl_name → Q[] questions for matrix logic
+    // Map bpl key → Q[] questions for matrix logic (key = "bpl_num bpl_name" matching detalle)
     const bplQsMap={};
-    bpls.forEach(b=>{bplQsMap[b.bpl]=Q.filter(q=>q.sheet===sh&&q.bpl_name===b.bpl);});
+    bpls.forEach(b=>{bplQsMap[b.bpl]=Q.filter(q=>q.sheet===sh&&(String(q.bpl_num)+' '+q.bpl_name)===b.bpl);});
 
     // Per-question aggregated stats (from auditByDist)
     const nvQs=Q.filter(q=>q.sheet===sh);
@@ -10893,7 +10893,8 @@ function dbRenderNV(){
         if(_isSI(ans))si++;else if(ans!=null&&ans!=='')no++;
       });
       const tot=si+no;
-      return{idx:idx+1,comp_num:q.comp_num,question:q.question,bpl_name:q.bpl_name,bpl_num:q.bpl_num,si,no,total:tot,score:tot?+(si/tot*100).toFixed(1):null};
+      const bpl_key=String(q.bpl_num)+' '+q.bpl_name;
+      return{idx:idx+1,comp_num:q.comp_num,question:q.question,bpl_name:q.bpl_name,bpl_key,bpl_num:q.bpl_num,si,no,total:tot,score:tot?+(si/tot*100).toFixed(1):null};
     });
 
     // bplDistComply: % of distributors (with audits) where ALL questions in BPL are SÍ
@@ -11024,7 +11025,7 @@ function dbRenderNV(){
     if(qStats.length){
       const bplGroups=[];let lastBpl=null;
       qStats.forEach(q=>{
-        if(q.bpl_name!==lastBpl){bplGroups.push({bpl:q.bpl_name,count:1});lastBpl=q.bpl_name;}
+        if(q.bpl_key!==lastBpl){bplGroups.push({bpl:q.bpl_name,count:1});lastBpl=q.bpl_key;}
         else bplGroups[bplGroups.length-1].count++;
       });
       html+=`
@@ -11042,7 +11043,7 @@ function dbRenderNV(){
               <th rowspan="2" style="padding:6px;text-align:center;font-size:10px;color:#7a90a8;font-weight:700;border-bottom:2px solid #d1dae6;border-left:2px solid #d1dae6">%</th>
             </tr>
             <tr style="background:#f0f4f8">
-              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;return`<th style="padding:5px 3px;text-align:center;font-size:10px;font-weight:700;color:#7a90a8;border-bottom:2px solid #d1dae6;cursor:help;${first?'border-left:1px solid #d1dae6':''}" title="${q.question}">P${q.idx}</th>`;}).join('')}
+              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_key!==q.bpl_key;return`<th style="padding:5px 3px;text-align:center;font-size:10px;font-weight:700;color:#7a90a8;border-bottom:2px solid #d1dae6;cursor:help;${first?'border-left:1px solid #d1dae6':''}" title="${q.question}">P${q.idx}</th>`;}).join('')}
             </tr>
           </thead>
           <tbody>${sortedDists.map((distRow,ri)=>{
@@ -11050,7 +11051,7 @@ function dbRenderNV(){
             const audit=auditByDist[dist];
             let rsi=0,rtot=0;
             const cells=qStats.map((q,qi)=>{
-              const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;
+              const first=qi===0||qStats[qi-1].bpl_key!==q.bpl_key;
               const bStyle=first?'border-left:1px solid #e8edf3':'';
               if(!audit)return`<td style="text-align:center;padding:5px 2px;color:#d1dae6;font-size:11px;${bStyle}">·</td>`;
               const ans=(audit.answers||{})[q.comp_num];
@@ -11074,7 +11075,7 @@ function dbRenderNV(){
           <tfoot>
             <tr style="background:#f0f4f8;border-top:2px solid #d1dae6">
               <td colspan="2" style="padding:7px 10px;font-size:10px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px">% cumpl. por preg.</td>
-              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_name!==q.bpl_name;const col=q.score==null?'#9ca3af':q.score>=70?'#1d9e6f':q.score>=50?'#e8920a':'#d93025';return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col};${first?'border-left:1px solid #d1dae6':''}">${q.score!=null?q.score+'%':'—'}</td>`;}).join('')}
+              ${qStats.map((q,qi)=>{const first=qi===0||qStats[qi-1].bpl_key!==q.bpl_key;const col=q.score==null?'#9ca3af':q.score>=70?'#1d9e6f':q.score>=50?'#e8920a':'#d93025';return`<td style="text-align:center;padding:7px 2px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:${col};${first?'border-left:1px solid #d1dae6':''}">${q.score!=null?q.score+'%':'—'}</td>`;}).join('')}
               <td style="border-left:2px solid #d1dae6"></td>
             </tr>
           </tfoot>
