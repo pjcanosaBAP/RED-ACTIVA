@@ -10504,13 +10504,14 @@ function dbRenderBPL(){
   const AREA_COLORS=dbAreaColorsMap();
   const filterArea=(document.getElementById('nw-bpl-area')||{}).value||'all';
   const filterDist=(document.getElementById('nw-bpl-dist')||{}).value||'all';
-  let d=dbG.detalle;
+  const nvAreaNames=new Set(SHEETS_NV().map(sh=>AN[sh]||sh));
+  let d=dbG.detalle.filter(r=>!nvAreaNames.has(r['Área']));
   if(filterDist!=='all')d=d.filter(r=>r['Distribuidor']===filterDist);
   if(filterArea!=='all')d=d.filter(r=>r['Área']===filterArea);
   const g={};d.forEach(r=>{const k=r['BPL'];if(!k)return;if(!g[k])g[k]={si:0,no:0,area:r['Área']};if(r['Respuesta']==='SI')g[k].si++;else g[k].no++;});
   const bplEntries=Object.entries(g).filter(([k])=>k.trim()).map(([k,v])=>({key:k,score:+(v.si/(v.si+v.no)*100).toFixed(1),si:v.si,no:v.no,area:v.area,num:parseInt(k)||999})).sort((a,b)=>a.num-b.num);
   const dists=[...new Set(dbG.resumen.map(r=>r['Distribuidor']))].sort();
-  const allAreas=SHEETS().map(sh=>AN[sh]||sh);
+  const allAreas=SHEETS_CORE().map(sh=>AN[sh]||sh);
   document.getElementById('nw-panel-bpl').innerHTML=`
     <div class="db-filter-bar">
       <span class="db-filter-lbl">Área:</span>
