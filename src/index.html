@@ -3540,11 +3540,13 @@ function _autoSave(){
   // Subtle indicator
   const ind=document.getElementById('autosave-ind');
   if(ind){ind.textContent='✓ autoguardado';ind.style.opacity='1';clearTimeout(ind._t);ind._t=setTimeout(()=>ind.style.opacity='0',2200);}
-  // Refresh active network tab if visible
-  const panels=document.getElementById('nw-panels');
-  if(panels&&panels.style.display!=='none'){
+  // Always rebuild dbG so any subsequent tab navigation shows fresh data
+  buildNetworkData();
+  // Re-render the active sub-tab only if the network panel is currently visible
+  const panelNet=document.getElementById('panel-network');
+  if(panelNet&&panelNet.classList.contains('on')){
     const activeTab=document.querySelector('#nw-sub-nav .sn-tab.on');
-    if(activeTab){buildNetworkData();dbRenderTab(activeTab.dataset.tab);}
+    if(activeTab) dbRenderTab(activeTab.dataset.tab);
   }
 }
 function _scheduleAutoSave(){clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,1500);}
@@ -10387,6 +10389,7 @@ function buildNetworkData(){
 }
 
 function dbRenderTab(t){
+  buildNetworkData();
   document.querySelectorAll('#nw-panels .nw-panel').forEach(p=>p.style.display='none');
   const panel=document.getElementById('nw-panel-'+t);if(panel) panel.style.display='';
   document.querySelectorAll('#nw-sub-nav .sn-tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
