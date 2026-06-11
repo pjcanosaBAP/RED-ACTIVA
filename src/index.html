@@ -3522,12 +3522,15 @@ function saveAudit(){
 }
 // ── AUTOSAVE ──────────────────────────────────────────────────────────────────
 let _asTimer=null;
-function _autoSave(){
-  if(_loadedFrozenAudit)return; // never overwrite frozen audits
+// Sync current ans{} into saved[] in-memory (no persist, no indicator).
+// Called by buildNetworkData() so the dashboard always reflects live answers
+// regardless of the 1.5s autosave debounce.
+function _syncAnsToSaved(){
+  if(_loadedFrozenAudit)return;
   const dist=(document.getElementById('sel-dist')||{}).value||'';
   const fecha=(document.getElementById('sel-fecha')||{}).value||'';
   const edicion=(document.getElementById('sel-edicion')||{}).value||'';
-  if(!dist||!fecha)return;
+  if(!dist||!fecha||!Object.keys(ans).length)return;
   const auditor=(document.getElementById('sel-auditor')||{}).value||'';
   const sc=computeScores(ans);
   const weightSnapshot={aw:{...AW},wcfg:JSON.parse(JSON.stringify(WCfg)),matrixCfg:JSON.parse(JSON.stringify(MATRIX_CFG))};
@@ -3535,14 +3538,17 @@ function _autoSave(){
   const existingId=idx>=0?saved[idx].id:null;
   const audit={id:existingId||String(Date.now()),distribuidor:dist,fecha,auditor,edicion,pais:cfg.pais||'',answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
   if(idx>=0)saved[idx]=audit;else saved.push(audit);
+}
+function _autoSave(){
+  _syncAnsToSaved(); // write ans to saved[] first
+  const dist=(document.getElementById('sel-dist')||{}).value||'';
+  const fecha=(document.getElementById('sel-fecha')||{}).value||'';
+  if(!dist||!fecha)return;
   persist();
   updateAudCnt();renderSaved();
-  // Subtle indicator
   const ind=document.getElementById('autosave-ind');
   if(ind){ind.textContent='✓ autoguardado';ind.style.opacity='1';clearTimeout(ind._t);ind._t=setTimeout(()=>ind.style.opacity='0',2200);}
-  // Always rebuild dbG so any subsequent tab navigation shows fresh data
   buildNetworkData();
-  // Re-render the active sub-tab only if the network panel is currently visible
   const panelNet=document.getElementById('panel-network');
   if(panelNet&&panelNet.classList.contains('on')){
     const activeTab=document.querySelector('#nw-sub-nav .sn-tab.on');
@@ -10335,6 +10341,7 @@ function dbCatBadge(cat){
 }
 
 function buildNetworkData(){
+  _syncAnsToSaved(); // always flush live ans{} before reading saved[]
   // País filter
   const paisSel=document.getElementById('nw-pais-filter');
   if(paisSel){
