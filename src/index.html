@@ -1050,6 +1050,7 @@ body.readonly .admin-only{display:none!important;}
     <div id="sb-dot" title="Supabase: iniciando... (clic = re-sincronizar)" style="width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;cursor:pointer;transition:background .4s;margin-right:4px" onclick="loadFromSupabase()"></div>
     <button class="btn btn-out" onclick="toggleSaved()" style="gap:4px">📋 <span id="aud-cnt-badge" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 6px;font-size:10px">0</span></button>
     <button class="btn btn-green admin-only" onclick="saveAudit()">💾 Guardar</button>
+    <span id="autosave-ind" style="font-size:10px;color:#1d9e6f;font-weight:600;opacity:0;transition:opacity .5s;white-space:nowrap;margin-left:2px"></span>
 
     <div class="tb-more-wrap">
       <button class="btn btn-out" onclick="toggleTbMore()" title="Más opciones">···</button>
@@ -3112,10 +3113,12 @@ function setA(comp,val){
   const row=document.getElementById('qr-'+k);
   if(row) row.style.background=active==='si'?'#f1f8e9':active==='no'?'#fce4ec':active==='na'?'#fff8e1':'';
   recalc();
+  _scheduleAutoSave();
 }
 function setCom(comp,val){
   if(val.trim()) coms[comp]=val; else delete coms[comp];
   document.getElementById('kpi-com').textContent=Object.keys(coms).length;
+  _scheduleAutoSave();
 }
 
 // ── DISTRIBUTOR CHANGE GUARD ──
@@ -3517,6 +3520,35 @@ function saveAudit(){
   persist(); showToast('✅ Guardado: '+dist+' · '+edicion);
   updateAudCnt(); renderSaved(); renderGlobal();
 }
+// ── AUTOSAVE ──────────────────────────────────────────────────────────────────
+let _asTimer=null;
+function _autoSave(){
+  if(_loadedFrozenAudit)return; // never overwrite frozen audits
+  const dist=(document.getElementById('sel-dist')||{}).value||'';
+  const fecha=(document.getElementById('sel-fecha')||{}).value||'';
+  const edicion=(document.getElementById('sel-edicion')||{}).value||'';
+  if(!dist||!fecha)return;
+  const auditor=(document.getElementById('sel-auditor')||{}).value||'';
+  const sc=computeScores(ans);
+  const weightSnapshot={aw:{...AW},wcfg:JSON.parse(JSON.stringify(WCfg)),matrixCfg:JSON.parse(JSON.stringify(MATRIX_CFG))};
+  const idx=saved.findIndex(a=>a.distribuidor===dist&&a.edicion===edicion);
+  const existingId=idx>=0?saved[idx].id:null;
+  const audit={id:existingId||String(Date.now()),distribuidor:dist,fecha,auditor,edicion,pais:cfg.pais||'',answers:{...ans},comments:{...coms},scores:sc,weights:weightSnapshot};
+  if(idx>=0)saved[idx]=audit;else saved.push(audit);
+  persist();
+  updateAudCnt();renderSaved();
+  // Subtle indicator
+  const ind=document.getElementById('autosave-ind');
+  if(ind){ind.textContent='✓ autoguardado';ind.style.opacity='1';clearTimeout(ind._t);ind._t=setTimeout(()=>ind.style.opacity='0',2200);}
+  // Refresh active network tab if visible
+  const panels=document.getElementById('nw-panels');
+  if(panels&&panels.style.display!=='none'){
+    const activeTab=document.querySelector('#nw-sub-nav .sn-tab.on');
+    if(activeTab){buildNetworkData();dbRenderTab(activeTab.dataset.tab);}
+  }
+}
+function _scheduleAutoSave(){clearTimeout(_asTimer);_asTimer=setTimeout(_autoSave,1500);}
+
 function loadAudit(idx){
   const a=saved[idx]; if(!a) return;
   if(Object.keys(ans).length>0&&!confirm('¿Cargar esta auditoría? Se perderán cambios no guardados.')) return;
