@@ -3543,6 +3543,7 @@ function _syncAnsToSaved(){
   if(idx>=0)saved[idx]=audit;else saved.push(audit);
 }
 function _autoSave(){
+  if(_loadedFrozenAudit)return;
   _syncAnsToSaved(); // write ans to saved[] first
   const dist=(document.getElementById('sel-dist')||{}).value||'';
   const fecha=(document.getElementById('sel-fecha')||{}).value||'';
@@ -5140,7 +5141,7 @@ function renderDashCritDetail(){
         const qData=Q.find(function(x){return x.comp_num===q;});
         const ansV=answers[q];
         const aeAns=aeAnswers[q];
-        if(ansV==='no'||!ansV){
+        if(ansV==='no'||ansV==='na'||!ansV){
           const statusDot=ansV==='no'?'🔴':ansV==='na'?'🟡':'⚪';
           const aeNote=aeAns==='si'?' <span style="color:#7b1fa2;font-size:9px">(AE: SÍ ⚠)</span>':aeAns==='no'?' <span style="color:var(--g400);font-size:9px">(AE: NO)</span>':'';
           h+='<div class="crit-fail-q"><span class="crit-fail-num">'+q+'</span><span>'+statusDot+' '+(qData?qData.question.slice(0,100)+'...':q)+aeNote+'</span></div>';
