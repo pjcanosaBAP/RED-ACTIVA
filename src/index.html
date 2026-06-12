@@ -6121,114 +6121,125 @@ async function exportDistExcel(){
   wb.created=new Date();
 
   // ════════════════════════════════════════════════════════════
-  // HOJA 1 — RESUMEN EJECUTIVO
+  // HOJA 1 — RESUMEN EJECUTIVO (Opción B)
   // ════════════════════════════════════════════════════════════
   {
     const ws=wb.addWorksheet('Resumen Ejecutivo',{
-      views:[{showGridLines:false,state:'frozen',ySplit:1}],
+      views:[{showGridLines:false,state:'frozen',ySplit:2}],
       pageSetup:{fitToPage:true,fitToWidth:1}
     });
-    ws.columns=[
-      {width:2},{width:38},{width:8},{width:10},{width:14},{width:12}
-    ];
+    // A=spacer | B=ÁREA | C=NOMBRE | D=PESO | E=ADHER. | F=PUNTAJE | G=vs ANTERIOR
+    ws.columns=[{width:2},{width:8},{width:32},{width:8},{width:13},{width:13},{width:13}];
 
-    // Fila 1 — Título principal
-    ws.addRow([]); ws.getRow(1).height=8; // spacer top
+    // Fila 1 — Brand bar oscura
+    {const r=ws.addRow(['','RED ACTIVA 2.0 · EVALUACIÓN BPL · '+((audit.pais||cfg.pais||'').toUpperCase())]);
+     r.height=28; ws.mergeCells('B1:G1');
+     applyStyle(r.getCell(2),{name:'Calibri',bold:true,size:13,color:{argb:'FF60A5FA'}},solidFill(NAVY),{horizontal:'left',vertical:'middle'});
+     [3,4,5,6,7].forEach(i=>{try{applyStyle(r.getCell(i),null,solidFill(NAVY),{vertical:'middle'});}catch(e){}});
+    }
 
-    // Fila 2 — Header brand
-    const r2=ws.addRow(['','INFORME DE EVALUACIÓN BPL · RED ACTIVA 2.0']);
-    r2.height=32;
-    ws.mergeCells('B2:G2');
-    applyStyle(r2.getCell(2),
-      {name:'Calibri',bold:true,size:14,color:{argb:'FF0070C0'}},
-      solidFill('FFF0F7FF'),
-      {horizontal:'left',vertical:'middle'},
-      bottomBorder('FF0070C0'));
+    // Fila 2 — Distribuidor + meta
+    {const r=ws.addRow(['',dist]);
+     r.height=24; ws.mergeCells('B2:C2');
+     applyStyle(r.getCell(2),{name:'Calibri',bold:true,size:13,color:{argb:NAVY}},solidFill('FFF0F7FF'),{horizontal:'left',vertical:'middle'});
+     applyStyle(r.getCell(3),null,solidFill('FFF0F7FF'),{vertical:'middle'});
+     r.getCell(4).value='Ed: '+edicion; r.getCell(5).value='Fecha: '+(audit.fecha||'—'); r.getCell(6).value='Auditor: '+(audit.auditor||'—');
+     [4,5,6,7].forEach(i=>applyStyle(r.getCell(i),{name:'Calibri',size:9,color:{argb:'FF475569'}},solidFill('FFF0F7FF'),leftMid));
+    }
 
-    // Fila 3 — Distribuidor
-    const r3=ws.addRow(['',dist]);
-    r3.height=26;
-    ws.mergeCells('B3:G3');
-    applyStyle(r3.getCell(2),
-      {name:'Calibri',bold:true,size:13,color:{argb:NAVY}},
-      noFill,{horizontal:'left',vertical:'middle'});
+    ws.addRow([]).height=8;
 
-    // Fila 4 — Edición / Fecha / Auditor
-    const r4=ws.addRow(['','Edición: '+edicion,'','Fecha: '+(audit.fecha||'—'),'','Auditor: '+(audit.auditor||'—')]);
-    r4.height=18;
-    [2,4,6].forEach(i=>applyStyle(r4.getCell(i),{name:'Calibri',size:10,color:{argb:'FF475569'}},noFill,leftMid));
+    // Fila 4 — KPIs: Puntaje | Categoría | vs ANTERIOR
+    const prevAuditXl=saved.filter(a=>a.distribuidor===dist&&a.edicion!==edicion).sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''))[0];
+    const xlDeltaNum=prevAuditXl&&prevAuditXl.scores?((sc.total||0)-(prevAuditXl.scores.total||0))*100:null;
+    const xlDeltaStr=xlDeltaNum!==null?((xlDeltaNum>=0?'▲ +':'▼ ')+Math.abs(xlDeltaNum).toFixed(1)+'%'):'—';
+    const xlDeltaARGB=xlDeltaNum!==null?(xlDeltaNum>=0?'FF1D9E6F':'FFD63030'):'FF94A3B8';
+    {const r=ws.addRow(['','PUNTAJE',pctStr(sc.total||0),'CATEGORÍA',cat,'vs ANTERIOR',xlDeltaStr]);
+     r.height=38;
+     applyStyle(r.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+     applyStyle(r.getCell(3),{name:'Calibri',bold:true,size:22,color:{argb:scoreARGB(sc.total||0)}},solidFill(LGRAY),centerMid);
+     applyStyle(r.getCell(4),{name:'Calibri',bold:true,size:10,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+     applyStyle(r.getCell(5),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill(AR(catHex)),centerMid);
+     applyStyle(r.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
+     applyStyle(r.getCell(7),{name:'Calibri',bold:true,size:16,color:{argb:xlDeltaARGB}},solidFill(LGRAY),centerMid);
+    }
 
-    ws.addRow([]).height=10; // spacer
+    // Fila 5 — Críticos
+    {const metC=CRIT_LIST.filter(c=>isMet_(c.tag)).length;
+     const r=ws.addRow(['','CRÍTICOS','',metC+' / '+CRIT_LIST.length]);
+     r.height=24; ws.mergeCells('B5:C5');
+     applyStyle(r.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:'FF92400E'}},solidFill('FFFFF7ED'),leftMid);
+     applyStyle(r.getCell(3),null,solidFill('FFFFF7ED'),leftMid);
+     ws.mergeCells('D5:G5');
+     applyStyle(r.getCell(4),{name:'Calibri',bold:true,size:13,color:{argb:metC>=CRIT_LIST.length?'FF00A854':'FFD63030'}},solidFill('FFFFF7ED'),{horizontal:'left',vertical:'middle'});
+    }
 
-    // Fila 6 — KPIs: Score | Categoría | Críticos
-    const r6=ws.addRow(['','PUNTAJE TOTAL','',pctStr(sc.total||0),'CATEGORÍA','',cat]);
-    r6.height=34;
-    ws.mergeCells('B6:C6');
-    applyStyle(r6.getCell(2),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
-    applyStyle(r6.getCell(4),{name:'Calibri',bold:true,size:20,color:{argb:scoreARGB(sc.total||0)}},solidFill(LGRAY),centerMid);
-    applyStyle(r6.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb:'FF64748B'}},solidFill(LGRAY),centerMid);
-    ws.mergeCells('E6:F6');
-    applyStyle(r6.getCell(7),{name:'Calibri',bold:true,size:14,color:{argb:WHITE}},solidFill(AR(catHex)),centerMid);
+    ws.addRow([]).height=8;
 
-    ws.addRow([]).height=10;
+    // Header tabla áreas
+    {const r=ws.addRow(['','ÁREA','NOMBRE','PESO','ADHERENCIA','PUNTAJE','vs ANTERIOR']);
+     r.height=22;
+     [2,3,4,5,6,7].forEach(i=>applyStyle(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid));
+     r.getCell(3).alignment={horizontal:'left',vertical:'middle'};
+    }
 
-    // Tabla de áreas — header: NOMBRE | ÁREA | PESO | ADHERENCIA | PUNTAJE
-    const rAH=ws.addRow(['','NOMBRE','ÁREA','PESO','ADHERENCIA','PUNTAJE']);
-    rAH.height=20;
-    [2,3,4,5,6].forEach(i=>applyStyle(rAH.getCell(i),
-      {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
-      solidFill(NAVY),centerMid,bottomBorder('FF475569')));
-
-    // Filas de áreas — sin columna categoría, con adherencia = peso × puntaje
+    // Filas áreas con delta
     SHEETS_CORE().forEach((sh,si)=>{
-      const v=(sc.areas||{})[sh]||0;
-      const w=AW[sh]||0;
-      const adh=v*w; // adherencia = puntaje × peso
-      const aARGB=AR(AC[sh]||'#607d8b');
-      const bg=si%2===0?LGRAY:'FFFFFFFF';
-      const rA=ws.addRow(['',AN[sh]||sh,sh,(w*100).toFixed(0)+'%',pctStr(adh),pctStr(v)]);
+      const v=(sc.areas||{})[sh]||0; const w=AW[sh]||0; const adh=v*w;
+      const aARGB=AR(AC[sh]||'#607d8b'); const bg=si%2===0?LGRAY:'FFFFFFFF';
+      let aDeltaStr='—'; let aDeltaARGB='FF94A3B8';
+      if(prevAuditXl&&prevAuditXl.scores){
+        const prevV=(prevAuditXl.scores.areas||{})[sh]||0;
+        const d=(v-prevV)*100;
+        aDeltaStr=(d>=0?'▲ +':'▼ ')+Math.abs(d).toFixed(1)+'%';
+        aDeltaARGB=d>=0?'FF1D9E6F':'FFD63030';
+      }
+      const rA=ws.addRow(['',sh,AN[sh]||sh,(w*100).toFixed(0)+'%',pctStr(adh),pctStr(v),aDeltaStr]);
       rA.height=20;
-      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),leftMid);
-      applyStyle(rA.getCell(3),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:aARGB}},solidFill(bg),leftMid);
       applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
       applyStyle(rA.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(adh)}},solidFill(bg),centerMid);
       applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:11,color:{argb:scoreARGB(v)}},solidFill(bg),centerMid);
+      applyStyle(rA.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:aDeltaARGB}},solidFill(bg),centerMid);
     });
     SHEETS_NV().forEach(sh=>{
-      const v=(sc.areas||{})[sh]||0;
-      const aARGB=AR(AC[sh]||'#94a3b8');
-      const rA=ws.addRow(['',(AN[sh]||sh)+' · No Vinculante',sh,'—','—',pctStr(v)]);
+      const v=(sc.areas||{})[sh]||0; const aARGB=AR(AC[sh]||'#94a3b8');
+      let aDeltaStr='—'; let aDeltaARGB='FF94A3B8';
+      if(prevAuditXl&&prevAuditXl.scores){
+        const prevV=(prevAuditXl.scores.areas||{})[sh]||0; const d=(v-prevV)*100;
+        aDeltaStr=(d>=0?'▲ +':'▼ ')+Math.abs(d).toFixed(1)+'%'; aDeltaARGB=d>=0?'FF1D9E6F':'FFD63030';
+      }
+      const rA=ws.addRow(['',' NV',AN[sh]||sh,'—','—',pctStr(v),aDeltaStr]);
       rA.height=18;
-      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),leftMid);
-      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(2),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(3),{name:'Calibri',italic:true,size:10,color:{argb:aARGB}},solidFill('FFF1F5F9'),leftMid);
       applyStyle(rA.getCell(4),{name:'Calibri',size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
       applyStyle(rA.getCell(5),{name:'Calibri',size:10,color:{argb:'FF94A3B8'}},solidFill('FFF1F5F9'),centerMid);
       applyStyle(rA.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:scoreARGB(v)}},solidFill('FFF1F5F9'),centerMid);
+      applyStyle(rA.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:aDeltaARGB}},solidFill('FFF1F5F9'),centerMid);
     });
 
     ws.addRow([]).height=12;
 
     // Tabla de críticos — header: ATRIBUTO BPL | COD. | ÁREA | COMP. | ESTADO
-    const rCH=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO']);
-    rCH.height=20;
-    [2,3,4,5,6].forEach(i=>applyStyle(rCH.getCell(i),
-      {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
-      solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    {const r=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO','']);
+     r.height=20;
+     [2,3,4,5,6].forEach(i=>applyStyle(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    }
 
     CRIT_LIST.forEach((c,ci)=>{
       const met=isMet_(c.tag);
       const qs=Q.filter(q=>q.critico===c.tag);
       const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
       const bg=ci%2===0?LGRAY:'FFFFFFFF';
-      const rC=ws.addRow(['',qs[0]?.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE']);
+      const rC=ws.addRow(['',qs[0]?.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE','']);
       rC.height=18;
       applyStyle(rC.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
       applyStyle(rC.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
       applyStyle(rC.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
       applyStyle(rC.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:met?'FF00A854':'FFD63030'}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(6),
-        {name:'Calibri',bold:true,size:10,color:{argb:WHITE}},
-        solidFill(met?'FF00A854':'FFD63030'),centerMid);
+      applyStyle(rC.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(met?'FF00A854':'FFD63030'),centerMid);
     });
   }
 
@@ -7929,132 +7940,171 @@ async function generateDistPPTX(){
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   const W=13.33, H=7.5;
+  const FF='Calibri';
 
   function _ff(f){if(!f)return '';const p=f.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f;}
   function _sC(v){return v>=0.85?'1D9E6F':v>=0.70?'1A6DB5':v>=0.50?'C97A00':'C0392B';}
 
-  function _bgP(s){
-    if(typeof IMG_BG!=='undefined') s.addImage({data:IMG_BG,x:0,y:0,w:W,h:H});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:-0.36,y:-0.36,w:2.97,h:2.10});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:10.52,y:0.21,w:2.58,h:0.64});
-    if(typeof IMG_DECO!=='undefined'){s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});s.addImage({data:IMG_DECO,x:-0.54,y:1.89,w:1.38,h:1.28});}
-  }
-  function _bgC(s){
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:9.20,y:0.08,w:1.22,h:0.80});
-    if(typeof IMG_ARCOR!=='undefined')  s.addImage({data:IMG_ARCOR,x:10.58,y:0.16,w:2.50,h:0.62});
-    if(typeof IMG_DECO!=='undefined') s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});
-    if(typeof IMG_DECO2!=='undefined'){s.addImage({data:IMG_DECO2,x:0,y:6.87,w:6.67,h:0.63});s.addImage({data:IMG_DECO2,x:6.67,y:6.87,w:6.67,h:0.63});}
-  }
-  function _ttl(s,t){
-    s.addText(t,{x:0.45,y:0.12,w:8.80,h:0.76,fontFace:'Calibri',fontSize:40,bold:true,color:'0070C0',valign:'middle'});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:0.91,w:W-0.90,h:0.02,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
+  // ── País: color de acento y bandera
+  const _paisUpper=(curAudit.pais||cfg.pais||'').toUpperCase();
+  const PAIS_COLOR=_paisUpper==='ARGENTINA'?'74ACDF':_paisUpper==='URUGUAY'?'0038A8':_paisUpper==='CHILE'?'D52B1E':'1A6DB5';
+  const PAIS_LABEL=curAudit.pais||cfg.pais||'';
+  function _addFlag(s,x,y,fw,fh){
+    if(_paisUpper==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined') s.addImage({data:LOGO_FLAG_UY,x,y,w:fw,h:fh});
+    else if(_paisUpper==='CHILE'&&typeof LOGO_FLAG_CL!=='undefined') s.addImage({data:LOGO_FLAG_CL,x,y,w:fw,h:fh});
+    else if(typeof LOGO_FLAG_AR!=='undefined') s.addImage({data:LOGO_FLAG_AR,x,y,w:fw,h:fh});
   }
 
-  // ── SLIDE 1: PORTADA ────────────────────────────────────
-  {const s=pptx.addSlide(); _bgP(s);
-    if(typeof IMG_LOGO_SM!=='undefined') s.addImage({data:IMG_LOGO_SM,x:-0.26,y:2.76,w:0.61,h:0.59});
-    {const _p=(curAudit.pais||cfg.pais||'').toUpperCase();const _f=(_p==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined')?LOGO_FLAG_UY:(typeof LOGO_FLAG_CL!=='undefined'?LOGO_FLAG_CL:null);if(_f) s.addImage({data:_f,x:5.98,y:5.63,w:1.24,h:0.83});}
-    s.addText('INFORME EVALUACIÓN '+ed,{x:1.38,y:2.06,w:10.10,h:0.91,fontFace:'Calibri',fontSize:38,bold:true,color:'0070C0',align:'center',valign:'middle'});
-    s.addText(dist,{x:2.18,y:3.28,w:8.83,h:1.45,fontFace:'Calibri',fontSize:30,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
-    if(fechaRaw) s.addText(_ff(fechaRaw),{x:4.56,y:4.62,w:3.89,h:0.64,fontFace:'Calibri',fontSize:26,bold:true,color:'1F2937',align:'center',valign:'middle'});
-  }
-
-  // ── SLIDE 2: FORTALEZAS ─────────────────────────────────
-  {const s=pptx.addSlide(); _bgC(s); _ttl(s,'FORTALEZAS');
-    const fC=[{bg:'1F3864',bd:'2F5496',tx:'FFFFFF'},{bg:'2E4F83',bd:'8DA9DB',tx:'FFFFFF'},{bg:'9DC3E6',bd:'B3C6E7',tx:'1F2937'},{bg:'BDD7EE',bd:'B3C6E7',tx:'1F2937'}];
-    dd.fortalezas.forEach((txt,i)=>{const c=fC[i],y=1.45+i*1.38;
-      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
-      s.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
-      if(txt) s.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
-    });
-  }
-
-  // ── SLIDE 3: OPORTUNIDADES ──────────────────────────────
-  {const s=pptx.addSlide(); _bgC(s); _ttl(s,'OPORTUNIDADES');
-    const oC=[{bg:'7B2D00',bd:'B45309',tx:'FFFFFF'},{bg:'9A3412',bd:'F97316',tx:'FFFFFF'},{bg:'FED7AA',bd:'FDBA74',tx:'1F2937'},{bg:'FEF3C7',bd:'FCD34D',tx:'1F2937'}];
-    dd.debilidades.forEach((txt,i)=>{const c=oC[i],y=1.45+i*1.38;
-      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
-      s.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'9A3412'},line:{color:'9A3412',width:0}});
-      if(txt) s.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
-    });
-  }
-
+  // ── Paleta categoría
   const totalPct=((sc.total||0)*100).toFixed(1);
   const catHex={PROACTIVO:'1D9E6F',ACTIVO:'1A6DB5',REACTIVO:'C97A00',INACTIVO:'C0392B'}[cat]||'1A6DB5';
-
-  // Colores del app para la matriz (idénticos al dashboard)
   const MX_CAT_C={PROACTIVO:'00A854',ACTIVO:'0078C8',REACTIVO:'E67E00',INACTIVO:'D63030'};
   const MX_CODE_C={PR:'00A854',AC:'0078C8',RE:'E67E00',IN:'D63030'};
   const MX_CODE_L={PR:'PRO',AC:'ACT',RE:'REA',IN:'INA'};
-  const MX_LIGHT={PR:'D4F0E2',AC:'D4E8F5',RE:'FDE8C8',IN:'FAD7D7'};
+
+  // ── Helper: banda + footer comunes en slides de contenido
+  const _hdrDark=(s,title,sub='')=>{
+    s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.55,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText(title,{x:0.30,y:0,w:8.50,h:0.55,fontFace:FF,fontSize:18,bold:true,color:'FFFFFF',valign:'middle'});
+    if(sub) s.addText(sub,{x:8.85,y:0,w:4.20,h:0.55,fontFace:FF,fontSize:8.5,color:'94A3B8',align:'right',valign:'middle'});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.05,w:1.28,h:0.44});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.05,w:0.58,h:0.44});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('RED Activa 2.0 · '+PAIS_LABEL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
+    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
+  };
+
+  // ── Helper: header colorido (fortalezas / oportunidades)
+  const _hdrColor=(s,title,accentHex,icon='')=>{
+    s.background={color:accentHex==='C97A00'?'FFF8F1':'F0F7FF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.70,fill:{color:accentHex},line:{color:accentHex,width:0}});
+    if(icon) s.addText(icon,{x:0.28,y:0,w:0.60,h:0.70,fontFace:FF,fontSize:22,color:'FFFFFF',valign:'middle',align:'center'});
+    s.addText(title,{x:icon?0.92:0.35,y:0,w:9,h:0.70,fontFace:FF,fontSize:22,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.10,w:1.28,h:0.44});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.10,w:0.58,h:0.44});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('RED Activa 2.0 · '+PAIS_LABEL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
+    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
+  };
+
+  // ── Helper: card fortaleza/oportunidad
+  const _card=(s,txt,i,accentHex,bgHex,borderHex)=>{
+    const cy=0.82+i*1.52; const ch=1.34;
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.35,y:cy,w:W-0.70,h:ch,fill:{color:bgHex},line:{color:borderHex,width:1},rectRadius:0.08});
+    s.addShape(pptx.shapes.OVAL,{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fill:{color:accentHex},line:{color:accentHex,width:0}});
+    s.addText(String(i+1),{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fontFace:FF,fontSize:14,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    if(txt) s.addText(txt,{x:1.12,y:cy+0.12,w:W-1.58,h:ch-0.24,fontFace:FF,fontSize:15,color:'1E293B',valign:'middle',wrap:true});
+  };
+
+  // ── SLIDE 1: PORTADA ────────────────────────────────────
+  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+    // Banda superior de país
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:PAIS_COLOR},line:{color:PAIS_COLOR,width:0}});
+    _addFlag(s,0.28,0.08,0.96,0.50);
+    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
+    // Cuerpo
+    s.addText(('PROGRAMA BPL · '+(PAIS_LABEL||'Argentina')).toUpperCase(),{x:1.5,y:1.55,w:10.33,h:0.26,fontFace:FF,fontSize:9,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:2});
+    s.addText('INFORME DE EVALUACIÓN',{x:0.5,y:1.85,w:12.33,h:0.70,fontFace:FF,fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle'});
+    s.addText('EDICIÓN '+ed,{x:0.5,y:2.52,w:12.33,h:0.40,fontFace:FF,fontSize:16,bold:true,color:PAIS_COLOR,align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:4.5,y:2.98,w:4.33,h:0.03,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
+    s.addText(dist,{x:0.5,y:3.06,w:12.33,h:0.80,fontFace:FF,fontSize:22,bold:true,color:'1A2E4A',align:'center',valign:'middle',wrap:true});
+    // Score box con categoría y críticos
+    const BX=3.80,BY=3.98,BW=5.73,BH=1.16;
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX,y:BY,w:BW,h:BH,fill:{color:'FFFFFF'},line:{color:'D1DAE6',width:1.5},rectRadius:0.10});
+    s.addShape(pptx.shapes.RECTANGLE,{x:BX,y:BY,w:BW,h:0.06,fill:{color:catHex},line:{color:catHex,width:0}});
+    s.addText(totalPct+'%',{x:BX+0.16,y:BY+0.08,w:2.10,h:BH-0.14,fontFace:FF,fontSize:42,bold:true,color:catHex,valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX+2.38,y:BY+0.24,w:1.62,h:0.38,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.08});
+    s.addText(cat,{x:BX+2.38,y:BY+0.24,w:1.62,h:0.38,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX+4.12,y:BY+0.24,w:1.38,h:0.38,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1},rectRadius:0.08});
+    s.addText('Críticos\n'+(sc.critMet||0)+'/'+tc,{x:BX+4.12,y:BY+0.24,w:1.38,h:0.38,fontFace:FF,fontSize:9,bold:true,color:'92400E',align:'center',valign:'middle'});
+    const dStr=_ff(fechaRaw); const audStr=curAudit.auditor?' · '+curAudit.auditor:'';
+    if(dStr) s.addText(dStr+audStr,{x:BX,y:BY+BH+0.08,w:BW,h:0.22,fontFace:FF,fontSize:9,color:'64748B',align:'center',valign:'middle'});
+    // Banda inferior
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText(('RED ACTIVA 2.0 · EVALUACIÓN BPL · '+(PAIS_LABEL||'')).toUpperCase().trim(),{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8.5,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+  }
+
+  // ── SLIDE 2: FORTALEZAS ─────────────────────────────────
+  {const s=pptx.addSlide();
+    _hdrColor(s,'Fortalezas','0070C0','✦');
+    dd.fortalezas.forEach((txt,i)=>_card(s,txt,i,'0070C0','EFF6FF','BFDBFE'));
+  }
+
+  // ── SLIDE 3: OPORTUNIDADES ──────────────────────────────
+  {const s=pptx.addSlide();
+    _hdrColor(s,'Oportunidades de Mejora','C97A00','⚡');
+    dd.debilidades.forEach((txt,i)=>_card(s,txt,i,'C97A00','FFF8F1','FED7AA'));
+  }
 
   // ── SLIDE 4: DASHBOARD GENERAL ──────────────────────────
-  {const s=pptx.addSlide(); _bgC(s); _ttl(s,'DASHBOARD GENERAL');
-    // Donut principal — puntaje total (sin título, % grande dentro)
-    s.addChart(pptx.charts.DOUGHNUT,[{name:'Score',labels:['Score',''],values:[parseFloat(totalPct),Math.max(0,100-parseFloat(totalPct))]}],{
-      x:0.28,y:1.00,w:4.10,h:3.00,chartColors:[catHex,'E8EDF3'],
-      dataNoEffects:true,showLegend:false,showValue:false,holeSize:65,showTitle:false,
-    });
-    s.addText(totalPct+'%',{x:0.68,y:2.05,w:3.30,h:1.00,fontFace:'Calibri',fontSize:52,bold:true,color:catHex,align:'center',valign:'middle'});
-    // Categoría rounded rect
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:4.12,w:3.65,h:0.55,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.10});
-    s.addText(cat,{x:0.50,y:4.12,w:3.65,h:0.55,fontFace:'Calibri',fontSize:16,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    // Deltas
-    let _dy=4.80;
-    const prevAudit=saved.filter(a=>a.distribuidor===dist&&a.edicion!==ed).sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''))[0];
-    if(prevAudit&&prevAudit.scores){
-      const delta=((sc.total||0)-(prevAudit.scores.total||0))*100;
-      s.addText((delta>=0?'▲ +':'▼ ')+delta.toFixed(1)+'%  vs Ed. '+prevAudit.edicion,{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:delta>=0?'1D9E6F':'C0392B',align:'center',valign:'middle'});
-      _dy+=0.32;
-    }
+  {const s=pptx.addSlide();
+    _hdrDark(s,'Dashboard General',dist+' · '+ed);
+    const prevAuditDB=saved.filter(a=>a.distribuidor===dist&&a.edicion!==ed).sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''))[0];
     const curAE=_getAEFor(dist,ed);
-    if(curAE&&curAE.scores){
-      const deltaAE=((sc.total||0)-(curAE.scores.total||0))*100;
-      s.addText((deltaAE>=0?'▲ +':'▼ ')+deltaAE.toFixed(1)+'%  vs Autoevaluación',{x:0.35,y:_dy,w:3.95,h:0.28,fontFace:'Calibri',fontSize:11,bold:true,color:deltaAE>=0?'7C3AED':'C97A00',align:'center',valign:'middle'});
-      _dy+=0.32;
+    // ─ Col izquierda: donut + categoría + deltas + críticos
+    const LX=0.35; const LW=4.10;
+    s.addChart(pptx.charts.DOUGHNUT,[{name:'Score',labels:['Score',''],values:[parseFloat(totalPct),Math.max(0,100-parseFloat(totalPct))]}],{
+      x:LX,y:0.62,w:LW,h:3.00,chartColors:[catHex,'E8EDF3'],
+      dataNoEffects:true,showLegend:false,showValue:false,holeSize:65,showTitle:false,
+      chartArea:{fill:{color:'FFFFFF'}},plotArea:{fill:{color:'FFFFFF'}},
+    });
+    s.addText(totalPct+'%',{x:LX+0.60,y:1.30,w:2.90,h:1.00,fontFace:FF,fontSize:48,bold:true,color:catHex,align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX+0.22,y:3.68,w:3.65,h:0.45,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.10});
+    s.addText(cat,{x:LX+0.22,y:3.68,w:3.65,h:0.45,fontFace:FF,fontSize:15,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    let _dy=4.22;
+    if(prevAuditDB&&prevAuditDB.scores){
+      const delta=((sc.total||0)-(prevAuditDB.scores.total||0))*100;
+      const dc=delta>=0?'1D9E6F':'D63030'; const dbg=delta>=0?'D4F0E2':'FAD7D7';
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX+0.20,y:_dy,w:3.68,h:0.34,fill:{color:dbg},line:{color:dbg,width:0},rectRadius:0.07});
+      s.addText((delta>=0?'▲ +':'▼ ')+Math.abs(delta).toFixed(1)+'%  vs Ed. '+prevAuditDB.edicion,{x:LX+0.20,y:_dy,w:3.68,h:0.34,fontFace:FF,fontSize:10,bold:true,color:dc,align:'center',valign:'middle'});
+      _dy+=0.42;
     }
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.50,y:_dy+0.06,w:3.65,h:0.46,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1.5},rectRadius:0.08});
-    s.addText('Críticos: '+(sc.critMet||0)+' / '+tc,{x:0.50,y:_dy+0.06,w:3.65,h:0.46,fontFace:'Calibri',fontSize:13,bold:true,color:'92400E',align:'center',valign:'middle'});
-    // Divider
-    s.addShape(pptx.shapes.RECTANGLE,{x:4.55,y:1.00,w:0.02,h:5.70,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
-    // 2×2 donuts por área — sin título de chart, nombre y % como texto overlay
-    const coreSheets=SHEETS_CORE();
-    [{x:4.72,y:0.95},{x:8.90,y:0.95},{x:4.72,y:3.80},{x:8.90,y:3.80}].forEach((pos,i)=>{
-      if(!coreSheets[i]) return;
-      const sh=coreSheets[i]; const v=(sc.areas||{})[sh]||0;
-      const pct100=Math.round(v*1000)/10;
+    if(curAE&&curAE.scores){
+      const dAE=((sc.total||0)-(curAE.scores.total||0))*100;
+      const dc=dAE>=0?'7C3AED':'C97A00'; const dbg=dAE>=0?'EDE9FE':'FFF7ED';
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX+0.20,y:_dy,w:3.68,h:0.34,fill:{color:dbg},line:{color:dbg,width:0},rectRadius:0.07});
+      s.addText((dAE>=0?'▲ +':'▼ ')+Math.abs(dAE).toFixed(1)+'%  vs Autoevaluación',{x:LX+0.20,y:_dy,w:3.68,h:0.34,fontFace:FF,fontSize:10,bold:true,color:dc,align:'center',valign:'middle'});
+      _dy+=0.42;
+    }
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX+0.20,y:_dy,w:3.68,h:0.38,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1.5},rectRadius:0.07});
+    s.addText('Críticos: '+(sc.critMet||0)+' / '+tc,{x:LX+0.20,y:_dy,w:3.68,h:0.38,fontFace:FF,fontSize:13,bold:true,color:'92400E',align:'center',valign:'middle'});
+    // ─ Divisor
+    s.addShape(pptx.shapes.RECTANGLE,{x:LX+LW+0.10,y:0.62,w:0.02,h:H-0.95,fill:{color:'E2E8F0'},line:{color:'E2E8F0',width:0}});
+    // ─ Col derecha: barras por área
+    const RX=LX+LW+0.26; const RW=W-RX-0.22;
+    const coreShtsDB=SHEETS_CORE();
+    const barH=(H-0.96)/Math.max(coreShtsDB.length,1)-0.10;
+    coreShtsDB.forEach((sh,i)=>{
+      const v=(sc.areas||{})[sh]||0; const pct100=Math.round(v*1000)/10;
       const aColor=(AC[sh]||'#607d8b').replace('#','');
-      s.addChart(pptx.charts.DOUGHNUT,[{name:sh,labels:[sh,''],values:[pct100,Math.max(0,100-pct100)]}],{
-        x:pos.x,y:pos.y,w:3.90,h:2.58,chartColors:[aColor,'E8EDF3'],
-        dataNoEffects:true,showLegend:false,showValue:false,holeSize:62,showTitle:false,
-      });
-      // % grande dentro del donut
-      s.addText(pct100+'%',{x:pos.x+0.80,y:pos.y+0.85,w:2.30,h:0.80,fontFace:'Calibri',fontSize:30,bold:true,color:aColor,align:'center',valign:'middle'});
-      // Nombre del área debajo del gráfico, en negrita
-      s.addText(sh+' · '+(AN[sh]||sh),{x:pos.x,y:pos.y+2.58,w:3.90,h:0.30,fontFace:'Calibri',fontSize:10,bold:true,color:'243D5E',align:'center',valign:'middle'});
+      const ry=0.68+i*(barH+0.10);
+      s.addText(sh+' · '+(AN[sh]||sh),{x:RX,y:ry,w:RW-0.90,h:barH*0.46,fontFace:FF,fontSize:9.5,bold:true,color:'1A2E4A',valign:'bottom'});
+      s.addText(pct100.toFixed(1)+'%',{x:RX+RW-0.88,y:ry,w:0.84,h:barH*0.46,fontFace:FF,fontSize:10,bold:true,color:aColor,align:'right',valign:'bottom'});
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:RX,y:ry+barH*0.50,w:RW,h:barH*0.38,fill:{color:'E2E8F0'},line:{color:'E2E8F0',width:0},rectRadius:0.04});
+      const fillW=Math.max(0.05,RW*pct100/100);
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:RX,y:ry+barH*0.50,w:fillW,h:barH*0.38,fill:{color:aColor},line:{color:aColor,width:0},rectRadius:0.04});
     });
   }
 
-  // ── SLIDE 5: DETALLE POR ÁREA — grid 2×2 ───────────────
-  {const s=pptx.addSlide(); _bgC(s); _ttl(s,'DETALLE POR ÁREA');
+  // ── SLIDE 5: DETALLE POR ÁREA ────────────────────────────
+  {const s=pptx.addSlide();
+    _hdrDark(s,'Detalle por Área',dist+' · '+ed);
     const coreSheets=SHEETS_CORE();
-    // Grid 2×2: los 4 cuadros centrados en el slide
     const colW=5.80; const colGap=0.45;
-    const rowGap=0.20;
-    const gX=(13.33-(colW*2+colGap))/2; // centra horizontalmente
-    const cols=[gX, gX+colW+colGap];
-    const rows=[1.10, 3.90];            // fila 1 y fila 2
-    const CELL_H=2.65;
+    const gX=(W-(colW*2+colGap))/2;
+    const cols=[gX,gX+colW+colGap]; const rows=[0.65,3.82]; const CELL_H=3.00;
     coreSheets.forEach((sh,i)=>{
       const col=i%2; const row=Math.floor(i/2);
       if(row>=rows.length) return;
       const sx=cols[col]; const sy=rows[row]; const YMAX=sy+CELL_H;
-      const aScore=(sc.areas||{})[sh]||0;
-      const aColor=(AC[sh]||'#607d8b').replace('#','');
-      // Header de área
+      const aScore=(sc.areas||{})[sh]||0; const aColor=(AC[sh]||'#607d8b').replace('#','');
       s.addShape(pptx.shapes.RECTANGLE,{x:sx,y:sy,w:colW,h:0.32,fill:{color:aColor},line:{color:aColor,width:0}});
-      s.addText(sh+' · '+(AN[sh]||sh),{x:sx+0.10,y:sy,w:colW-1.45,h:0.32,fontFace:'Calibri',fontSize:11,bold:true,color:'FFFFFF',valign:'middle'});
-      s.addText((aScore*100).toFixed(1)+'%',{x:sx+colW-1.40,y:sy,w:1.30,h:0.32,fontFace:'Calibri',fontSize:11,bold:true,color:'FFFFFF',align:'right',valign:'middle'});
+      s.addText(sh+' · '+(AN[sh]||sh),{x:sx+0.10,y:sy,w:colW-1.45,h:0.32,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',valign:'middle'});
+      s.addText((aScore*100).toFixed(1)+'%',{x:sx+colW-1.40,y:sy,w:1.30,h:0.32,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',align:'right',valign:'middle'});
       let curY=sy+0.34;
       const bplNums=[...new Set(Q.filter(q=>q.sheet===sh).map(q=>q.bpl_num))].sort((a,b)=>a-b);
       bplNums.forEach(bk=>{
@@ -8062,41 +8112,35 @@ async function generateDistPPTX(){
         const bv=((sc.bpls||{})[sh+'_'+bk]||{}).score||0;
         const bName=Q.find(q=>q.sheet===sh&&q.bpl_num===bk)?.bpl_name||('BPL '+bk);
         s.addShape(pptx.shapes.RECTANGLE,{x:sx+0.04,y:curY,w:colW-0.04,h:0.26,fill:{color:'F8FAFC'},line:{color:'E8EDF3',width:0.5}});
-        s.addText(bName,{x:sx+0.12,y:curY,w:colW-1.55,h:0.26,fontFace:'Calibri',fontSize:9.5,color:'3D5573',valign:'middle'});
-        s.addText((bv*100).toFixed(0)+'%',{x:sx+colW-1.40,y:curY,w:1.30,h:0.26,fontFace:'Calibri',fontSize:9.5,bold:true,color:_sC(bv),align:'right',valign:'middle'});
+        s.addText(bName,{x:sx+0.12,y:curY,w:colW-1.55,h:0.26,fontFace:FF,fontSize:9.5,color:'3D5573',valign:'middle'});
+        s.addText((bv*100).toFixed(0)+'%',{x:sx+colW-1.40,y:curY,w:1.30,h:0.26,fontFace:FF,fontSize:9.5,bold:true,color:_sC(bv),align:'right',valign:'middle'});
         curY+=0.27;
       });
     });
   }
 
   // ── SLIDE 6: CONDICIONALES CRÍTICOS ─────────────────────
-  {const s=pptx.addSlide(); _bgC(s); _ttl(s,'CONDICIONALES CRÍTICOS');
+  {const s=pptx.addSlide();
+    _hdrDark(s,'Condicionales Críticos',dist+' · '+ed);
     const critStatus=sc.critStatus||{};
     const _isMet=tag=>(critStatus[tag]?.st||critStatus[tag])==='met';
     const metC=CRIT_LIST.filter(c=>_isMet(c.tag)).length;
     const unmetC=CRIT_LIST.filter(c=>critStatus[c.tag]!==undefined&&!_isMet(c.tag)).length;
-
-    // Layout: margen izq = 0.45 a 3.20 | tabla derecha = 3.28 a fin
     const tcX=3.28; const tcW=9.90;
-    // Cajas CUMPLEN/NO CUMPLEN — centradas horizontal y verticalmente en el margen izq
-    // Espacio vertical aprox: y=1.08 a y=4.50 (tabla + matriz) → centro ≈ 2.79
-    const LW=2.60; const LX=0.45+(tcX-0.45-LW)/2; // centrado horizontal
+    const LW=2.60; const LX=0.45+(tcX-0.45-LW)/2;
     const LH=1.20; const LGap=0.40;
-    const LTotalH=LH*2+LGap;
-    const LY=1.08+(3.42-LTotalH)/2; // centrado vertical en el margen (~3.42in disponibles)
+    const LY=0.68+(3.40-(LH*2+LGap))/2;
     s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:LY,w:LW,h:LH,fill:{color:'00A854'},line:{color:'00A854',width:0},rectRadius:0.12});
-    s.addText('✓',{x:LX,y:LY,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(metC+' CUMPLEN',{x:LX,y:LY+LH*0.50,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText('✓',{x:LX,y:LY,w:LW,h:LH*0.50,fontFace:FF,fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(metC+' CUMPLEN',{x:LX,y:LY+LH*0.50,w:LW,h:LH*0.50,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:LY+LH+LGap,w:LW,h:LH,fill:{color:'D63030'},line:{color:'D63030',width:0},rectRadius:0.12});
-    s.addText('✗',{x:LX,y:LY+LH+LGap,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addText(unmetC+' INCUMPLEN',{x:LX,y:LY+LH+LGap+LH*0.50,w:LW,h:LH*0.50,fontFace:'Calibri',fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-
-    // Derecha: tabla — todos los críticos sin corte
+    s.addText('✗',{x:LX,y:LY+LH+LGap,w:LW,h:LH*0.50,fontFace:FF,fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText(unmetC+' INCUMPLEN',{x:LX,y:LY+LH+LGap+LH*0.50,w:LW,h:LH*0.50,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:4.10,x:tcX+1.30},{l:'COMP.',w:1.00,x:tcX+5.40},{l:'ESTADO',w:3.40,x:tcX+6.40}];
-    let ty=1.08;
+    let ty=0.68;
     tcols2.forEach(c=>{
       s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-      s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:'Calibri',fontSize:8.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText(c.l,{x:c.x,y:ty,w:c.w,h:0.26,fontFace:FF,fontSize:8.5,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     });
     ty+=0.28;
     CRIT_LIST.forEach((crit,ri)=>{
@@ -8106,17 +8150,16 @@ async function generateDistPPTX(){
       const bName=qs[0]?.bpl_name||'—'; const sh=qs[0]?.sheet||'—';
       const bg=ri%2===0?'F8FAFC':'FFFFFF';
       s.addShape(pptx.shapes.RECTANGLE,{x:tcX,y:ty,w:tcW,h:0.24,fill:{color:bg},line:{color:'E8EDF3',width:0.5}});
-      s.addText('C'+tag.replace('CRITICO ',''),{x:tcX,y:ty,w:0.58,h:0.24,fontFace:'Calibri',fontSize:8,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
-      s.addText(sh,{x:tcX+0.58,y:ty,w:0.72,h:0.24,fontFace:'Calibri',fontSize:8,color:'3D5573',align:'center',valign:'middle'});
-      s.addText(bName,{x:tcX+1.30,y:ty,w:4.10,h:0.24,fontFace:'Calibri',fontSize:8,color:'3D5573',valign:'middle'});
-      s.addText(siQ+'/'+qs.length,{x:tcX+5.40,y:ty,w:1.00,h:0.24,fontFace:'Calibri',fontSize:8,bold:true,color:isMet?'00A854':'D63030',align:'center',valign:'middle'});
-      s.addShape(pptx.shapes.RECTANGLE,{x:tcX+6.44,y:ty+0.02,w:3.30,h:0.20,fill:{color:isMet?'00A854':'D63030'},line:{color:isMet?'00A854':'D63030',width:0}});
-      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:tcX+6.44,y:ty+0.02,w:3.30,h:0.20,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText('C'+tag.replace('CRITICO ',''),{x:tcX,y:ty,w:0.58,h:0.24,fontFace:FF,fontSize:8,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
+      s.addText(sh,{x:tcX+0.58,y:ty,w:0.72,h:0.24,fontFace:FF,fontSize:8,color:'3D5573',align:'center',valign:'middle'});
+      s.addText(bName,{x:tcX+1.30,y:ty,w:4.10,h:0.24,fontFace:FF,fontSize:8,color:'3D5573',valign:'middle'});
+      s.addText(siQ+'/'+qs.length,{x:tcX+5.40,y:ty,w:1.00,h:0.24,fontFace:FF,fontSize:8,bold:true,color:isMet?'00A854':'D63030',align:'center',valign:'middle'});
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:tcX+6.44,y:ty+0.03,w:3.30,h:0.18,fill:{color:isMet?'00A854':'D63030'},line:{color:isMet?'00A854':'D63030',width:0},rectRadius:0.04});
+      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:tcX+6.44,y:ty+0.03,w:3.30,h:0.18,fontFace:FF,fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
       ty+=0.25;
     });
-
-    // ── Matriz BPL Críticos ──────────────────────────────
-    const mxY=ty+0.20;
+    // ─ Matriz BPL Críticos
+    const mxY=ty+0.18;
     const mx=(curAudit.weights&&curAudit.weights.matrixCfg)||MATRIX_CFG;
     const total100=(sc.total||0)*100;
     const sRow=total100>=THR.pro?0:total100>=THR.act?1:total100>=50?2:3;
@@ -8125,43 +8168,27 @@ async function generateDistPPTX(){
     const mCatRows=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
     const mCatColors_=['00A854','0078C8','E67E00','D63030'];
     const mW=tcW; const mX=tcX;
-    // Título
     s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY,w:mW,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('Matriz de Condicionales · BPL Críticos   —   Score: '+totalPct+'%   Críticos: '+(sc.critMet||0)+'/'+tc,
-      {x:mX+0.12,y:mxY,w:mW-0.24,h:0.26,fontFace:'Calibri',fontSize:9,bold:true,color:'FFFFFF',valign:'middle'});
+    s.addText('Matriz de Condicionales · Score: '+totalPct+'%   Críticos: '+(sc.critMet||0)+'/'+tc,{x:mX+0.12,y:mxY,w:mW-0.24,h:0.26,fontFace:FF,fontSize:9,bold:true,color:'FFFFFF',valign:'middle'});
     const mRowH=0.34; const mScoreW=1.55;
     const mBandW=(mW-mScoreW)/Math.max(mx.bands.length,1);
-    // Header bandas (Score / Críticos | banda1 | banda2 ...)
     s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:mxY+0.28,w:mScoreW,h:0.28,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
-    s.addText('Score / Críticos',{x:mX,y:mxY+0.28,w:mScoreW,h:0.28,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText('Score / Críticos',{x:mX,y:mxY+0.28,w:mScoreW,h:0.28,fontFace:FF,fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     mx.bands.forEach((b,bi)=>{
       const bx=mX+mScoreW+bi*mBandW; const isAB=bi===bCol;
       s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:mxY+0.28,w:mBandW,h:0.28,fill:{color:isAB?'1565C0':'2F5496'},line:{color:isAB?'1565C0':'2F5496',width:0}});
-      s.addText(b.label,{x:bx,y:mxY+0.28,w:mBandW,h:0.28,fontFace:'Calibri',fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText(b.label,{x:bx,y:mxY+0.28,w:mBandW,h:0.28,fontFace:FF,fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     });
-    // Filas de categorías — fondo blanco, solo resaltar la activa
     mCatRows.forEach((cr,ri)=>{
-      const ry=mxY+0.58+ri*mRowH;
-      const catC=mCatColors_[ri];
-      const isActiveRow=ri===sRow;
-      // Columna score: fondo blanco, texto en color de categoría
+      const ry=mxY+0.58+ri*mRowH; const catC=mCatColors_[ri]; const isActiveRow=ri===sRow;
       s.addShape(pptx.shapes.RECTANGLE,{x:mX,y:ry,w:mScoreW,h:mRowH,fill:{color:'FFFFFF'},line:{color:'E8EDF3',width:0.5}});
-      s.addText(cr,{x:mX+0.06,y:ry,w:mScoreW-0.12,h:mRowH*0.58,fontFace:'Calibri',fontSize:9,bold:true,color:catC,valign:'bottom'});
-      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',
-        {x:mX+0.06,y:ry+mRowH*0.58,w:mScoreW-0.12,h:mRowH*0.40,fontFace:'Calibri',fontSize:7.5,color:'7A90A8',valign:'top'});
-      // Celdas de banda
+      s.addText(cr,{x:mX+0.06,y:ry,w:mScoreW-0.12,h:mRowH*0.58,fontFace:FF,fontSize:9,bold:true,color:catC,valign:'bottom'});
+      s.addText(ri===0?'≥'+THR.pro+'%':ri===1?'≥'+THR.act+'%':ri===2?'≥50%':'<50%',{x:mX+0.06,y:ry+mRowH*0.58,w:mScoreW-0.12,h:mRowH*0.40,fontFace:FF,fontSize:7.5,color:'7A90A8',valign:'top'});
       mx.bands.forEach((b,bi)=>{
-        const bx=mX+mScoreW+bi*mBandW;
-        const code=(mx.cells[ri]||[])[bi]||'IN';
-        const codeC=MX_CODE_C[code]||'D63030';
-        const isActive=ri===sRow&&bi===bCol;
-        // Fondo blanco siempre; solo la celda activa se rellena con color
-        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,
-          fill:{color:isActive?codeC:'FFFFFF'},
-          line:{color:isActive?codeC:'E8EDF3',width:isActive?2:0.5}});
-        s.addText(MX_CODE_L[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,
-          fontFace:'Calibri',fontSize:isActive?10:9,bold:true,
-          color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
+        const bx=mX+mScoreW+bi*mBandW; const code=(mx.cells[ri]||[])[bi]||'IN';
+        const codeC=MX_CODE_C[code]||'D63030'; const isActive=ri===sRow&&bi===bCol;
+        s.addShape(pptx.shapes.RECTANGLE,{x:bx,y:ry,w:mBandW,h:mRowH,fill:{color:isActive?codeC:'FFFFFF'},line:{color:isActive?codeC:'E8EDF3',width:isActive?2:0.5}});
+        s.addText(MX_CODE_L[code]||code,{x:bx,y:ry,w:mBandW,h:mRowH,fontFace:FF,fontSize:isActive?10:9,bold:true,color:isActive?'FFFFFF':codeC,align:'center',valign:'middle'});
       });
     });
   }
@@ -8169,7 +8196,8 @@ async function generateDistPPTX(){
   // ── SLIDE 7: ÁREA NO VINCULANTE (si existe) ─────────────
   const nvSheets=SHEETS_NV();
   if(nvSheets.length>0){
-    const s=pptx.addSlide(); _bgC(s); _ttl(s,'ÁREA NO VINCULANTE');
+    const s=pptx.addSlide();
+    _hdrDark(s,'Área No Vinculante',dist+' · '+ed);
     s.addText('Informativas — no inciden en el resultado global',{x:0.80,y:0.95,w:9.0,h:0.26,fontFace:'Calibri',fontSize:12,color:'7A90A8',valign:'middle'});
     // Columnas centradas: ATRIBUTO | TOTAL | SI ✓ | NO ✗ | % CUMPL.
     const nvCols=[
@@ -8231,9 +8259,17 @@ async function generateDistPPTX(){
   }
 
   // ── SLIDE 8: CIERRE ─────────────────────────────────────
-  {const s=pptx.addSlide(); _bgP(s);
+  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:PAIS_COLOR},line:{color:PAIS_COLOR,width:0}});
+    _addFlag(s,0.28,0.08,0.96,0.50);
+    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
     if(typeof IMG_PHOTO!=='undefined') s.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
-    s.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:'Calibri',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+    s.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:FF,fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
   }
 
   // Save
@@ -12283,52 +12319,74 @@ async function generateDevolucionPPTX(){
   if(typeof PptxGenJS==='undefined'){showToast('⚠️ PptxGenJS no disponible');return;}
   const pptx=new PptxGenJS();
   pptx.layout='LAYOUT_WIDE';
-  const W=13.33,H=7.5;
+  const W=13.33,H=7.5,FF='Calibri';
   function _fechaDev(f){if(!f)return '';const p=f.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f;}
-  function _bgP(s){
-    if(typeof IMG_BG!=='undefined') s.addImage({data:IMG_BG,x:0,y:0,w:W,h:H});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:-0.36,y:-0.36,w:2.97,h:2.10});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:10.52,y:0.21,w:2.58,h:0.64});
-    if(typeof IMG_DECO!=='undefined'){s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});s.addImage({data:IMG_DECO,x:-0.54,y:1.89,w:1.38,h:1.28});}
+  // País: color de acento y bandera
+  const _dPais=((audit&&audit.pais)||cfg.pais||'').toUpperCase();
+  const _dPC=_dPais==='ARGENTINA'?'74ACDF':_dPais==='URUGUAY'?'0038A8':_dPais==='CHILE'?'D52B1E':'1A6DB5';
+  const _dPL=(audit&&audit.pais)||cfg.pais||'';
+  function _dFlag(s,x,y,fw,fh){
+    if(_dPais==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined') s.addImage({data:LOGO_FLAG_UY,x,y,w:fw,h:fh});
+    else if(_dPais==='CHILE'&&typeof LOGO_FLAG_CL!=='undefined') s.addImage({data:LOGO_FLAG_CL,x,y,w:fw,h:fh});
+    else if(typeof LOGO_FLAG_AR!=='undefined') s.addImage({data:LOGO_FLAG_AR,x,y,w:fw,h:fh});
   }
-  function _bgC(s){
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:9.20,y:0.08,w:1.22,h:0.80});
-    if(typeof IMG_ARCOR!=='undefined')  s.addImage({data:IMG_ARCOR, x:10.58,y:0.16,w:2.50,h:0.62});
-    if(typeof IMG_DECO!=='undefined') s.addImage({data:IMG_DECO,x:12.65,y:1.64,w:1.38,h:1.28});
-    if(typeof IMG_DECO2!=='undefined'){s.addImage({data:IMG_DECO2,x:0,y:6.87,w:6.67,h:0.63});s.addImage({data:IMG_DECO2,x:6.67,y:6.87,w:6.67,h:0.63});}
+  const _dHdrColor=(s,title,accentHex,icon='')=>{
+    s.background={color:accentHex==='C97A00'?'FFF8F1':'F0F7FF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.70,fill:{color:accentHex},line:{color:accentHex,width:0}});
+    if(icon) s.addText(icon,{x:0.28,y:0,w:0.60,h:0.70,fontFace:FF,fontSize:22,color:'FFFFFF',valign:'middle',align:'center'});
+    s.addText(title,{x:icon?0.92:0.35,y:0,w:9,h:0.70,fontFace:FF,fontSize:22,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.10,w:1.28,h:0.44});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.10,w:0.58,h:0.44});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('RED Activa 2.0 · '+_dPL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
+    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
+  };
+  const _dCard=(s,txt,i,accentHex,bgHex,borderHex)=>{
+    const cy=0.82+i*1.52; const ch=1.34;
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.35,y:cy,w:W-0.70,h:ch,fill:{color:bgHex},line:{color:borderHex,width:1},rectRadius:0.08});
+    s.addShape(pptx.shapes.OVAL,{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fill:{color:accentHex},line:{color:accentHex,width:0}});
+    s.addText(String(i+1),{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fontFace:FF,fontSize:14,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    if(txt) s.addText(txt,{x:1.12,y:cy+0.12,w:W-1.58,h:ch-0.24,fontFace:FF,fontSize:15,color:'1E293B',valign:'middle',wrap:true});
+  };
+  // ── SLIDE 1: PORTADA (sin puntaje ni categoría) ──────────
+  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:_dPC},line:{color:_dPC,width:0}});
+    _dFlag(s,0.28,0.08,0.96,0.50);
+    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
+    s.addText(('DEVOLUCIÓN · '+(_dPL||'Argentina')).toUpperCase(),{x:1.5,y:1.78,w:10.33,h:0.26,fontFace:FF,fontSize:9,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:2});
+    s.addText('EVALUACIÓN BPL',{x:0.5,y:2.10,w:12.33,h:0.70,fontFace:FF,fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle'});
+    s.addText('EDICIÓN '+ed,{x:0.5,y:2.78,w:12.33,h:0.40,fontFace:FF,fontSize:16,bold:true,color:_dPC,align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:4.5,y:3.24,w:4.33,h:0.03,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
+    s.addText(dist,{x:0.5,y:3.32,w:12.33,h:0.90,fontFace:FF,fontSize:24,bold:true,color:'1A2E4A',align:'center',valign:'middle',wrap:true});
+    const dStr=_fechaDev(fechaRaw);
+    if(dStr) s.addText(dStr,{x:0.5,y:4.38,w:12.33,h:0.36,fontFace:FF,fontSize:14,color:'64748B',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText(('RED ACTIVA 2.0 · DEVOLUCIÓN BPL · '+(_dPL||'')).toUpperCase().trim(),{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8.5,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
   }
-  function _divider(s){
-    s.addShape(pptx.shapes.RECTANGLE,{x:0.45,y:0.92,w:W-0.90,h:0.02,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
+  // ── SLIDE 2: FORTALEZAS ──────────────────────────────────
+  {const s=pptx.addSlide(); _dHdrColor(s,'Fortalezas','0070C0','✦');
+    dd.fortalezas.forEach((txt,i)=>_dCard(s,txt,i,'0070C0','EFF6FF','BFDBFE'));
   }
-  // Portada
-  const s1=pptx.addSlide(); _bgP(s1);
-  if(typeof IMG_LOGO_SM!=='undefined') s1.addImage({data:IMG_LOGO_SM,x:-0.26,y:2.76,w:0.61,h:0.59});
-  {const _p=((audit&&audit.pais)||cfg.pais||'').toUpperCase();const _f=(_p==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined')?LOGO_FLAG_UY:(typeof LOGO_FLAG_CL!=='undefined'?LOGO_FLAG_CL:null);if(_f) s1.addImage({data:_f,x:5.98,y:5.63,w:1.24,h:0.83});}
-  s1.addText('DEVOLUCIÓN EVALUACIÓN '+ed,{x:1.38,y:2.06,w:10.10,h:0.91,fontFace:'Fira Sans',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle'});
-  s1.addText(dist,{x:2.18,y:3.28,w:8.83,h:1.45,fontFace:'Fira Sans',fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
-  if(fechaRaw) s1.addText(_fechaDev(fechaRaw),{x:4.56,y:4.62,w:3.89,h:0.64,fontFace:'Fira Sans',fontSize:28,bold:true,color:'1F2937',align:'center',valign:'middle'});
-  // Fortalezas
-  const fC=[{bg:'1F3864',bd:'2F5496',tx:'FFFFFF'},{bg:'2E4F83',bd:'8DA9DB',tx:'FFFFFF'},{bg:'9DC3E6',bd:'B3C6E7',tx:'1F2937'},{bg:'BDD7EE',bd:'B3C6E7',tx:'1F2937'}];
-  const s2=pptx.addSlide(); _bgC(s2);
-  s2.addText('FORTALEZAS',{x:0.45,y:0.12,w:9.0,h:0.78,fontFace:'Fira Sans',fontSize:48,bold:true,color:'0070C0',valign:'middle'}); _divider(s2);
-  dd.fortalezas.forEach((txt,i)=>{const c=fC[i],y=1.45+i*1.38;
-    s2.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
-    s2.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'2F5496'},line:{color:'2F5496',width:0}});
-    if(txt) s2.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
-  });
-  // Oportunidades
-  const oC=[{bg:'7B2D00',bd:'B45309',tx:'FFFFFF'},{bg:'9A3412',bd:'F97316',tx:'FFFFFF'},{bg:'FED7AA',bd:'FDBA74',tx:'1F2937'},{bg:'FEF3C7',bd:'FCD34D',tx:'1F2937'}];
-  const s3=pptx.addSlide(); _bgC(s3);
-  s3.addText('OPORTUNIDADES',{x:0.45,y:0.12,w:9.0,h:0.78,fontFace:'Fira Sans',fontSize:48,bold:true,color:'0070C0',valign:'middle'}); _divider(s3);
-  dd.debilidades.forEach((txt,i)=>{const c=oC[i],y=1.45+i*1.38;
-    s3.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:1.80,y,w:11.0,h:0.95,fill:{color:c.bg},line:{color:c.bd,width:1},rectRadius:0.07});
-    s3.addShape(pptx.shapes.OVAL,{x:1.05,y:y+0.24,w:0.48,h:0.48,fill:{color:'9A3412'},line:{color:'9A3412',width:0}});
-    if(txt) s3.addText(txt,{x:1.80,y,w:11.0,h:0.95,fontFace:'Calibri',fontSize:20,color:c.tx,align:'center',valign:'middle',margin:8,wrap:true});
-  });
-  // Cierre
-  const sC=pptx.addSlide(); _bgP(sC);
-  if(typeof IMG_PHOTO!=='undefined') sC.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
-  sC.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:'Fira Sans',fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+  // ── SLIDE 3: OPORTUNIDADES ───────────────────────────────
+  {const s=pptx.addSlide(); _dHdrColor(s,'Oportunidades de Mejora','C97A00','⚡');
+    dd.debilidades.forEach((txt,i)=>_dCard(s,txt,i,'C97A00','FFF8F1','FED7AA'));
+  }
+  // ── SLIDE 4: CIERRE ─────────────────────────────────────
+  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:_dPC},line:{color:_dPC,width:0}});
+    _dFlag(s,0.28,0.08,0.96,0.50);
+    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
+    if(typeof IMG_PHOTO!=='undefined') s.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
+    s.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:FF,fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
+    s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+  }
   await pptx.writeFile({fileName:'Dev - EV'+ed+' - '+dist+'.pptx'});
   showToast('✅ PPT Devolución generada');
 }
