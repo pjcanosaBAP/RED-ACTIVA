@@ -194,19 +194,25 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .q-row.peso-cero .q-num{color:#9575cd;font-weight:800;}
 .q-row.peso-cero .q-text{color:var(--g500);font-style:italic;}
 @keyframes pulse-warn{0%,100%{background:#fff}50%{background:#fff8e1;}}
-.q-num{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:var(--g400);
-  min-width:44px;padding-top:2px;font-weight:600;}
+.q-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--g600);
+  min-width:44px;padding-top:2px;font-weight:700;}
 .q-main{flex:1;display:flex;flex-direction:column;gap:4px;}
 .q-top{display:flex;align-items:flex-start;gap:6px;}
 .q-text{font-size:12px;line-height:1.5;color:var(--g800);flex:1;font-weight:600;}
 .crit-badge{font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;
   background:var(--red-l);color:var(--red-t);border:1px solid #ef9a9a;
   white-space:nowrap;flex-shrink:0;font-family:'Barlow Condensed',sans-serif;}
-.q-com{width:100%;padding:5px 9px;border:1.5px solid #f59e0b;border-radius:5px;
+.q-com{display:none;width:100%;padding:5px 9px;border:1.5px solid #f59e0b;border-radius:5px;
   font-family:'Barlow',sans-serif;font-size:11px;color:var(--g700);
-  resize:vertical;min-height:28px;max-height:80px;background:#fffbeb;}
+  resize:vertical;min-height:28px;max-height:80px;background:#fffbeb;margin-top:4px;}
+.q-com.visible{display:block;}
 .q-com:focus{outline:none;border-color:#d97706;background:#fff7e6;box-shadow:0 0 0 3px rgba(245,158,11,.12);}
 .q-com::placeholder{color:#d4a84b;font-style:italic;}
+.q-com-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:0 3px;
+  line-height:1;border-radius:4px;color:var(--g300);flex-shrink:0;transition:color .15s;}
+.q-com-btn:hover{color:var(--g500);}
+.q-com-btn.has-com{color:#f59e0b;}
+.bpl-prog{font-size:10px;font-weight:700;color:var(--g500);white-space:nowrap;}
 .q-ctrl{display:flex;gap:4px;flex-shrink:0;padding-top:1px;}
 .q-cmp-row{display:flex;gap:4px;align-items:center;flex-shrink:0;padding-top:1px;flex-direction:column;}
 .cmp-chip{display:flex;align-items:center;gap:3px;font-size:9px;font-weight:700;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;
@@ -285,14 +291,14 @@ body.sb-mini #sb-pending-panel{display:none!important;}
   border:1.5px solid var(--g200);background:#fff;color:var(--g500);font-family:'Barlow Condensed',sans-serif;
   letter-spacing:.3px;transition:all .15s;}
 .cmp-toggle-btn.on{background:var(--blue-xl);border-color:var(--blue2);color:var(--blue2);}
-.tgl{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:800;
+.tgl{padding:5px 13px;border-radius:12px;font-size:11px;font-weight:800;
   cursor:pointer;border:2px solid;transition:all .15s;
   font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;}
-.tg-si{border-color:var(--g200);color:var(--g400);background:#fff;}
+.tg-si{border-color:#d1d5db;color:#6b7280;background:#f9fafb;}
 .tg-si.on{border-color:var(--green);background:var(--green);color:#fff;}
-.tg-no{border-color:var(--g200);color:var(--g400);background:#fff;}
+.tg-no{border-color:#d1d5db;color:#6b7280;background:#f9fafb;}
 .tg-no.on{border-color:var(--red);background:var(--red);color:#fff;}
-.tg-na{border-color:var(--g200);color:var(--g400);background:#fff;}
+.tg-na{border-color:#d1d5db;color:#6b7280;background:#f9fafb;}
 .tg-na.on{border-color:var(--amber);background:var(--amber);color:#fff;}
 
 /* SUBTOTALS */
@@ -3019,7 +3025,7 @@ function buildForm(){
         <div class="bpl-hdr" onclick="togBpl('${sh}',${bk})">
           <div class="bpl-num">${bk}</div>
           <div class="bpl-name-txt">${bpl.name}</div>
-          <div class="bpl-wtag">peso: ${(bpl.weight*100).toFixed(0)}%</div>
+          <div class="bpl-prog" id="bprg-${sh}-${bk}">0/— resp.</div>
           <div class="bpl-score-chip" id="bsc-${sh}-${bk}" style="background:var(--g100);color:var(--g400)">—</div>
           <div class="bpl-chev open" id="bch-${sh}-${bk}">▼</div>
         </div>
@@ -3037,6 +3043,7 @@ function buildForm(){
                 <div class="q-text">${q.question}</div>
                 ${isCrit?`<span class="crit-badge">🔴 ${q.critico}</span>`:''}
                 ${_isPeso0?`<span style="font-size:9px;background:#ede7f6;color:#7e57c2;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:4px">PESO 0 · N/A sugerido</span>`:''}
+                <button class="q-com-btn" id="combt-${k}" onclick="toggleQCom('${q.comp_num}')" title="Agregar observación">💬</button>
               </div>
               <textarea class="q-com" id="com-${k}" placeholder="Observación..." rows="1" oninput="setCom('${q.comp_num}',this.value)"></textarea>
             </div>
@@ -3118,9 +3125,24 @@ function setA(comp,val){
   const _cp=document.getElementById('dash-sub-criticos');
   if(_cp&&_cp.style.display!=='none') renderDashCritDetail();
 }
+function toggleQCom(comp){
+  const k=comp.replace(/\./g,'_');
+  const ta=document.getElementById('com-'+k);
+  if(!ta) return;
+  ta.classList.toggle('visible');
+  if(ta.classList.contains('visible')) ta.focus();
+}
+function _setComBtn(k, hasContent){
+  const btn=document.getElementById('combt-'+k);
+  if(btn) btn.classList.toggle('has-com', hasContent);
+}
 function setCom(comp,val){
   if(val.trim()) coms[comp]=val; else delete coms[comp];
   document.getElementById('kpi-com').textContent=Object.keys(coms).length;
+  const k=comp.replace(/\./g,'_');
+  const ta=document.getElementById('com-'+k);
+  if(ta){ if(val.trim()) ta.classList.add('visible'); else ta.classList.remove('visible'); }
+  _setComBtn(k, !!val.trim());
   _scheduleAutoSave();
 }
 
@@ -3162,7 +3184,7 @@ function resetForm(){
     const k=q.comp_num.replace(/\./g,'_');
     ['si','no','na'].forEach(v=>{ const b=document.getElementById(v+'-'+k); if(b) b.classList.remove('on'); });
     const row=document.getElementById('qr-'+k); if(row) row.style.background='';
-    const com=document.getElementById('com-'+k); if(com) com.value='';
+    const com=document.getElementById('com-'+k); if(com){ com.value=''; com.classList.remove('visible'); _setComBtn(k,false); }
   });
   document.getElementById('kpi-com').textContent=0;
   recalc();
@@ -3340,6 +3362,9 @@ function recalc(){
     if(asttl){ asttl.textContent=sc.answered>0?fmt(sc.areas[sh]):'—'; asttl.style.color=scoreColor(sc.areas[sh]); }
     bplKeys.forEach(bk=>{
       const b=sc.bpls[sh+'_'+bk]||{score:0,contrib:0};
+      const bplQs=Q.filter(q=>q.sheet===sh&&q.bpl_num===bk);
+      const bprg=document.getElementById('bprg-'+sh+'-'+bk);
+      if(bprg) bprg.textContent=bplQs.filter(q=>ans[q.comp_num]).length+'/'+bplQs.length+' resp.';
       const chip=document.getElementById('bsc-'+sh+'-'+bk);
       if(chip){ chip.textContent=sc.answered>0?fmt(b.score):'—'; chip.style.background=sc.answered>0?scoreColor(b.score)+'22':'var(--g100)'; chip.style.color=sc.answered>0?scoreColor(b.score):'var(--g400)'; }
       const sp=document.getElementById('bsp-'+sh+'-'+bk); if(sp) sp.textContent=sc.answered>0?fmt(b.score):'—';
@@ -3587,7 +3612,7 @@ function loadAudit(idx){
     ['si','no','na'].forEach(x=>{const b=document.getElementById(x+'-'+k);if(b)b.classList.toggle('on',x===v);});
     const row=document.getElementById('qr-'+k);
     if(row&&v) row.style.background=v==='si'?'#f1f8e9':v==='no'?'#fce4ec':'#fff8e1';
-    const com=document.getElementById('com-'+k); if(com) com.value=coms[q.comp_num]||'';
+    const com=document.getElementById('com-'+k); if(com){ com.value=coms[q.comp_num]||''; const _hc=!!coms[q.comp_num]; com.classList.toggle('visible',_hc); _setComBtn(k,_hc); }
   });
   document.getElementById('kpi-com').textContent=Object.keys(coms).length;
   if(_loadedFrozenAudit){
