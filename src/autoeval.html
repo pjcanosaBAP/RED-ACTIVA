@@ -322,7 +322,6 @@ select.inp{cursor:pointer}
 
 <script>
 // ── CONFIG ──────────────────────────────────────────────────────────────────
-const ADMIN_PIN = '1234'; // Cambiar este valor para modificar el PIN de admin
 const SBURL = 'https://fkyifkbfgdxgmwbgnhud.supabase.co';
 const SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZreWlma2JmZ2R4Z213YmduaHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTkxMDYsImV4cCI6MjA5NTQ3NTEwNn0.lHuJ3onWCd0v2LWp5Sftzc_kdWR59ar_7oRqsgwYA8M';
 const sbc = supabase.createClient(SBURL, SBKEY);
@@ -893,8 +892,6 @@ function showAdminPin(){
 }
 
 async function adminLogin(){
-  const pin = (document.getElementById('inp-admin-pin').value||'').trim();
-  if(pin !== ADMIN_PIN){ setErr('err-admin','PIN incorrecto'); return; }
   setErr('err-admin','');
   const btn = document.getElementById('btn-admin');
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span>'; }
@@ -907,8 +904,10 @@ async function adminLogin(){
 }
 
 async function loadAdminView(){
-  const {data, error} = await sbc.rpc('ae_admin_view', {p_codigo: S.codigo});
+  const adminPin = (document.getElementById('inp-admin-pin').value||'').trim();
+  const {data, error} = await sbc.rpc('ae_admin_view', {p_codigo: S.codigo, p_admin_pin: adminPin});
   if(error) throw new Error('RPC error: '+error.message);
+  if(data && data.error === 'invalid_pin') throw new Error('PIN de administrador incorrecto');
   if(!data || data.error) throw new Error('Campaña no encontrada para código: '+S.codigo);
 
   const camp = data.campaign;
