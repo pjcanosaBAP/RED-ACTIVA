@@ -2562,13 +2562,10 @@ function _syncDistributors(pais){
   if(!p){ DISTRIBUTORS.length=0; return; }
   _distsObj(); // asegurar migración
   if(!cfg.dists||Array.isArray(cfg.dists)) cfg.dists={};
-  // Fusionar: lista configurada + distribuidores de auditorías guardadas para ese país
+  // Solo distribuidores explícitamente configurados — no mezclar con registros de auditorías/autoevals
   const configured=cfg.dists[p]||[];
-  const fromSaved=saved.filter(a=>(a.pais||'').toUpperCase()===p&&a.distribuidor).map(a=>a.distribuidor);
-  const merged=[...new Set([...configured,...fromSaved])].sort();
-  cfg.dists[p]=merged;
   DISTRIBUTORS.length=0;
-  merged.forEach(d=>DISTRIBUTORS.push(d));
+  [...configured].sort().forEach(d=>DISTRIBUTORS.push(d));
 }
 
 // Load cfg
