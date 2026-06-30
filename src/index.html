@@ -2589,6 +2589,7 @@ function loadCfg(){
   updateAreaWeights();
   renderCfgDists();
   renderWeightsCfg();
+  try{ rebuildDistSelect(); }catch(e){}
 }
 function saveCfg(){
   // Safe reads — elements may not be rendered if Config tab is not active
