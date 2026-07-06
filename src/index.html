@@ -2176,6 +2176,7 @@ function saveWCfg(){
   clearTimeout(_sbPushConfigTimer);
   _sbPushConfigTimer=setTimeout(()=>_sbPushConfig(),2000);
   recalc();
+  _recalcAEScores();
 }
 function resetWeightsCfg(){
   if(!confirm('¿Restablecer TODOS los pesos a los valores originales del Excel?')) return;
