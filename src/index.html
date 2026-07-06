@@ -1155,13 +1155,6 @@ body.readonly .admin-only{display:none!important;}
                 <option value="">— Seleccionar —</option>
               </select>
             </div>
-            <div style="display:flex;align-items:flex-end;padding-bottom:2px">
-              <button id="hist-toggle-btn" onclick="openHist()" 
-                style="display:none;background:var(--blue-xl);color:var(--blue);border:1.5px solid var(--blue);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:'Barlow',sans-serif"
-                title="Ver auditoría anterior de este distribuidor">
-                📋 Ver edición anterior
-              </button>
-            </div>
             <div class="fg"><label>Fecha de Auditoría</label><input type="date" id="sel-fecha"></div>
             <div class="fg" style="min-width:170px"><label>Auditor</label><input type="text" id="sel-auditor" placeholder="Nombre del auditor"></div>
           </div>
@@ -1879,37 +1872,6 @@ body.readonly .admin-only{display:none!important;}
   </div>
 </div>
 
-<!-- ── PANEL HISTÓRICO ── -->
-<button id="hist-toggle" onclick="toggleHistPanel()" style="display:none"><span>📋 HISTÓRICO</span></button>
-
-<div id="hist-panel">
-  <div id="hist-panel-hd">
-    <h3 id="hist-panel-title">Histórico</h3>
-    <button id="hist-close" onclick="toggleHistPanel()">✕</button>
-  </div>
-  <div id="hist-controls">
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-      <div class="fg" style="flex:1">
-        <label style="font-size:10px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">Edición a comparar</label>
-        <select id="hist-sel-ed" onchange="renderHistPanel()" style="width:100%;padding:5px 8px;border:1.5px solid var(--g200);border-radius:6px;font-size:12px">
-          <option value="">— Seleccioná una edición —</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:4px">
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">
-          <input type="checkbox" id="hist-only-diff" onchange="renderHistPanel()" checked>
-          Solo diferencias
-        </label>
-      </div>
-    </div>
-    <div id="hist-summary" style="margin-top:8px"></div>
-  </div>
-  <div id="hist-body">
-    <div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">
-      Seleccioná un distribuidor y una edición para ver el histórico.
-    </div>
-  </div>
-</div>
 
 
 
@@ -12184,42 +12146,6 @@ function makeTableSortable(tbl){
 
 </script>
 
-<!-- ── HISTORY PANEL ────────────────────────── -->
-<div class="hist-overlay" id="hist-overlay" onclick="closeHist()"></div>
-<div class="hist-panel" id="hist-panel">
-  <div class="hist-hd">
-    <div>
-      <div class="hist-hd-title" id="hist-dist-name">Historial</div>
-      <span class="hist-hd-sub" id="hist-edition-label">Seleccioná una edición</span>
-    </div>
-    <select id="hist-sel-ed" class="hist-btn" onchange="renderHistPanel()" style="min-width:90px;padding:4px 8px;font-size:12px"></select>
-    <button class="hist-btn" onclick="closeHist()" style="padding:4px 8px;font-size:16px;line-height:1">✕</button>
-  </div>
-  <div class="hist-toolbar">
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
-        <input type="checkbox" id="hist-only-diff" onchange="renderHistPanel()"> Solo diferencias
-      </label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
-        <input type="checkbox" id="hist-only-no" onchange="renderHistPanel()"> Solo NO
-      </label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
-        <input type="checkbox" id="hist-only-crit" onchange="renderHistPanel()"> Solo Críticos
-      </label>
-    </div>
-    <div id="hist-summary" style="font-size:10px;color:var(--g500);margin-left:auto"></div>
-  </div>
-  <div class="hist-legend">
-    <span>📗 SI</span>
-    <span>📕 NO</span>
-    <span>⬜ N/A</span>
-    <span style="color:var(--g300)">— Sin respuesta</span>
-    <span style="margin-left:4px">🔺 Mejoró · 🔻 Empeoró · ◾ Igual</span>
-  </div>
-  <div class="hist-body" id="hist-body">
-    <div style="padding:40px;text-align:center;color:var(--g400)">Seleccioná un distribuidor y una edición.</div>
-  </div>
-</div>
 
   <script>
 /* PptxGenJS inlined */
