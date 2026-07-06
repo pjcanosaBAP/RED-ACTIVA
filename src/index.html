@@ -4672,6 +4672,7 @@ async function loadFromSupabase(){
 
     // ── Refresh all UI ────────────────────────────────────────
     try{ updateAudCnt(); renderSaved(); renderGlobal(); renderAEList(); }catch(e){}
+    try{ renderCmpColumns(); }catch(e){}
     showToast('☁️ Supabase — '+saved.length+' EV · '+autoevals.length+' AE');
 
   } catch(e){
