@@ -10304,16 +10304,8 @@ rebuildDynamicUI();
 // 3. Set date/year defaults
 document.getElementById('sel-fecha').value=new Date().toISOString().slice(0,10);
 const _anioInit=(cfg.anio||'').toString();
-// Smart default: advance edition past most recent EV/AE year so prev-year data shows correctly
-(function(){
-  const evYrs=saved.map(a=>parseInt((a.edicion||'').replace(/\D/g,''))||0).filter(y=>y>2000);
-  const aeYrs=autoevals.map(a=>parseInt((a.edicion||'').replace(/\D/g,''))||0).filter(y=>y>2000);
-  const maxDataYr=Math.max(0,...evYrs,...aeYrs);
-  const cfgYr=parseInt(_anioInit)||0;
-  const bestYr=Math.max(cfgYr, maxDataYr>0?maxDataYr+1:0)||2025;
-  _ensureEdicionOption(String(bestYr));
-  const glEd=document.getElementById('gl-edicion'); if(glEd) glEd.value=String(bestYr);
-})();
+_ensureEdicionOption(_anioInit);
+const glEd=document.getElementById('gl-edicion'); if(glEd) glEd.value=_anioInit;
 // 4. Clear any DOM content captured by outerHTML snapshot, then rebuild clean
 ['form-sections','crit-grid','sb-area-nav','db-area-bars',
  'cfg-area-weight-rows','an-m1-out','an-m2-out','an-m3-out','an-m4-out'].forEach(id=>{
