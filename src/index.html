@@ -4761,8 +4761,20 @@ function _cmpChipHTML(lbl, val){
 
 function renderCmpColumns(){
   const dist=(document.getElementById('sel-dist')||{}).value||'';
-  const edicion=(document.getElementById('sel-edicion')||{}).value||'';
-  const ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
+  let edicion=(document.getElementById('sel-edicion')||{}).value||'';
+  let ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
+  // Auto-detect edition from AE data when current edition has no match
+  if(!ae&&dist&&cmpShowAE){
+    const distUp=dist.trim().toUpperCase();
+    const anyAE=autoevals
+      .filter(a=>a.distribuidor&&a.distribuidor.trim().toUpperCase()===distUp)
+      .sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''));
+    if(anyAE.length){
+      ae=anyAE[0];
+      edicion=ae.edicion||edicion;
+      _ensureEdicionOption(edicion);
+    }
+  }
   const prev=cmpShowPrev&&dist&&edicion?_getPrevAudit(dist,edicion,cmpEdicion||null):null;
   // Show bar whenever a distributor is selected (even without comparison data)
   const bar=document.getElementById('cmp-compare-bar');
