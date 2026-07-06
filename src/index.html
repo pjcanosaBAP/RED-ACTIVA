@@ -3242,7 +3242,7 @@ function computeScores(answers, weightOverride){
       const bpGroups=Object.entries(saScores).filter(([k])=>k.startsWith(sh+'_'+bk+'_'));
       let bplScoreSum=0, bplWSum=0;
       bpGroups.forEach(([,v])=>{
-        if(!v.answered) return; // exclude all-NA subattrs from BPL score
+        if(v.bplW===0) return; // weight=0 in WCfg → explicitly excluded (e.g. N/A facilities)
         bplScoreSum+=v.score*v.bplW; bplWSum+=v.bplW;
       });
       const bplScore=bplWSum>0?bplScoreSum/bplWSum:0;
