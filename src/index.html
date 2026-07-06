@@ -5853,6 +5853,11 @@ function clearActiveAudit(){
   if(!n){ showToast('ℹ️ No hay respuestas cargadas'); return; }
   if(!confirm('¿Limpiar las '+n+' respuestas cargadas?\nLas ediciones guardadas no se verán afectadas.')) return;
   resetForm();
+  const selDist=document.getElementById('sel-dist');
+  if(selDist) selDist.value='';
+  const tbDist=document.getElementById('tb-dist');
+  if(tbDist) tbDist.textContent='—';
+  try{ renderCmpColumns(); renderDashResumen(); }catch(e){}
   showToast('🗑 Respuestas limpiadas');
 }
 
