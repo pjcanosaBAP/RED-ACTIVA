@@ -1155,14 +1155,7 @@ body.readonly .admin-only{display:none!important;}
                 <option value="">— Seleccionar —</option>
               </select>
             </div>
-            <div style="display:flex;align-items:flex-end;padding-bottom:2px">
-              <button id="hist-toggle-btn" onclick="openHist()"
-                style="display:none;background:var(--blue-xl);color:var(--blue);border:1.5px solid var(--blue);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:'Barlow',sans-serif"
-                title="Ver auditoría anterior de este distribuidor">
-                📋 Ver edición anterior
-              </button>
-            </div>
-            <div class="fg"><label>Fecha de Auditoría</label><input type="date" id="sel-fecha"></div>
+<div class="fg"><label>Fecha de Auditoría</label><input type="date" id="sel-fecha"></div>
             <div class="fg" style="min-width:170px"><label>Auditor</label><input type="text" id="sel-auditor" placeholder="Nombre del auditor"></div>
           </div>
         </div>
@@ -1880,7 +1873,6 @@ body.readonly .admin-only{display:none!important;}
 </div>
 
 <!-- ── PANEL HISTÓRICO ── -->
-<button id="hist-toggle" onclick="toggleHistPanel()" style="display:none"><span>📋 HISTÓRICO</span></button>
 
 <div id="hist-panel">
   <div id="hist-panel-hd">
