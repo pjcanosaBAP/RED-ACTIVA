@@ -4503,6 +4503,7 @@ async function _sbApplyRemoteConfig(){
     }
     cfg.pais=_ePais; cfg.anio=_eAnio;
     localStorage.setItem('bpl_cfg_v5', JSON.stringify(cfg));
+    _ensureEdicionOption(_eAnio);
     const structLoaded = loadStructure(_ePais, _eAnio);
     if(structLoaded){
       _rebuildCritList();
@@ -4761,20 +4762,8 @@ function _cmpChipHTML(lbl, val){
 
 function renderCmpColumns(){
   const dist=(document.getElementById('sel-dist')||{}).value||'';
-  let edicion=(document.getElementById('sel-edicion')||{}).value||'';
-  let ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
-  // Auto-detect edition from AE data when current edition has no match
-  if(!ae&&dist&&cmpShowAE){
-    const distUp=dist.trim().toUpperCase();
-    const anyAE=autoevals
-      .filter(a=>a.distribuidor&&a.distribuidor.trim().toUpperCase()===distUp)
-      .sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''));
-    if(anyAE.length){
-      ae=anyAE[0];
-      edicion=ae.edicion||edicion;
-      _ensureEdicionOption(edicion);
-    }
-  }
+  const edicion=(document.getElementById('sel-edicion')||{}).value||'';
+  const ae=cmpShowAE&&dist&&edicion?_getAEFor(dist,edicion):null;
   const prev=cmpShowPrev&&dist&&edicion?_getPrevAudit(dist,edicion,cmpEdicion||null):null;
   // Show bar whenever a distributor is selected (even without comparison data)
   const bar=document.getElementById('cmp-compare-bar');
@@ -10315,8 +10304,16 @@ rebuildDynamicUI();
 // 3. Set date/year defaults
 document.getElementById('sel-fecha').value=new Date().toISOString().slice(0,10);
 const _anioInit=(cfg.anio||'').toString();
-_ensureEdicionOption(_anioInit);
-const glEd=document.getElementById('gl-edicion'); if(glEd) glEd.value=_anioInit;
+// Smart default: advance edition past most recent EV/AE year so prev-year data shows correctly
+(function(){
+  const evYrs=saved.map(a=>parseInt((a.edicion||'').replace(/\D/g,''))||0).filter(y=>y>2000);
+  const aeYrs=autoevals.map(a=>parseInt((a.edicion||'').replace(/\D/g,''))||0).filter(y=>y>2000);
+  const maxDataYr=Math.max(0,...evYrs,...aeYrs);
+  const cfgYr=parseInt(_anioInit)||0;
+  const bestYr=Math.max(cfgYr, maxDataYr>0?maxDataYr+1:0)||2025;
+  _ensureEdicionOption(String(bestYr));
+  const glEd=document.getElementById('gl-edicion'); if(glEd) glEd.value=String(bestYr);
+})();
 // 4. Clear any DOM content captured by outerHTML snapshot, then rebuild clean
 ['form-sections','crit-grid','sb-area-nav','db-area-bars',
  'cfg-area-weight-rows','an-m1-out','an-m2-out','an-m3-out','an-m4-out'].forEach(id=>{
