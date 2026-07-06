@@ -5857,7 +5857,9 @@ function clearActiveAudit(){
   if(selDist) selDist.value='';
   const tbDist=document.getElementById('tb-dist');
   if(tbDist) tbDist.textContent='—';
-  try{ renderCmpColumns(); renderDashResumen(); }catch(e){}
+  const anSelDist=document.getElementById('an-sel-dist');
+  if(anSelDist) anSelDist.value='';
+  try{ renderCmpColumns(); renderDashResumen(); renderM1(); }catch(e){}
   showToast('🗑 Respuestas limpiadas');
 }
 
