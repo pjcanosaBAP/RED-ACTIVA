@@ -8384,7 +8384,7 @@ function updateHistPanelForDist(dist){
   const curEd  = document.getElementById('sel-edicion').value;
 
   if(!dist){
-    toggle.style.display = 'none';
+    if(toggle) toggle.style.display = 'none';
     if(_histPanelOpen) toggleHistPanel();
     return;
   }
@@ -8395,13 +8395,13 @@ function updateHistPanelForDist(dist){
     .sort((a,b) => (b.edicion||'').localeCompare(a.edicion||''));
 
   if(!priorAudits.length){
-    toggle.style.display = 'none';
+    if(toggle) toggle.style.display = 'none';
     if(_histPanelOpen) toggleHistPanel();
     return;
   }
 
   // Show toggle button
-  toggle.style.display = 'block';
+  if(toggle) toggle.style.display = 'block';
 
   // Populate edition selector
   selEd.innerHTML = '<option value="">— Seleccioná edición —</option>' +
