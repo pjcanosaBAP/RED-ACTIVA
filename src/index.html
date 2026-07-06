@@ -2118,7 +2118,7 @@ function switchStruct(pais, anio){
   _syncDistributors(pais);
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   try{ rebuildSbStructSel(); }catch(e){}
-  const sel=document.getElementById('sel-edicion'); if(sel) sel.value=anio;
+  _ensureEdicionOption(anio);
   const inp=document.getElementById('cfg-pais'); if(inp) inp.value=pais;
   const inpa=document.getElementById('cfg-anio'); if(inpa) inpa.value=anio;
   if(loadStructure(pais,anio)){
@@ -3165,6 +3165,21 @@ function onEdicionChange(){
   try{ rebuildSbStructSel(); }catch(e){}
   setTimeout(function(){renderCmpColumns();renderDashResumen();}, 50);
 }
+function _ensureEdicionOption(year){
+  const sel=document.getElementById('sel-edicion');
+  if(!sel||!year) return;
+  const ys=year.toString();
+  if(![...sel.options].some(o=>o.value===ys)){
+    const opt=document.createElement('option');
+    opt.value=ys; opt.textContent=ys;
+    let inserted=false;
+    for(let i=0;i<sel.options.length;i++){
+      if(sel.options[i].value>ys){sel.insertBefore(opt,sel.options[i]);inserted=true;break;}
+    }
+    if(!inserted) sel.appendChild(opt);
+  }
+  sel.value=ys;
+}
 function resetForm(){
   _loadedAuditMatrix = null; // Clear saved matrix on new form
   _loadedFrozenAudit = null;  // Clear frozen audit on new form
@@ -3595,7 +3610,7 @@ function loadAudit(idx){
   _selDist.setAttribute('data-prev',a.distribuidor);
   document.getElementById('sel-fecha').value=a.fecha;
   document.getElementById('sel-auditor').value=a.auditor||'';
-  document.getElementById('sel-edicion').value=a.edicion||'2025';
+  _ensureEdicionOption(a.edicion||'2025');
   document.getElementById('tb-dist').textContent=a.distribuidor||'—';
   Q.forEach(q=>{
     const k=q.comp_num.replace(/\./g,'_'); const v=ans[q.comp_num];
@@ -6513,7 +6528,7 @@ function savePaisAnio(){
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   _sbPushConfig();
   try{ rebuildSbStructSel(); }catch(e){}
-  const sel=document.getElementById('sel-edicion'); if(sel) sel.value=anio;
+  _ensureEdicionOption(anio);
   // Load structure for the new pais/anio (or reset to base if none exists)
   if(!loadStructure(pais,anio)){
     Q=[...Q_BASE.map(q=>({...q}))];
@@ -10288,7 +10303,7 @@ rebuildDynamicUI();
 // 3. Set date/year defaults
 document.getElementById('sel-fecha').value=new Date().toISOString().slice(0,10);
 const _anioInit=(cfg.anio||'').toString();
-document.getElementById('sel-edicion').value=_anioInit;
+_ensureEdicionOption(_anioInit);
 const glEd=document.getElementById('gl-edicion'); if(glEd) glEd.value=_anioInit;
 // 4. Clear any DOM content captured by outerHTML snapshot, then rebuild clean
 ['form-sections','crit-grid','sb-area-nav','db-area-bars',
