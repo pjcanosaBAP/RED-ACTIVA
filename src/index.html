@@ -5772,7 +5772,7 @@ function importEVFile(input){
       try{
         const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
         const areaNames=SHEETS();
-        const areaSheets=wb.SheetNames.filter(function(s){return areaNames.includes(s);});
+        const areaSheets=wb.SheetNames.filter(function(s){return areaNames.includes(s)||areaNames.some(function(n){return NV[n]&&s===n+' NV';});});
         if(!areaSheets.length){
           filesFail++; pending--;
           log.innerHTML+=`<br>❌ <strong>${fname}</strong>: no se encontraron solapas de área (${areaNames.join(', ')})`;
@@ -5793,15 +5793,26 @@ function importEVFile(input){
         }
 
         areaSheets.forEach(function(shName){
+          const areaCode=areaNames.includes(shName)?shName:shName.replace(/ NV$/,'');
           const ws=wb.Sheets[shName];
           const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          // Para áreas NV: remapar BPLs posicionalmente (Excel: 1,2,3… → App: 23,24,25…)
+          let bplRemap=null;
+          if(NV[areaCode]){
+            const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
+            const excelBplSet=new Set();
+            rows.forEach(function(r){const cn=(r[3]||'').toString().trim();if(/^\d+\.\d+(\.\d+)+$/.test(cn))excelBplSet.add(Number(cn.split('.')[0]));});
+            const excelBpls=[...excelBplSet].sort(function(a,b){return a-b;});
+            if(excelBpls.length&&appBpls.length){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
+          }
           rows.forEach(function(row){
-            const compNum=(row[3]||'').toString().trim();
-            if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return; // solo filas de preguntas
-            const v=_parseAns(row[5]); // columna F (índice 5)
+            let compNum=(row[3]||'').toString().trim();
+            if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return;
+            if(bplRemap){const b=Number(compNum.split('.')[0]);if(bplRemap[b]!==undefined)compNum=compNum.replace(/^\d+/,String(bplRemap[b]));}
+            const v=_parseAns(row[5]);
             if(v) answers[compNum]=v;
             if(fileType==='EV'){
-              const cmt=(row[8]||'').toString().trim(); // columna I (índice 8)
+              const cmt=(row[8]||'').toString().trim();
               if(cmt&&v) evComments[compNum]=cmt;
             }
           });
