@@ -4742,9 +4742,13 @@ function _getAEFor(distribuidor, edicion){
     return excel||candidates[0];
   }
   // Default portal:
-  // 1. Source explícito portal
+  // 1. Source explícito portal — si también existe excel, mergear answers (excel llena huecos del portal)
   const portal=candidates.find(a=>a.source==='portal');
-  if(portal) return portal;
+  const excelAlt=candidates.find(a=>a.source==='excel');
+  if(portal){
+    if(excelAlt) return Object.assign({},portal,{answers:Object.assign({},excelAlt.answers||{},portal.answers||{})});
+    return portal;
+  }
   // 2. Edición en formato campaña (AE26, EV26 → portal)
   const campaignFmt=candidates.find(a=>/^(AE|EV)\d+$/i.test(a.edicion||''));
   if(campaignFmt) return campaignFmt;
