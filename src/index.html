@@ -5805,7 +5805,8 @@ function importEVFile(input){
           // Auto-detectar columna de comp_num: escanear cols 0–8
           let compCol=-1;
           for(let ci=0;ci<=8;ci++){if(rows.some(function(r){return /^\d+\.\d+(\.\d+)+$/.test((r[ci]||'').toString().trim());})){compCol=ci;break;}}
-          if(compCol<0) compCol=3; // fallback
+          const compDetected=compCol>=0;
+          if(!compDetected) compCol=3; // fallback numérico (no activa modo normal)
           const ansCol=compCol===3?5:compCol===0?2:compCol+2;
           // Auto-detectar y remapar BPLs cuando los del Excel no coinciden con Q
           let bplRemap=null;
@@ -5818,7 +5819,7 @@ function importEVFile(input){
             if(needsRemap){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
           }
           let shCount=0;
-          if(compCol>=0){
+          if(compDetected){
             // Modo normal: leer comp_num y respuesta por columna detectada
             rows.forEach(function(row){
               let compNum=(row[compCol]||'').toString().trim();
@@ -5842,7 +5843,7 @@ function importEVFile(input){
               if(v){answers[areaQs[qIdx].comp_num]=v;shCount++;qIdx++;}
             });
           }
-          sheetLog.push(shName+'='+shCount+(compCol<0?'[pos]':compCol!==3?'[c'+compCol+']':''));
+          sheetLog.push(shName+'='+shCount+(!compDetected?'[pos]':compCol!==3?'[c'+compCol+']':''));
         });
 
         const answCount=Object.keys(answers).length;
