@@ -5818,24 +5818,31 @@ function importEVFile(input){
             if(needsRemap){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
           }
           let shCount=0;
-          rows.forEach(function(row){
-            let compNum=(row[compCol]||'').toString().trim();
-            if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return;
-            if(bplRemap){const b=Number(compNum.split('.')[0]);if(bplRemap[b]!==undefined)compNum=compNum.replace(/^\d+/,String(bplRemap[b]));}
-            const v=_parseAns(row[ansCol]);
-            if(v){answers[compNum]=v;shCount++;}
-            if(fileType==='EV'){
-              const cmt=(row[8]||'').toString().trim();
-              if(cmt&&v) evComments[compNum]=cmt;
-            }
-          });
-          if(shCount===0){
-            const sRow=rows.find(function(r){return r.some(function(c){return String(c||'').trim()!=='';});});
-            const sHint=sRow?'['+sRow.slice(0,7).map(function(c){return '"'+String(c||'').substring(0,10)+'"';}).join(',')+']':'[vacía]';
-            sheetLog.push(shName+'=0 '+sHint);
-          } else {
-            sheetLog.push(shName+'='+shCount+(compCol!==3?'[c'+compCol+']':''));
+          if(compCol>=0){
+            // Modo normal: leer comp_num y respuesta por columna detectada
+            rows.forEach(function(row){
+              let compNum=(row[compCol]||'').toString().trim();
+              if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return;
+              if(bplRemap){const b=Number(compNum.split('.')[0]);if(bplRemap[b]!==undefined)compNum=compNum.replace(/^\d+/,String(bplRemap[b]));}
+              const v=_parseAns(row[ansCol]);
+              if(v){answers[compNum]=v;shCount++;}
+              if(fileType==='EV'){const cmt=(row[8]||'').toString().trim();if(cmt&&v)evComments[compNum]=cmt;}
+            });
+          } else if(appBpls.length){
+            // Fallback posicional: hoja sin comp_nums (ej. SUST portal)
+            // Detectar la columna con más respuestas válidas
+            const _ansRe=/^(si|sí|no|n\/a|na)$/i;
+            let posAnsCol=5;let bestAnsN=0;
+            for(let ci=0;ci<=8;ci++){const n=rows.filter(function(r){return _ansRe.test((r[ci]||'').toString().trim());}).length;if(n>bestAnsN){bestAnsN=n;posAnsCol=ci;}}
+            const areaQs=Q.filter(function(q){return q.sheet===areaCode;});
+            let qIdx=0;
+            rows.forEach(function(row){
+              if(qIdx>=areaQs.length) return;
+              const v=_parseAns(row[posAnsCol]);
+              if(v){answers[areaQs[qIdx].comp_num]=v;shCount++;qIdx++;}
+            });
           }
+          sheetLog.push(shName+'='+shCount+(compCol<0?'[pos]':compCol!==3?'[c'+compCol+']':''));
         });
 
         const answCount=Object.keys(answers).length;
