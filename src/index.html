@@ -5772,7 +5772,7 @@ function importEVFile(input){
       try{
         const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
         const areaNames=SHEETS();
-        const areaSheets=wb.SheetNames.filter(function(s){return areaNames.includes(s)||areaNames.some(function(n){return NV[n]&&s===n+' NV';});});
+        const areaSheets=wb.SheetNames.filter(function(s){return areaNames.includes(s)||areaNames.some(function(n){return s===n+' NV';});});
         if(!areaSheets.length){
           filesFail++; pending--;
           log.innerHTML+=`<br>❌ <strong>${fname}</strong>: no se encontraron solapas de área (${areaNames.join(', ')})`;
@@ -5796,14 +5796,16 @@ function importEVFile(input){
           const areaCode=areaNames.includes(shName)?shName:shName.replace(/ NV$/,'');
           const ws=wb.Sheets[shName];
           const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-          // Para áreas NV: remapar BPLs posicionalmente (Excel: 1,2,3… → App: 23,24,25…)
+          // Auto-detectar y remapar BPLs cuando los del Excel no coinciden con Q
+          // (cubre SUST NV que viene numerado desde 1 en el portal pero Q lo tiene desde 23)
           let bplRemap=null;
-          if(NV[areaCode]){
-            const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
+          const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
+          if(appBpls.length){
             const excelBplSet=new Set();
             rows.forEach(function(r){const cn=(r[3]||'').toString().trim();if(/^\d+\.\d+(\.\d+)+$/.test(cn))excelBplSet.add(Number(cn.split('.')[0]));});
             const excelBpls=[...excelBplSet].sort(function(a,b){return a-b;});
-            if(excelBpls.length&&appBpls.length){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
+            const needsRemap=excelBpls.length&&excelBpls.some(function(b){return!appBpls.includes(b);});
+            if(needsRemap){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
           }
           rows.forEach(function(row){
             let compNum=(row[3]||'').toString().trim();
