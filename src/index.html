@@ -5829,7 +5829,13 @@ function importEVFile(input){
               if(cmt&&v) evComments[compNum]=cmt;
             }
           });
-          sheetLog.push(shName+'='+shCount+(compCol!==3?'[c'+compCol+']':''));
+          if(shCount===0){
+            const sRow=rows.find(function(r){return r.some(function(c){return String(c||'').trim()!=='';});});
+            const sHint=sRow?'['+sRow.slice(0,7).map(function(c){return '"'+String(c||'').substring(0,10)+'"';}).join(',')+']':'[vacía]';
+            sheetLog.push(shName+'=0 '+sHint);
+          } else {
+            sheetLog.push(shName+'='+shCount+(compCol!==3?'[c'+compCol+']':''));
+          }
         });
 
         const answCount=Object.keys(answers).length;
