@@ -2837,8 +2837,9 @@ function scoreColor(v){
   if(p>=THR.rea) return '#e65100';
   return '#c62828';
 }
-// Returns correct total crits for an audit (frozen use their own, live use CRIT_LIST)
+// Returns correct total crits for an audit (uses stored scores.totalCrits, fallback to CRIT_LIST)
 function auditTotalCrits(audit){
+  if(audit && audit.scores && audit.scores.totalCrits) return audit.scores.totalCrits;
   if(audit && audit.totalCrits) return audit.totalCrits;
   return CRIT_LIST.length;
 }
@@ -9328,7 +9329,7 @@ function renderM1(){
       <div class="an-kpi-lbl">vs Promedio Red</div>
     </div>
     <div class="an-kpi">
-      <div class="an-kpi-val" style="color:${critOk===CRIT_LIST.length?'#2e7d32':'#c62828'}">${critOk}/${CRIT_LIST.length}</div>
+      <div class="an-kpi-val" style="color:${critOk===auditTotalCrits(audit)?'#2e7d32':'#c62828'}">${critOk}/${auditTotalCrits(audit)}</div>
       <div class="an-kpi-lbl">Críticos OK</div>
     </div>
     <div class="an-kpi" style="background:${semBg(total)}">
@@ -10298,6 +10299,7 @@ function renderHistPanel(){
       loadQCustom();
       console.log('[RA2] startup: no per-país structure, loaded from legacy keys');
     }
+    _rebuildCritList(); // sync CRIT_LIST to Q after loadStructure (Q_BASE may differ from active country)
     console.log('[RA2] startup: AC keys =',Object.keys(AC).join(','),' pais='+_startPais+' anio='+_startAnio);
   }
 })();
