@@ -5802,22 +5802,26 @@ function importEVFile(input){
           const areaCode=areaNames.includes(shName)?shName:shName.replace(/ NV$/,'');
           const ws=wb.Sheets[shName];
           const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          // Auto-detectar columna de comp_num: probar col D(3) primero, luego A(0)
+          const _hasComp=function(ci){return rows.some(function(r){return /^\d+\.\d+(\.\d+)+$/.test((r[ci]||'').toString().trim());});};
+          const compCol=_hasComp(3)?3:_hasComp(0)?0:3;
+          const ansCol=compCol===3?5:2;
           // Auto-detectar y remapar BPLs cuando los del Excel no coinciden con Q
           let bplRemap=null;
           const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
           if(appBpls.length){
             const excelBplSet=new Set();
-            rows.forEach(function(r){const cn=(r[3]||'').toString().trim();if(/^\d+\.\d+(\.\d+)+$/.test(cn))excelBplSet.add(Number(cn.split('.')[0]));});
+            rows.forEach(function(r){const cn=(r[compCol]||'').toString().trim();if(/^\d+\.\d+(\.\d+)+$/.test(cn))excelBplSet.add(Number(cn.split('.')[0]));});
             const excelBpls=[...excelBplSet].sort(function(a,b){return a-b;});
             const needsRemap=excelBpls.length&&excelBpls.some(function(b){return!appBpls.includes(b);});
             if(needsRemap){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
           }
           let shCount=0;
           rows.forEach(function(row){
-            let compNum=(row[3]||'').toString().trim();
+            let compNum=(row[compCol]||'').toString().trim();
             if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return;
             if(bplRemap){const b=Number(compNum.split('.')[0]);if(bplRemap[b]!==undefined)compNum=compNum.replace(/^\d+/,String(bplRemap[b]));}
-            const v=_parseAns(row[5]);
+            const v=_parseAns(row[ansCol]);
             if(v){answers[compNum]=v;shCount++;}
             if(fileType==='EV'){
               const cmt=(row[8]||'').toString().trim();
