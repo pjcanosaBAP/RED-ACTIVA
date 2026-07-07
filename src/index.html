@@ -5797,12 +5797,12 @@ function importEVFile(input){
           return null;
         }
 
+        const sheetLog=[];
         areaSheets.forEach(function(shName){
           const areaCode=areaNames.includes(shName)?shName:shName.replace(/ NV$/,'');
           const ws=wb.Sheets[shName];
           const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
           // Auto-detectar y remapar BPLs cuando los del Excel no coinciden con Q
-          // (cubre SUST NV que viene numerado desde 1 en el portal pero Q lo tiene desde 23)
           let bplRemap=null;
           const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
           if(appBpls.length){
@@ -5812,17 +5812,19 @@ function importEVFile(input){
             const needsRemap=excelBpls.length&&excelBpls.some(function(b){return!appBpls.includes(b);});
             if(needsRemap){bplRemap={};excelBpls.forEach(function(eb,i){if(i<appBpls.length)bplRemap[eb]=appBpls[i];});}
           }
+          let shCount=0;
           rows.forEach(function(row){
             let compNum=(row[3]||'').toString().trim();
             if(!/^\d+\.\d+(\.\d+)+$/.test(compNum)) return;
             if(bplRemap){const b=Number(compNum.split('.')[0]);if(bplRemap[b]!==undefined)compNum=compNum.replace(/^\d+/,String(bplRemap[b]));}
             const v=_parseAns(row[5]);
-            if(v) answers[compNum]=v;
+            if(v){answers[compNum]=v;shCount++;}
             if(fileType==='EV'){
               const cmt=(row[8]||'').toString().trim();
               if(cmt&&v) evComments[compNum]=cmt;
             }
           });
+          sheetLog.push(shName+'='+shCount);
         });
 
         const answCount=Object.keys(answers).length;
@@ -5850,7 +5852,7 @@ function importEVFile(input){
           totalAE++;
         }
 
-        log.innerHTML+=`<br>✔ <strong>${fname}</strong>: ${fileType} — ${distName} ${edYear} — ${answCount} respuestas`;
+        log.innerHTML+=`<br>✔ <strong>${fname}</strong>: ${fileType} — ${distName} ${edYear} — ${answCount} resp. [${sheetLog.join(', ')}]`;
         filesOK++; pending--;
         if(!pending){
           persist(); updateAudCnt(); renderSaved(); renderGlobal(); renderAEList();
