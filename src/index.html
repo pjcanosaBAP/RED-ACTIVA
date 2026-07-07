@@ -5871,7 +5871,7 @@ function importEVFile(input){
           totalAE++;
         }
 
-        log.innerHTML+=`<br>✔ <strong>${fname}</strong>: ${fileType} — ${distName} ${edYear} — ${answCount} resp. [${sheetLog.join(', ')}]`;
+        log.innerHTML+=`<br>✔ <strong>${fname}</strong>: ${fileType} — ${distName} ${edYear} — ${answCount} respuestas`;
         filesOK++; pending--;
         if(!pending){
           persist(); updateAudCnt(); renderSaved(); renderGlobal(); renderAEList();
