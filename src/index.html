@@ -5802,10 +5802,11 @@ function importEVFile(input){
           const areaCode=areaNames.includes(shName)?shName:shName.replace(/ NV$/,'');
           const ws=wb.Sheets[shName];
           const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-          // Auto-detectar columna de comp_num: probar col D(3) primero, luego A(0)
-          const _hasComp=function(ci){return rows.some(function(r){return /^\d+\.\d+(\.\d+)+$/.test((r[ci]||'').toString().trim());});};
-          const compCol=_hasComp(3)?3:_hasComp(0)?0:3;
-          const ansCol=compCol===3?5:2;
+          // Auto-detectar columna de comp_num: escanear cols 0–8
+          let compCol=-1;
+          for(let ci=0;ci<=8;ci++){if(rows.some(function(r){return /^\d+\.\d+(\.\d+)+$/.test((r[ci]||'').toString().trim());})){compCol=ci;break;}}
+          if(compCol<0) compCol=3; // fallback
+          const ansCol=compCol===3?5:compCol===0?2:compCol+2;
           // Auto-detectar y remapar BPLs cuando los del Excel no coinciden con Q
           let bplRemap=null;
           const appBpls=[...new Set(Q.filter(function(q){return q.sheet===areaCode;}).map(function(q){return Number(q.comp_num.split('.')[0]);}))].sort(function(a,b){return a-b;});
@@ -5828,7 +5829,7 @@ function importEVFile(input){
               if(cmt&&v) evComments[compNum]=cmt;
             }
           });
-          sheetLog.push(shName+'='+shCount);
+          sheetLog.push(shName+'='+shCount+(compCol!==3?'[c'+compCol+']':''));
         });
 
         const answCount=Object.keys(answers).length;
@@ -6134,7 +6135,7 @@ function renderGlobal(){
   // Enable/disable AE tab based on autoevals presence
   const _aeBtn=document.getElementById('global-tab-ae');
   if(_aeBtn){
-    const _hasAE=autoevals.some(function(a){return !ed||(a.edicion===ed);});
+    const _hasAE=autoevals.length>0;
     _aeBtn.classList.toggle('sn-disabled',!_hasAE);
   }
 }
