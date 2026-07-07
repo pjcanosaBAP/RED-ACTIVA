@@ -2988,6 +2988,7 @@ function pctBadge(v){ const n=parseFloat(v); if(isNaN(n)) return '<span class="b
 // ── BUILD FORM ──
 function buildForm(){
   const wrap=document.getElementById('form-sections');
+  wrap.innerHTML='';
   SHEETS().forEach(sh=>{
     const shQs=Q.filter(q=>q.sheet===sh);
     const bpls={};
@@ -5859,6 +5860,7 @@ function clearActiveAudit(){
   const n=Object.keys(ans).length;
   if(!n){ showToast('ℹ️ No hay respuestas cargadas'); return; }
   if(!confirm('¿Limpiar las '+n+' respuestas cargadas?\nLas ediciones guardadas no se verán afectadas.')) return;
+  window.scrollTo(0,0);
   resetForm();
   const selDist=document.getElementById('sel-dist');
   if(selDist) selDist.value='';
