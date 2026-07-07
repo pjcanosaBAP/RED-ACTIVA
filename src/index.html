@@ -105,7 +105,7 @@ body.sb-mini .sb-nav,body.sb-mini .sb-score{display:none;}
 body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 
 /* ═══ TOPBAR ═══ */
-.main{margin-left:var(--sb);min-height:100vh;}
+.main{margin-left:var(--sb);min-height:100vh;background:#f1f5f9;}
 .topbar{background:var(--navy2);height:var(--topbar);padding:0 18px;
   display:flex;align-items:center;gap:10px;
   position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.2);}
@@ -5861,7 +5861,6 @@ function clearActiveAudit(){
   const n=Object.keys(ans).length;
   if(!n){ showToast('ℹ️ No hay respuestas cargadas'); return; }
   if(!confirm('¿Limpiar las '+n+' respuestas cargadas?\nLas ediciones guardadas no se verán afectadas.')) return;
-  window.scrollTo(0,0);
   resetForm();
   const selDist=document.getElementById('sel-dist');
   if(selDist) selDist.value='';
@@ -5869,6 +5868,12 @@ function clearActiveAudit(){
   if(tbDist) tbDist.textContent='—';
   const anSelDist=document.getElementById('an-sel-dist');
   if(anSelDist) anSelDist.value='';
+  // Collapse all expanded form sections so the page height shrinks to minimum
+  document.querySelectorAll('.area-body').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.area-chev').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('[id^="bplc-"]').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.bpl-chev').forEach(el=>el.classList.remove('open'));
+  window.scrollTo(0,0);
   try{ renderCmpColumns(); renderDashResumen(); renderM1(); }catch(e){}
   showToast('🗑 Respuestas limpiadas');
 }
