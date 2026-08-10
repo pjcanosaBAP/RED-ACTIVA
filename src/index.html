@@ -8059,9 +8059,8 @@ function _pptDistKit(pptx,ctx){
     addFlag(s,0.28,0.07,0.80,0.42);
     s.addText((ctx.pais||'').toUpperCase(),{x:1.22,y:0,w:5,h:0.55,fontFace:FF,fontSize:12,bold:true,color:'FFFFFF',valign:'middle',charSpacing:2});
     s.addText('RED ACTIVA 2.0',{x:W-4.30,y:0,w:4.00,h:0.55,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',align:'right',valign:'middle',charSpacing:1});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.24,y:1.05,w:2.05,h:0.57});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:6.84,y:1.05,w:1.46,h:0.57});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:8.44,y:1.08,w:0.60,h:0.51});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.55,y:1.05,w:2.05,h:0.57});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:7.15,y:1.02,w:1.63,h:0.63});
     s.addText(o.kicker||'',{x:1.50,y:2.02,w:10.33,h:0.28,fontFace:FF,fontSize:10,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:3});
     s.addText(o.title,{x:0.50,y:2.32,w:12.33,h:0.66,fontFace:FF,fontSize:30,bold:true,color:NAVY,align:'center',valign:'middle'});
     s.addShape(pptx.shapes.RECTANGLE,{x:5.67,y:3.08,w:2.00,h:0.035,fill:{color:paisColor},line:{color:paisColor,width:0}});
@@ -8095,10 +8094,9 @@ function _pptDistKit(pptx,ctx){
     }
     s.addText('¡MUCHAS GRACIAS!',{x:3.30,y:2.25,w:9.20,h:1.00,fontFace:FF,fontSize:44,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     s.addText('Por la participación de todo el equipo en esta jornada',{x:3.30,y:3.30,w:9.20,h:0.45,fontFace:FF,fontSize:16,color:'94A3B8',align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:(W-4.90)/2,y:4.85,w:4.90,h:0.90,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.10});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.55,y:5.02,w:2.00,h:0.56});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:6.80,y:5.05,w:1.30,h:0.51});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:8.24,y:5.05,w:0.58,h:0.50});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:(W-4.30)/2,y:4.85,w:4.30,h:0.90,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.10});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.79,y:5.02,w:2.00,h:0.56});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:7.14,y:5.00,w:1.50,h:0.58});
     s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.45,w:W,h:0.35,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
   };
   return {W,H,FF,NAVY,paisColor,paisLabel:ctx.pais||'',addFlag,footer,hdrDark,hdrColor,cardsGrid,cover,closing};
