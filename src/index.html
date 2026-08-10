@@ -8007,6 +8007,103 @@ function scrollToUnanswered(){
   }, 300);
 }
 
+// ── KIT COMPARTIDO PPT (Informe Distribuidor + Devolución) ─
+function _pptDistKit(pptx,ctx){
+  const W=13.33,H=7.5,FF='Calibri',NAVY='1A2E4A';
+  const paisU=(ctx.pais||'').toUpperCase();
+  const paisColor=paisU==='ARGENTINA'?'74ACDF':paisU==='URUGUAY'?'0038A8':paisU==='CHILE'?'D52B1E':'1A6DB5';
+  const addFlag=(s,x,y,fw,fh)=>{
+    if(paisU==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined') s.addImage({data:LOGO_FLAG_UY,x,y,w:fw,h:fh});
+    else if(paisU==='CHILE'&&typeof LOGO_FLAG_CL!=='undefined') s.addImage({data:LOGO_FLAG_CL,x,y,w:fw,h:fh});
+    else if(typeof LOGO_FLAG_AR!=='undefined') s.addImage({data:LOGO_FLAG_AR,x,y,w:fw,h:fh});
+  };
+  const footer=s=>{
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:NAVY},line:{color:NAVY,width:0}});
+    s.addText('RED Activa 2.0 · '+(ctx.pais||'')+' · Edición '+ctx.ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
+    s.addText(ctx.dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
+  };
+  // Header oscuro de slides interiores — sin logos: el subtítulo dispone de todo el ancho derecho
+  const hdrDark=(s,title,sub='')=>{
+    s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.55,fill:{color:NAVY},line:{color:NAVY,width:0}});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0.55,w:W,h:0.035,fill:{color:paisColor},line:{color:paisColor,width:0}});
+    s.addText(title,{x:0.30,y:0,w:6.90,h:0.55,fontFace:FF,fontSize:18,bold:true,color:'FFFFFF',valign:'middle'});
+    if(sub) s.addText(sub,{x:7.30,y:0,w:5.73,h:0.55,fontFace:FF,fontSize:9,color:'94A3B8',align:'right',valign:'middle'});
+    footer(s);
+  };
+  // Header de color (fortalezas / oportunidades) — sin logos ni emojis
+  const hdrColor=(s,title,accentHex,nItems)=>{
+    s.background={color:accentHex==='C97A00'?'FFF8F1':'F0F7FF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.70,fill:{color:accentHex},line:{color:accentHex,width:0}});
+    s.addText(title,{x:0.35,y:0,w:8.50,h:0.70,fontFace:FF,fontSize:22,bold:true,color:'FFFFFF',valign:'middle'});
+    if(nItems) s.addText(nItems+(nItems===1?' punto':' puntos'),{x:9.00,y:0,w:3.98,h:0.70,fontFace:FF,fontSize:11,bold:true,color:'E8F1FA',align:'right',valign:'middle'});
+    footer(s);
+  };
+  // Grilla 2×2 de cards con barra de acento lateral y chip numerado
+  const cardsGrid=(s,items,accentHex,bgHex,borderHex)=>{
+    const gx=0.35,gap=0.25,cw=(W-gx*2-gap)/2,ch=2.80;
+    (items||[]).slice(0,4).forEach((txt,i)=>{
+      const cx=gx+(i%2)*(cw+gap), cy=0.98+Math.floor(i/2)*(ch+gap);
+      const filled=!!(txt&&String(txt).trim());
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:cx,y:cy,w:cw,h:ch,fill:{color:filled?bgHex:'FBFCFD'},line:{color:filled?borderHex:'E8EDF3',width:1},rectRadius:0.09});
+      s.addShape(pptx.shapes.RECTANGLE,{x:cx+0.02,y:cy+0.14,w:0.07,h:ch-0.28,fill:{color:filled?accentHex:'CBD5E1'},line:{color:filled?accentHex:'CBD5E1',width:0}});
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:cx+0.22,y:cy+0.20,w:0.42,h:0.42,fill:{color:filled?accentHex:'CBD5E1'},line:{color:filled?accentHex:'CBD5E1',width:0},rectRadius:0.07});
+      s.addText(String(i+1),{x:cx+0.22,y:cy+0.20,w:0.42,h:0.42,fontFace:FF,fontSize:15,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      if(filled) s.addText(String(txt),{x:cx+0.80,y:cy+0.16,w:cw-1.02,h:ch-0.32,fontFace:FF,fontSize:14,color:'1E293B',valign:'middle',wrap:true});
+    });
+  };
+  // Portada: franja país, logos con aire, distri protagonista, KPIs opcionales
+  const cover=(s,o)=>{
+    s.background={color:'FFFFFF'};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.55,fill:{color:paisColor},line:{color:paisColor,width:0}});
+    addFlag(s,0.28,0.07,0.80,0.42);
+    s.addText((ctx.pais||'').toUpperCase(),{x:1.22,y:0,w:5,h:0.55,fontFace:FF,fontSize:12,bold:true,color:'FFFFFF',valign:'middle',charSpacing:2});
+    s.addText('RED ACTIVA 2.0',{x:W-4.30,y:0,w:4.00,h:0.55,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',align:'right',valign:'middle',charSpacing:1});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.24,y:1.05,w:2.05,h:0.57});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:6.84,y:1.05,w:1.46,h:0.57});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:8.44,y:1.08,w:0.60,h:0.51});
+    s.addText(o.kicker||'',{x:1.50,y:2.02,w:10.33,h:0.28,fontFace:FF,fontSize:10,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:3});
+    s.addText(o.title,{x:0.50,y:2.32,w:12.33,h:0.66,fontFace:FF,fontSize:30,bold:true,color:NAVY,align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:5.67,y:3.08,w:2.00,h:0.035,fill:{color:paisColor},line:{color:paisColor,width:0}});
+    s.addText(ctx.dist,{x:0.50,y:3.20,w:12.33,h:0.85,fontFace:FF,fontSize:24,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
+    s.addText((ctx.pais||'').toUpperCase()+' · EDICIÓN '+ctx.ed,{x:0.50,y:4.06,w:12.33,h:0.32,fontFace:FF,fontSize:13,bold:true,color:paisColor,align:'center',valign:'middle'});
+    if(o.kpis){
+      const k=o.kpis; const ky=4.58,kh=1.12,kw=2.10,kgap=0.25; const kx0=(W-(kw*3+kgap*2))/2;
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:kx0,y:ky,w:kw,h:kh,fill:{color:'FFFFFF'},line:{color:'D1DAE6',width:1.25},rectRadius:0.09});
+      s.addText(k.pct+'%',{x:kx0,y:ky+0.04,w:kw,h:0.66,fontFace:FF,fontSize:28,bold:true,color:k.catHex,align:'center',valign:'middle'});
+      s.addText('SCORE TOTAL',{x:kx0,y:ky+kh-0.36,w:kw,h:0.28,fontFace:FF,fontSize:8,bold:true,color:'7A90A8',align:'center',valign:'middle',charSpacing:1.5});
+      const k2=kx0+kw+kgap;
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:k2,y:ky,w:kw,h:kh,fill:{color:k.catHex},line:{color:k.catHex,width:0},rectRadius:0.09});
+      s.addText(k.cat,{x:k2,y:ky+0.04,w:kw,h:0.66,fontFace:FF,fontSize:17,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText('CATEGORÍA',{x:k2,y:ky+kh-0.36,w:kw,h:0.28,fontFace:FF,fontSize:8,bold:true,color:'E8F1FA',align:'center',valign:'middle',charSpacing:1.5});
+      const k3=k2+kw+kgap;
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:k3,y:ky,w:kw,h:kh,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1.25},rectRadius:0.09});
+      s.addText(k.critMet+'/'+k.critTot,{x:k3,y:ky+0.04,w:kw,h:0.66,fontFace:FF,fontSize:24,bold:true,color:'92400E',align:'center',valign:'middle'});
+      s.addText('CRÍTICOS',{x:k3,y:ky+kh-0.36,w:kw,h:0.28,fontFace:FF,fontSize:8,bold:true,color:'C97A00',align:'center',valign:'middle',charSpacing:1.5});
+    }
+    if(o.fecha) s.addText(o.fecha,{x:0.50,y:o.kpis?5.92:4.66,w:12.33,h:0.30,fontFace:FF,fontSize:11,color:'64748B',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:NAVY},line:{color:NAVY,width:0}});
+    s.addText(o.footerTxt||'',{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8.5,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+  };
+  // Cierre: fondo navy, foto con marco, logos sobre tira blanca
+  const closing=s=>{
+    s.background={color:NAVY};
+    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.10,fill:{color:paisColor},line:{color:paisColor,width:0}});
+    if(typeof IMG_PHOTO!=='undefined'){
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.80,y:2.42,w:2.26,h:2.20,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.08});
+      s.addImage({data:IMG_PHOTO,x:0.90,y:2.52,w:2.06,h:2.00});
+    }
+    s.addText('¡MUCHAS GRACIAS!',{x:3.30,y:2.25,w:9.20,h:1.00,fontFace:FF,fontSize:44,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+    s.addText('Por la participación de todo el equipo en esta jornada',{x:3.30,y:3.30,w:9.20,h:0.45,fontFace:FF,fontSize:16,color:'94A3B8',align:'center',valign:'middle'});
+    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:(W-4.90)/2,y:4.85,w:4.90,h:0.90,fill:{color:'FFFFFF'},line:{color:'FFFFFF',width:0},rectRadius:0.10});
+    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:4.55,y:5.02,w:2.00,h:0.56});
+    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:6.80,y:5.05,w:1.30,h:0.51});
+    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:8.24,y:5.05,w:0.58,h:0.50});
+    s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.45,w:W,h:0.35,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+  };
+  return {W,H,FF,NAVY,paisColor,paisLabel:ctx.pais||'',addFlag,footer,hdrDark,hdrColor,cardsGrid,cover,closing};
+}
+
 // ── INFORME DISTRIBUIDOR ──────────────────────────────────
 async function generateDistPPTX(){
   if(typeof PptxGenJS==='undefined'){ showToast('❌ PptxGenJS no cargó. Recompilá la app.'); return; }
@@ -8036,15 +8133,9 @@ async function generateDistPPTX(){
   function _ff(f){if(!f)return '';const p=f.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f;}
   function _sC(v){return v>=0.85?'1D9E6F':v>=0.70?'1A6DB5':v>=0.50?'C97A00':'C0392B';}
 
-  // ── País: color de acento y bandera
-  const _paisUpper=(curAudit.pais||cfg.pais||'').toUpperCase();
-  const PAIS_COLOR=_paisUpper==='ARGENTINA'?'74ACDF':_paisUpper==='URUGUAY'?'0038A8':_paisUpper==='CHILE'?'D52B1E':'1A6DB5';
-  const PAIS_LABEL=curAudit.pais||cfg.pais||'';
-  function _addFlag(s,x,y,fw,fh){
-    if(_paisUpper==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined') s.addImage({data:LOGO_FLAG_UY,x,y,w:fw,h:fh});
-    else if(_paisUpper==='CHILE'&&typeof LOGO_FLAG_CL!=='undefined') s.addImage({data:LOGO_FLAG_CL,x,y,w:fw,h:fh});
-    else if(typeof LOGO_FLAG_AR!=='undefined') s.addImage({data:LOGO_FLAG_AR,x,y,w:fw,h:fh});
-  }
+  // ── País + helpers compartidos (kit)
+  const K=_pptDistKit(pptx,{pais:curAudit.pais||cfg.pais||'',dist,ed});
+  const PAIS_COLOR=K.paisColor, PAIS_LABEL=K.paisLabel;
 
   // ── Paleta categoría
   const totalPct=((sc.total||0)*100).toFixed(1);
@@ -8053,82 +8144,27 @@ async function generateDistPPTX(){
   const MX_CODE_C={PR:'00A854',AC:'0078C8',RE:'E67E00',IN:'D63030'};
   const MX_CODE_L={PR:'PRO',AC:'ACT',RE:'REA',IN:'INA'};
 
-  // ── Helper: banda + footer comunes en slides de contenido
-  const _hdrDark=(s,title,sub='')=>{
-    s.background={color:'FFFFFF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.55,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText(title,{x:0.30,y:0,w:8.50,h:0.55,fontFace:FF,fontSize:18,bold:true,color:'FFFFFF',valign:'middle'});
-    if(sub) s.addText(sub,{x:8.85,y:0,w:4.20,h:0.55,fontFace:FF,fontSize:8.5,color:'94A3B8',align:'right',valign:'middle'});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.05,w:1.28,h:0.44});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.05,w:0.58,h:0.44});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('RED Activa 2.0 · '+PAIS_LABEL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
-    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
-  };
-
-  // ── Helper: header colorido (fortalezas / oportunidades)
-  const _hdrColor=(s,title,accentHex,icon='')=>{
-    s.background={color:accentHex==='C97A00'?'FFF8F1':'F0F7FF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.70,fill:{color:accentHex},line:{color:accentHex,width:0}});
-    if(icon) s.addText(icon,{x:0.28,y:0,w:0.60,h:0.70,fontFace:FF,fontSize:22,color:'FFFFFF',valign:'middle',align:'center'});
-    s.addText(title,{x:icon?0.92:0.35,y:0,w:9,h:0.70,fontFace:FF,fontSize:22,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.10,w:1.28,h:0.44});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.10,w:0.58,h:0.44});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('RED Activa 2.0 · '+PAIS_LABEL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
-    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
-  };
-
-  // ── Helper: card fortaleza/oportunidad
-  const _card=(s,txt,i,accentHex,bgHex,borderHex)=>{
-    const cy=0.82+i*1.52; const ch=1.34;
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.35,y:cy,w:W-0.70,h:ch,fill:{color:bgHex},line:{color:borderHex,width:1},rectRadius:0.08});
-    s.addShape(pptx.shapes.OVAL,{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fill:{color:accentHex},line:{color:accentHex,width:0}});
-    s.addText(String(i+1),{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fontFace:FF,fontSize:14,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    if(txt) s.addText(txt,{x:1.12,y:cy+0.12,w:W-1.58,h:ch-0.24,fontFace:FF,fontSize:15,color:'1E293B',valign:'middle',wrap:true});
-  };
+  const _hdrDark=K.hdrDark;
 
   // ── SLIDE 1: PORTADA ────────────────────────────────────
-  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
-    // Banda superior de país
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:PAIS_COLOR},line:{color:PAIS_COLOR,width:0}});
-    _addFlag(s,0.28,0.08,0.96,0.50);
-    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
-    // Cuerpo
-    s.addText(('PROGRAMA BPL · '+(PAIS_LABEL||'Argentina')).toUpperCase(),{x:1.5,y:1.55,w:10.33,h:0.26,fontFace:FF,fontSize:9,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:2});
-    s.addText('INFORME DE EVALUACIÓN',{x:0.5,y:1.85,w:12.33,h:0.70,fontFace:FF,fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle'});
-    s.addText('EDICIÓN '+ed,{x:0.5,y:2.52,w:12.33,h:0.40,fontFace:FF,fontSize:16,bold:true,color:PAIS_COLOR,align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.RECTANGLE,{x:4.5,y:2.98,w:4.33,h:0.03,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
-    s.addText(dist,{x:0.5,y:3.06,w:12.33,h:0.80,fontFace:FF,fontSize:22,bold:true,color:'1A2E4A',align:'center',valign:'middle',wrap:true});
-    // Score box con categoría y críticos
-    const BX=3.80,BY=3.98,BW=5.73,BH=1.16;
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX,y:BY,w:BW,h:BH,fill:{color:'FFFFFF'},line:{color:'D1DAE6',width:1.5},rectRadius:0.10});
-    s.addShape(pptx.shapes.RECTANGLE,{x:BX,y:BY,w:BW,h:0.06,fill:{color:catHex},line:{color:catHex,width:0}});
-    s.addText(totalPct+'%',{x:BX+0.16,y:BY+0.08,w:2.10,h:BH-0.14,fontFace:FF,fontSize:42,bold:true,color:catHex,valign:'middle'});
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX+2.38,y:BY+0.24,w:1.62,h:0.38,fill:{color:catHex},line:{color:catHex,width:0},rectRadius:0.08});
-    s.addText(cat,{x:BX+2.38,y:BY+0.24,w:1.62,h:0.38,fontFace:FF,fontSize:11,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:BX+4.12,y:BY+0.24,w:1.38,h:0.38,fill:{color:'FFF7ED'},line:{color:'C97A00',width:1},rectRadius:0.08});
-    s.addText('Críticos\n'+(sc.critMet||0)+'/'+tc,{x:BX+4.12,y:BY+0.24,w:1.38,h:0.38,fontFace:FF,fontSize:9,bold:true,color:'92400E',align:'center',valign:'middle'});
+  {const s=pptx.addSlide();
     const dStr=_ff(fechaRaw); const audStr=curAudit.auditor?' · '+curAudit.auditor:'';
-    if(dStr) s.addText(dStr+audStr,{x:BX,y:BY+BH+0.08,w:BW,h:0.22,fontFace:FF,fontSize:9,color:'64748B',align:'center',valign:'middle'});
-    // Banda inferior
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText(('RED ACTIVA 2.0 · EVALUACIÓN BPL · '+(PAIS_LABEL||'')).toUpperCase().trim(),{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8.5,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+    K.cover(s,{kicker:'PROGRAMA BPL',title:'INFORME DE EVALUACIÓN',
+      kpis:{pct:totalPct,cat,catHex,critMet:sc.critMet||0,critTot:tc},
+      fecha:dStr?dStr+audStr:'',
+      footerTxt:('RED ACTIVA 2.0 · EVALUACIÓN BPL · '+(PAIS_LABEL||'')).toUpperCase().trim()});
   }
 
   // ── SLIDE 2: FORTALEZAS ─────────────────────────────────
   {const s=pptx.addSlide();
-    _hdrColor(s,'Fortalezas','0070C0','✦');
-    dd.fortalezas.forEach((txt,i)=>_card(s,txt,i,'0070C0','EFF6FF','BFDBFE'));
+    K.hdrColor(s,'Fortalezas','0070C0',dd.fortalezas.filter(t=>t&&t.trim()).length);
+    K.cardsGrid(s,dd.fortalezas,'0070C0','EFF6FF','BFDBFE');
   }
 
   // ── SLIDE 3: OPORTUNIDADES ──────────────────────────────
   {const s=pptx.addSlide();
-    _hdrColor(s,'Oportunidades de Mejora','C97A00','⚡');
-    dd.debilidades.forEach((txt,i)=>_card(s,txt,i,'C97A00','FFF8F1','FED7AA'));
+    K.hdrColor(s,'Oportunidades de Mejora','C97A00',dd.debilidades.filter(t=>t&&t.trim()).length);
+    K.cardsGrid(s,dd.debilidades,'C97A00','FFF8F1','FED7AA');
   }
 
   // ── SLIDE 4: DASHBOARD GENERAL ──────────────────────────
@@ -8350,18 +8386,7 @@ async function generateDistPPTX(){
   }
 
   // ── SLIDE 8: CIERRE ─────────────────────────────────────
-  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:PAIS_COLOR},line:{color:PAIS_COLOR,width:0}});
-    _addFlag(s,0.28,0.08,0.96,0.50);
-    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
-    if(typeof IMG_PHOTO!=='undefined') s.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
-    s.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:FF,fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
-  }
+  {const s=pptx.addSlide(); K.closing(s);}
 
   // Save
   const fileName='Informe - EV'+ed+' - '+dist.substring(0,50)+'.pptx';
@@ -12382,72 +12407,26 @@ async function generateDevolucionPPTX(){
   pptx.layout='LAYOUT_WIDE';
   const W=13.33,H=7.5,FF='Calibri';
   function _fechaDev(f){if(!f)return '';const p=f.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:f;}
-  // País: color de acento y bandera
-  const _dPais=((audit&&audit.pais)||cfg.pais||'').toUpperCase();
-  const _dPC=_dPais==='ARGENTINA'?'74ACDF':_dPais==='URUGUAY'?'0038A8':_dPais==='CHILE'?'D52B1E':'1A6DB5';
-  const _dPL=(audit&&audit.pais)||cfg.pais||'';
-  function _dFlag(s,x,y,fw,fh){
-    if(_dPais==='URUGUAY'&&typeof LOGO_FLAG_UY!=='undefined') s.addImage({data:LOGO_FLAG_UY,x,y,w:fw,h:fh});
-    else if(_dPais==='CHILE'&&typeof LOGO_FLAG_CL!=='undefined') s.addImage({data:LOGO_FLAG_CL,x,y,w:fw,h:fh});
-    else if(typeof LOGO_FLAG_AR!=='undefined') s.addImage({data:LOGO_FLAG_AR,x,y,w:fw,h:fh});
-  }
-  const _dHdrColor=(s,title,accentHex,icon='')=>{
-    s.background={color:accentHex==='C97A00'?'FFF8F1':'F0F7FF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.70,fill:{color:accentHex},line:{color:accentHex,width:0}});
-    if(icon) s.addText(icon,{x:0.28,y:0,w:0.60,h:0.70,fontFace:FF,fontSize:22,color:'FFFFFF',valign:'middle',align:'center'});
-    s.addText(title,{x:icon?0.92:0.35,y:0,w:9,h:0.70,fontFace:FF,fontSize:22,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.10,w:1.28,h:0.44});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.10,w:0.58,h:0.44});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.25,w:W,h:0.25,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('RED Activa 2.0 · '+_dPL+' · Edición '+ed,{x:0.20,y:H-0.25,w:7,h:0.25,fontFace:FF,fontSize:7,color:'60A5FA',valign:'middle'});
-    s.addText(dist,{x:W-5.5,y:H-0.25,w:5.3,h:0.25,fontFace:FF,fontSize:7,color:'94A3B8',align:'right',valign:'middle'});
-  };
-  const _dCard=(s,txt,i,accentHex,bgHex,borderHex)=>{
-    const cy=0.82+i*1.52; const ch=1.34;
-    s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:0.35,y:cy,w:W-0.70,h:ch,fill:{color:bgHex},line:{color:borderHex,width:1},rectRadius:0.08});
-    s.addShape(pptx.shapes.OVAL,{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fill:{color:accentHex},line:{color:accentHex,width:0}});
-    s.addText(String(i+1),{x:0.54,y:cy+(ch-0.44)/2,w:0.44,h:0.44,fontFace:FF,fontSize:14,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    if(txt) s.addText(txt,{x:1.12,y:cy+0.12,w:W-1.58,h:ch-0.24,fontFace:FF,fontSize:15,color:'1E293B',valign:'middle',wrap:true});
-  };
+  // País + helpers compartidos (mismo kit que el Informe Distribuidor)
+  const K=_pptDistKit(pptx,{pais:(audit&&audit.pais)||cfg.pais||'',dist,ed});
+  const _dPL=K.paisLabel;
   // ── SLIDE 1: PORTADA (sin puntaje ni categoría) ──────────
-  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:_dPC},line:{color:_dPC,width:0}});
-    _dFlag(s,0.28,0.08,0.96,0.50);
-    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
-    s.addText(('DEVOLUCIÓN · '+(_dPL||'Argentina')).toUpperCase(),{x:1.5,y:1.78,w:10.33,h:0.26,fontFace:FF,fontSize:9,bold:true,color:'94A3B8',align:'center',valign:'middle',charSpacing:2});
-    s.addText('EVALUACIÓN BPL',{x:0.5,y:2.10,w:12.33,h:0.70,fontFace:FF,fontSize:32,bold:true,color:'0070C0',align:'center',valign:'middle'});
-    s.addText('EDICIÓN '+ed,{x:0.5,y:2.78,w:12.33,h:0.40,fontFace:FF,fontSize:16,bold:true,color:_dPC,align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.RECTANGLE,{x:4.5,y:3.24,w:4.33,h:0.03,fill:{color:'D1DAE6'},line:{color:'D1DAE6',width:0}});
-    s.addText(dist,{x:0.5,y:3.32,w:12.33,h:0.90,fontFace:FF,fontSize:24,bold:true,color:'1A2E4A',align:'center',valign:'middle',wrap:true});
-    const dStr=_fechaDev(fechaRaw);
-    if(dStr) s.addText(dStr,{x:0.5,y:4.38,w:12.33,h:0.36,fontFace:FF,fontSize:14,color:'64748B',align:'center',valign:'middle'});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText(('RED ACTIVA 2.0 · DEVOLUCIÓN BPL · '+(_dPL||'')).toUpperCase().trim(),{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8.5,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
+  {const s=pptx.addSlide();
+    K.cover(s,{kicker:'DEVOLUCIÓN',title:'EVALUACIÓN BPL',fecha:_fechaDev(fechaRaw),
+      footerTxt:('RED ACTIVA 2.0 · DEVOLUCIÓN BPL · '+(_dPL||'')).toUpperCase().trim()});
   }
   // ── SLIDE 2: FORTALEZAS ──────────────────────────────────
-  {const s=pptx.addSlide(); _dHdrColor(s,'Fortalezas','0070C0','✦');
-    dd.fortalezas.forEach((txt,i)=>_dCard(s,txt,i,'0070C0','EFF6FF','BFDBFE'));
+  {const s=pptx.addSlide();
+    K.hdrColor(s,'Fortalezas','0070C0',dd.fortalezas.filter(t=>t&&t.trim()).length);
+    K.cardsGrid(s,dd.fortalezas,'0070C0','EFF6FF','BFDBFE');
   }
   // ── SLIDE 3: OPORTUNIDADES ───────────────────────────────
-  {const s=pptx.addSlide(); _dHdrColor(s,'Oportunidades de Mejora','C97A00','⚡');
-    dd.debilidades.forEach((txt,i)=>_dCard(s,txt,i,'C97A00','FFF8F1','FED7AA'));
+  {const s=pptx.addSlide();
+    K.hdrColor(s,'Oportunidades de Mejora','C97A00',dd.debilidades.filter(t=>t&&t.trim()).length);
+    K.cardsGrid(s,dd.debilidades,'C97A00','FFF8F1','FED7AA');
   }
   // ── SLIDE 4: CIERRE ─────────────────────────────────────
-  {const s=pptx.addSlide(); s.background={color:'FFFFFF'};
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:0,w:W,h:0.65,fill:{color:_dPC},line:{color:_dPC,width:0}});
-    _dFlag(s,0.28,0.08,0.96,0.50);
-    s.addText('RED ACTIVA 2.0',{x:1.38,y:0,w:4,h:0.65,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',valign:'middle'});
-    if(typeof IMG_BAP!=='undefined') s.addImage({data:IMG_BAP,x:5.50,y:0.08,w:1.80,h:0.50});
-    if(typeof IMG_ARCOR!=='undefined') s.addImage({data:IMG_ARCOR,x:W-2.75,y:0.08,w:1.28,h:0.50});
-    if(typeof IMG_ARCOR2!=='undefined') s.addImage({data:IMG_ARCOR2,x:W-1.38,y:0.08,w:0.58,h:0.50});
-    if(typeof IMG_PHOTO!=='undefined') s.addImage({data:IMG_PHOTO,x:0.66,y:2.86,w:2.06,h:2.00});
-    s.addText('¡MUCHAS GRACIAS\nPOR LA PARTICIPACIÓN\nA TODO EL EQUIPO\nEN ESTA JORNADA!',{x:3.17,y:1.92,w:7.42,h:3.33,fontFace:FF,fontSize:40,bold:true,color:'0070C0',align:'center',valign:'middle',wrap:true});
-    s.addShape(pptx.shapes.RECTANGLE,{x:0,y:H-0.40,w:W,h:0.40,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
-    s.addText('RED ACTIVA 2.0 · BAP PARTNERS CONSULTORÍA EMPRESARIAL',{x:0,y:H-0.40,w:W,h:0.40,fontFace:FF,fontSize:8,bold:true,color:'60A5FA',align:'center',valign:'middle',charSpacing:1});
-  }
+  {const s=pptx.addSlide(); K.closing(s);}
   await pptx.writeFile({fileName:'Dev - EV'+ed+' - '+dist+'.pptx'});
   showToast('✅ PPT Devolución generada');
 }
