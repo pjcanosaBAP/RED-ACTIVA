@@ -8641,6 +8641,11 @@ async function exportCmpExcel(){
     if(fmt) r.getCell(5).numFmt=fmt;
     [6,7].forEach(i=>st(r.getCell(i),null,solid(LGRAY),null,rowB));
   });
+  if(Math.abs(otros)>=0.05){
+    const r=ws.addRow(['','"Otros ajustes": variación que no proviene de respuestas del distribuidor — cambios en pesos y criterios de medición entre ediciones, componentes nuevos o excluidos del cuestionario, y el efecto combinado de cambios simultáneos (ej. N/A que modifican la base de cálculo).']);
+    r.height=30; ws.mergeCells(`B${r.number}:G${r.number}`);
+    st(r.getCell(2),{name:'Calibri',italic:true,size:8.5,color:{argb:'FF94A3B8'}},null,{horizontal:'left',vertical:'top',wrapText:true});
+  }
   ws.addRow([]).height=10;
 
   // Tabla por área
@@ -8743,7 +8748,10 @@ function renderCmpReport(baseEd){
   const otros=dTot-sumShown;
   h+='<strong style="color:#0f172a">¿Qué explica la variación de '+ppf(dTot)+'?</strong>&nbsp;&nbsp;';
   h+='Cambios de respuesta (detalle abajo): <strong style="color:'+ppc(sumShown)+'">'+ppf(sumShown)+'</strong>';
-  if(Math.abs(otros)>=0.05) h+=' &nbsp;·&nbsp; Otros ajustes de medición entre ediciones: <strong style="color:'+ppc(otros)+'">'+ppf(otros)+'</strong>';
+  if(Math.abs(otros)>=0.05){
+    h+=' &nbsp;·&nbsp; Otros ajustes de medición entre ediciones: <strong style="color:'+ppc(otros)+'">'+ppf(otros)+'</strong>';
+    h+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">ⓘ <em>Otros ajustes</em>: variación que no proviene de respuestas del distribuidor — cambios en los pesos y criterios de medición entre ediciones (áreas, atributos o componentes que valen distinto), componentes nuevos o excluidos del cuestionario, y el efecto combinado de varios cambios simultáneos (ej. respuestas N/A que modifican la base de cálculo).</div>';
+  }
   h+='</div>';
   // ── Tabla por área
   h+='<div class="cmp-sec">Variación por área</div>';
