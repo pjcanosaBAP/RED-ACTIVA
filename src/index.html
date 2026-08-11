@@ -8625,12 +8625,13 @@ async function exportCmpExcel(){
     ['Variación total', C.dTot, IMP_FMT, impARGB(C.dTot)],
     ['Mejoras (pasan a SI)', C.nUp, null,'FF1D9E6F'],
     ['Retrocesos (dejan de ser SI)', C.nDn, null,'FFD93025'],
-    ['Efecto cambios de respuesta', C.efResp, IMP_FMT, impARGB(C.efResp)],
+    ['Cambios de respuesta (detalle abajo)', 0, IMP_FMT, 'FF64748B'],
   ];
-  if(Math.abs(C.efArea)>=0.05) sumRows.push(['Efecto cambio de pesos de área', C.efArea, IMP_FMT, impARGB(C.efArea)]);
-  if(Math.abs(C.efInt)>=0.05) sumRows.push(['Efecto cambio de criterios internos', C.efInt, IMP_FMT, impARGB(C.efInt)]);
-  if(Math.abs(C.drift)>=0.05) sumRows.push(['Ajuste por recálculo', C.drift, IMP_FMT, impARGB(C.drift)]);
-  if(Math.abs(C.inter)>=0.05) sumRows.push(['Interacción entre cambios simultáneos', C.inter, IMP_FMT, impARGB(C.inter)]);
+  const cmpRows=C.rows.filter(r=>!r.nv&&Math.abs(r.imp)>=0.005);
+  const sumShown=cmpRows.reduce((s,r)=>s+r.imp,0);
+  const otros=C.dTot-sumShown;
+  sumRows[5]=['Cambios de respuesta (detalle abajo)', sumShown, IMP_FMT, impARGB(sumShown)];
+  if(Math.abs(otros)>=0.05) sumRows.push(['Otros ajustes de medición entre ediciones', otros, IMP_FMT, impARGB(otros)]);
   sumRows.forEach(([label,val,fmt,argb])=>{
     const r=ws.addRow(['',label,'','',val]); r.height=18;
     ws.mergeCells(`B${r.number}:D${r.number}`);
@@ -8662,48 +8663,24 @@ async function exportCmpExcel(){
   });
   ws.addRow([]).height=10;
 
-  // Criterios modificados entre ediciones (si los hay)
-  if(C.pondRows.length){
-    {const r=ws.addRow(['','CRITERIO MODIFICADO','','ELEMENTO','','ED. '+baseEd,'ED. '+cur.edicion]); r.height=20;
-     ws.mergeCells(`B${r.number}:C${r.number}`); ws.mergeCells(`D${r.number}:E${r.number}`);
-     [2,3,4,5,6,7].forEach(i=>st(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solid('FF7C3AED'),ctr));
-     r.getCell(2).alignment=lft; r.getCell(4).alignment=lft;}
-    C.pondRows.forEach((p,pi)=>{
-      const bg=pi%2===0?LGRAY:'FFFFFFFF';
-      const r=ws.addRow(['',p.tipo,'',p.el,'',p.v1*100,p.v2*100]); r.height=18;
-      ws.mergeCells(`B${r.number}:C${r.number}`); ws.mergeCells(`D${r.number}:E${r.number}`);
-      st(r.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:'FF475569'}},solid(bg),lft,rowB);
-      st(r.getCell(3),null,solid(bg),null,rowB);
-      st(r.getCell(4),{name:'Calibri',size:9,color:{argb:'FF1E2A38'}},solid(bg),lft,rowB);
-      st(r.getCell(5),null,solid(bg),null,rowB);
-      st(r.getCell(6),{name:'Calibri',size:10,color:{argb:'FF475569'}},solid(bg),ctr,rowB); r.getCell(6).numFmt=PCT_FMT;
-      st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:'FF1E2A38'}},solid(bg),ctr,rowB); r.getCell(7).numFmt=PCT_FMT;
-    });
-    ws.addRow([]).height=10;
-  }
-
   // Tabla por componente
   {const r=ws.addRow(['','CÓDIGO','ÁREA','ATRIBUTO BPL','COMPONENTE','ED. '+baseEd+' → '+cur.edicion,'IMPACTO']); r.height=20;
    [2,3,4,5,6,7].forEach(i=>st(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solid(NAVY),ctr));
    r.getCell(5).alignment=lft;
-   if(C.rows.length) ws.autoFilter={from:{row:r.number,column:2},to:{row:r.number+C.rows.length,column:7}};}
-  C.rows.forEach((rw,ri)=>{
+   if(cmpRows.length) ws.autoFilter={from:{row:r.number,column:2},to:{row:r.number+cmpRows.length,column:7}};}
+  cmpRows.forEach((rw,ri)=>{
     const bg=ri%2===0?'FFFFFFFF':LGRAY;
-    const r=ws.addRow(['',rw.q.comp_num+(rw.q.critico?' ⚠':''),rw.q.sheet,rw.q.bpl_name,rw.q.question,lbl(rw.v1)+' → '+lbl(rw.v2),rw.nv?null:rw.imp]);
+    const r=ws.addRow(['',rw.q.comp_num+(rw.q.critico?' ⚠':''),rw.q.sheet,rw.q.bpl_name,rw.q.question,lbl(rw.v1)+' → '+lbl(rw.v2),rw.imp]);
     st(r.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:rw.q.critico?'FFD93025':'FF334155'}},solid(bg),ctr,rowB);
     st(r.getCell(3),{name:'Calibri',bold:true,size:9,color:{argb:'FF'+(AC[rw.q.sheet]||'#607d8b').replace('#','').toUpperCase()}},solid(bg),ctr,rowB);
     st(r.getCell(4),{name:'Calibri',size:9,color:{argb:'FF475569'}},solid(bg),lft,rowB);
     st(r.getCell(5),{name:'Calibri',size:10,color:{argb:'FF1E2A38'}},solid(bg),{horizontal:'left',vertical:'top',wrapText:true},rowB);
     st(r.getCell(6),{name:'Calibri',bold:true,size:9,color:{argb:rw.v2==='si'?'FF1D9E6F':rw.v2==='no'?'FFD93025':'FF64748B'}},solid(bg),ctr,rowB);
-    if(rw.nv){ r.getCell(7).value='— NV'; st(r.getCell(7),{name:'Calibri',size:9,color:{argb:'FF94A3B8'}},solid(bg),ctr,rowB); }
-    else { st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:impARGB(rw.imp)}},solid(bg),{horizontal:'right',vertical:'middle'},rowB); r.getCell(7).numFmt=IMP_FMT; }
+    st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:impARGB(rw.imp)}},solid(bg),{horizontal:'right',vertical:'middle'},rowB); r.getCell(7).numFmt=IMP_FMT;
   });
   // Reconciliación
-  const recon=[['Suma de impactos',C.sumImp]];
-  if(Math.abs(C.inter)>=0.05) recon.push(['+ Interacción entre cambios simultáneos',C.inter]);
-  if(Math.abs(C.efArea)>=0.05) recon.push(['+ Cambio de pesos de área',C.efArea]);
-  if(Math.abs(C.efInt)>=0.05) recon.push(['+ Cambio de criterios internos',C.efInt]);
-  if(Math.abs(C.drift)>=0.05) recon.push(['+ Ajuste por recálculo',C.drift]);
+  const recon=[['Suma de impactos',sumShown]];
+  if(Math.abs(otros)>=0.05) recon.push(['+ Otros ajustes de medición entre ediciones',otros]);
   recon.forEach(([label,val])=>{
     const r=ws.addRow(['','','','','',label,val]); r.height=18;
     st(r.getCell(6),{name:'Calibri',bold:true,size:9,color:{argb:'FF475569'}},solid('FFF1F5F9'),{horizontal:'right',vertical:'middle'});
@@ -8761,38 +8738,13 @@ function renderCmpReport(baseEd){
   h+='</div>';
   // ── Descomposición de la variación
   h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:#475569">';
+  const cmpRows=rows.filter(r=>!r.nv&&Math.abs(r.imp)>=0.005);
+  const sumShown=cmpRows.reduce((s,r)=>s+r.imp,0);
+  const otros=dTot-sumShown;
   h+='<strong style="color:#0f172a">¿Qué explica la variación de '+ppf(dTot)+'?</strong>&nbsp;&nbsp;';
-  h+='Cambios de respuesta: <strong style="color:'+ppc(efResp)+'">'+ppf(efResp)+'</strong>';
-  if(Math.abs(efArea)>=0.05) h+=' &nbsp;·&nbsp; Cambio de pesos de área: <strong style="color:'+ppc(efArea)+'">'+ppf(efArea)+'</strong>';
-  if(Math.abs(efInt)>=0.05) h+=' &nbsp;·&nbsp; Cambio de criterios internos (atributos/componentes): <strong style="color:'+ppc(efInt)+'">'+ppf(efInt)+'</strong>';
-  if(Math.abs(drift)>=0.05) h+=' &nbsp;·&nbsp; Ajuste por recálculo: <strong style="color:'+ppc(drift)+'">'+ppf(drift)+'</strong>';
-  if(Math.abs(inter)>=0.05) h+=' &nbsp;·&nbsp; Interacción entre cambios simultáneos: <strong style="color:'+ppc(inter)+'">'+ppf(inter)+'</strong>';
+  h+='Cambios de respuesta (detalle abajo): <strong style="color:'+ppc(sumShown)+'">'+ppf(sumShown)+'</strong>';
+  if(Math.abs(otros)>=0.05) h+=' &nbsp;·&nbsp; Otros ajustes de medición entre ediciones: <strong style="color:'+ppc(otros)+'">'+ppf(otros)+'</strong>';
   h+='</div>';
-  // ── Detalle del efecto criterios/ponderación
-  if(pondRows.length||Math.abs(efPond)>=0.05){
-    h+='<div class="cmp-sec">Efecto criterios / ponderación · '+ppf(efPond)+'</div>';
-    h+='<div style="font-size:11.5px;color:#64748b;margin-bottom:8px">Parte de la variación que NO viene de respuestas del distribuidor sino de cambios en la vara de medición entre ediciones: pesos de área ('+ppf(efArea)+') y criterios internos — pesos de atributos BPL, sub-atributos y componentes ('+ppf(efInt)+'). Se calcula re-evaluando las respuestas de la edición '+esc(baseEd)+' con los criterios de la edición '+esc(cur.edicion)+'.</div>';
-    if(pondRows.length){
-      h+='<table class="cmp-table" style="margin-bottom:10px"><tr><th>CRITERIO MODIFICADO</th><th>ELEMENTO</th><th style="text-align:center">ED. '+esc(baseEd)+'</th><th style="text-align:center">ED. '+esc(cur.edicion)+'</th></tr>';
-      pondRows.forEach(p=>{
-        h+='<tr><td style="font-weight:700;color:#475569">'+esc(p.tipo)+'</td><td>'+esc(p.el)+'</td>';
-        h+='<td style="text-align:center">'+(p.v1*100).toFixed(1)+'%</td>';
-        h+='<td style="text-align:center;font-weight:700">'+(p.v2*100).toFixed(1)+'%</td></tr>';
-      });
-      h+='</table>';
-    }
-    if(pondAreas.length){
-      h+='<table class="cmp-table"><tr><th>ÁREA</th><th style="text-align:right">Δ POR PESOS DE ÁREA</th><th style="text-align:right">Δ POR CRITERIOS INTERNOS</th><th style="text-align:right">TOTAL</th></tr>';
-      pondAreas.forEach(p=>{
-        const tot=p.dW+p.dInt;
-        h+='<tr><td><strong style="color:'+(AC[p.sh]||'#607d8b')+'">'+esc(p.sh)+'</strong> · '+esc(AN[p.sh]||p.sh)+'</td>';
-        h+='<td style="text-align:right;font-weight:700;color:'+ppc(p.dW)+'">'+ppf(p.dW)+'</td>';
-        h+='<td style="text-align:right;font-weight:700;color:'+ppc(p.dInt)+'">'+ppf(p.dInt)+'</td>';
-        h+='<td style="text-align:right;font-weight:800;color:'+ppc(tot)+'">'+ppf(tot)+'</td></tr>';
-      });
-      h+='</table>';
-    }
-  }
   // ── Tabla por área
   h+='<div class="cmp-sec">Variación por área</div>';
   h+='<table class="cmp-table"><tr><th>ÁREA</th><th style="text-align:center">ED. '+esc(baseEd)+'</th><th style="text-align:center">ED. '+esc(cur.edicion)+'</th><th style="text-align:center">Δ</th></tr>';
@@ -8806,45 +8758,33 @@ function renderCmpReport(baseEd){
     h+='<td style="text-align:center;font-weight:700;color:'+ppc(d)+'">'+ppf(d)+'</td></tr>';
   });
   h+='</table>';
-  // ── Tabla por componente
-  h+='<div class="cmp-sec">Componentes que cambiaron ('+rows.length+') · ordenados por impacto en el puntaje</div>';
-  if(!rows.length){
-    h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b">Sin cambios de respuesta entre las dos ediciones.</div>';
+  // ── Tabla por componente (solo los que mueven el puntaje)
+  h+='<div class="cmp-sec">Componentes que explican la variación ('+cmpRows.length+') · ordenados por impacto</div>';
+  if(!cmpRows.length){
+    h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b">Ningún cambio de respuesta con impacto en el puntaje entre las dos ediciones.</div>';
   } else {
     h+='<table class="cmp-table"><tr><th>CÓDIGO</th><th>ÁREA</th><th>ATRIBUTO BPL</th><th>COMPONENTE</th><th style="text-align:center">ED. '+esc(baseEd)+' → '+esc(cur.edicion)+'</th><th style="text-align:right">IMPACTO</th></tr>';
-    rows.forEach(r=>{
+    cmpRows.forEach(r=>{
       h+='<tr>';
       h+='<td style="font-weight:700;color:'+(r.q.critico?'#d93025':'#334155')+'">'+esc(r.q.comp_num)+(r.q.critico?' ⚠':'')+'</td>';
       h+='<td><strong style="color:'+(AC[r.q.sheet]||'#607d8b')+'">'+esc(r.q.sheet)+'</strong></td>';
       h+='<td style="color:#475569">'+esc(r.q.bpl_name)+'</td>';
       h+='<td style="color:#0f172a">'+esc(r.q.question)+'</td>';
       h+='<td style="text-align:center;white-space:nowrap">'+chip(r.v1)+' → '+chip(r.v2)+'</td>';
-      h+='<td style="text-align:right;font-weight:800;color:'+(r.nv?'#94a3b8':ppc(r.imp))+'">'+(r.nv?'— NV':ppf(r.imp))+'</td>';
+      h+='<td style="text-align:right;font-weight:800;color:'+ppc(r.imp)+'">'+ppf(r.imp)+'</td>';
       h+='</tr>';
     });
     // Reconciliación
     h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;font-weight:700;color:#475569">Suma de impactos</td>';
-    h+='<td style="text-align:right;font-weight:800;color:'+ppc(sumImp)+'">'+ppf(sumImp)+'</td></tr>';
-    if(Math.abs(inter)>=0.05){
-      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Interacción entre cambios simultáneos</td>';
-      h+='<td style="text-align:right;font-weight:700;color:'+ppc(inter)+'">'+ppf(inter)+'</td></tr>';
-    }
-    if(Math.abs(efArea)>=0.05){
-      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Cambio de pesos de área</td>';
-      h+='<td style="text-align:right;font-weight:700;color:'+ppc(efArea)+'">'+ppf(efArea)+'</td></tr>';
-    }
-    if(Math.abs(efInt)>=0.05){
-      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Cambio de criterios internos</td>';
-      h+='<td style="text-align:right;font-weight:700;color:'+ppc(efInt)+'">'+ppf(efInt)+'</td></tr>';
-    }
-    if(Math.abs(drift)>=0.05){
-      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Ajuste por recálculo</td>';
-      h+='<td style="text-align:right;font-weight:700;color:'+ppc(drift)+'">'+ppf(drift)+'</td></tr>';
+    h+='<td style="text-align:right;font-weight:800;color:'+ppc(sumShown)+'">'+ppf(sumShown)+'</td></tr>';
+    if(Math.abs(otros)>=0.05){
+      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Otros ajustes de medición entre ediciones</td>';
+      h+='<td style="text-align:right;font-weight:700;color:'+ppc(otros)+'">'+ppf(otros)+'</td></tr>';
     }
     h+='<tr style="background:#1e2a38"><td colspan="5" style="text-align:right;font-weight:800;color:#fff">VARIACIÓN TOTAL '+esc(baseEd)+' → '+esc(cur.edicion)+'</td>';
     h+='<td style="text-align:right;font-weight:800;color:'+(dTot>=0?'#6ee7b7':'#fca5a5')+'">'+ppf(dTot)+'</td></tr>';
     h+='</table>';
-    h+='<div style="font-size:10.5px;color:#94a3b8;margin-top:8px">Impacto: variación del puntaje total (en puntos porcentuales) atribuible a cada componente, calculada revirtiendo su respuesta a la edición anterior manteniendo el resto constante. Los componentes NV no inciden en el puntaje.</div>';
+    h+='<div style="font-size:10.5px;color:#94a3b8;margin-top:8px">Impacto: cuánto sube o baja el puntaje total (en puntos porcentuales) por el cambio de respuesta de ese componente, manteniendo el resto constante. "Otros ajustes de medición" agrupa lo que no depende de las respuestas: cambios de pesos/criterios entre ediciones y efectos combinados.</div>';
   }
   body.innerHTML=h;
   }catch(e){
