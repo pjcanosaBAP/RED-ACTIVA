@@ -977,6 +977,17 @@ body.readonly .admin-only{display:none!important;}
 /* DEV MODAL */
 #dev-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;}
 #dev-modal-inner{background:#fff;border-radius:12px;padding:28px;width:min(700px,96vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+/* CMP MODAL: Δ Ediciones */
+#cmp-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;}
+#cmp-modal-inner{background:#f8fafc;border-radius:12px;padding:24px 28px;width:min(1080px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.cmp-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 16px;text-align:center;min-width:118px;flex:1}
+.cmp-kpi .l{font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px;text-transform:uppercase}
+.cmp-kpi .v{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;line-height:1.15}
+.cmp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:12px}
+.cmp-table th{background:#1e2a38;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:700}
+.cmp-table td{padding:6px 10px;border-bottom:1px solid #eef2f7;vertical-align:middle}
+.cmp-chip{display:inline-block;padding:1px 8px;border-radius:6px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.cmp-sec{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#0f172a;margin:18px 0 8px}
 .dev-section-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--g500);margin:14px 0 8px;}
 .dev-input-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
 .dev-num{width:22px;height:22px;border-radius:50%;background:var(--blue2);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -1229,6 +1240,11 @@ body.readonly .admin-only{display:none!important;}
                 style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%"
                 title="Cargar fortalezas y oportunidades para el informe">
                 📝 Devolución
+              </button>
+              <button onclick="openCmpModal()"
+                style="background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%"
+                title="Comparativo por componente entre ediciones con impacto sobre el puntaje">
+                🔀 Δ Ediciones
               </button>
             </div>
           </div>
@@ -8467,6 +8483,131 @@ async function generateDistPPTX(){
   }
 }
 
+// ── Δ EDICIONES: reporte comparativo por componente ──────
+function _cmpCurAudit(){
+  if(_loadedFrozenAudit) return _loadedFrozenAudit;
+  const dist=(document.getElementById('sel-dist')||{}).value||'';
+  const ed=(document.getElementById('sel-edicion')||{}).value||'';
+  if(!dist||!ed) return null;
+  return saved.find(a=>a.distribuidor===dist&&a.edicion===ed);
+}
+function openCmpModal(){
+  const cur=_cmpCurAudit();
+  if(!cur){showToast('⚠️ Cargá una auditoría primero');return;}
+  const prevs=saved.filter(a=>a.distribuidor===cur.distribuidor&&(a.edicion||'')<(cur.edicion||''))
+                   .sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''));
+  if(!prevs.length){showToast('⚠️ No hay ediciones anteriores de '+cur.distribuidor+' para comparar');return;}
+  const sel=document.getElementById('cmp-base-ed');
+  sel.innerHTML=prevs.map(a=>'<option value="'+a.edicion+'">Edición '+a.edicion+'</option>').join('');
+  document.getElementById('cmp-modal').style.display='flex';
+  renderCmpReport(prevs[0].edicion);
+}
+function closeCmpModal(){document.getElementById('cmp-modal').style.display='none';}
+function renderCmpReport(baseEd){
+  const cur=_cmpCurAudit(); if(!cur) return;
+  const prev=saved.find(a=>a.distribuidor===cur.distribuidor&&a.edicion===baseEd);
+  const body=document.getElementById('cmp-body');
+  if(!prev){body.innerHTML='';return;}
+  const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ans1=prev.answers||{}, ans2=cur.answers||{};
+  const t1=((prev.scores||{}).total||0)*100, t2=((cur.scores||{}).total||0)*100;
+  const dTot=t2-t1;
+  const w2=cur.weights||null;
+  const csT=a=>computeScores(a,w2).total*100;
+  const t2c=csT(ans2);           // respuestas actuales, criterios actuales
+  const t1c=csT(ans1);           // respuestas anteriores, criterios actuales
+  const efResp=t2c-t1c;          // efecto atribuible a cambios de respuesta
+  const efPond=(t1c-t1)+(t2-t2c);// efecto de cambios de criterios/ponderación entre ediciones
+  // Componentes cuya respuesta cambió
+  const norm=v=>v==='si'||v==='no'||v==='na'?v:null;
+  const changed=Q.filter(q=>norm(ans1[q.comp_num])!==norm(ans2[q.comp_num]));
+  // Impacto contrafactual: cuánto cae/sube el score actual si este componente vuelve a su respuesta anterior
+  const rows=changed.map(q=>{
+    const v1=norm(ans1[q.comp_num]), v2=norm(ans2[q.comp_num]);
+    const tmp=Object.assign({},ans2);
+    if(v1===null) delete tmp[q.comp_num]; else tmp[q.comp_num]=v1;
+    const nv=!!NV[q.sheet];
+    const imp=nv?0:t2c-csT(tmp);
+    return {q,v1,v2,imp,nv};
+  }).sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
+  const sumImp=rows.reduce((s,r)=>s+r.imp,0);
+  const inter=efResp-sumImp;     // interacción entre cambios simultáneos (denominadores N/A, etc.)
+  const nUp=rows.filter(r=>r.v2==='si'&&r.v1!=='si').length;
+  const nDn=rows.filter(r=>r.v1==='si'&&r.v2!=='si').length;
+  // Helpers de formato
+  const ppf=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(2)+' pp';
+  const ppc=v=>v>0.005?'#1d9e6f':v<-0.005?'#d93025':'#64748b';
+  const chip=v=>{
+    const m={si:['SI','#e8f5ee','#1d9e6f'],no:['NO','#fdecea','#d93025'],na:['N/A','#f1f5f9','#64748b']};
+    const c=m[v]||['—','#f8fafc','#94a3b8'];
+    return '<span class="cmp-chip" style="background:'+c[1]+';color:'+c[2]+'">'+c[0]+'</span>';
+  };
+  document.getElementById('cmp-title').textContent=cur.distribuidor;
+  document.getElementById('cmp-sub').textContent='Variación por componente · Edición '+baseEd+' → Edición '+cur.edicion;
+  let h='';
+  // ── KPIs
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">';
+  h+='<div class="cmp-kpi"><div class="l">Score Ed. '+esc(baseEd)+'</div><div class="v" style="color:#475569">'+t1.toFixed(1)+'%</div></div>';
+  h+='<div class="cmp-kpi"><div class="l">Score Ed. '+esc(cur.edicion)+'</div><div class="v" style="color:#1e2a38">'+t2.toFixed(1)+'%</div></div>';
+  h+='<div class="cmp-kpi" style="border-color:'+ppc(dTot)+'"><div class="l">Variación</div><div class="v" style="color:'+ppc(dTot)+'">'+ppf(dTot)+'</div></div>';
+  h+='<div class="cmp-kpi"><div class="l">Mejoras</div><div class="v" style="color:#1d9e6f">▲ '+nUp+'</div></div>';
+  h+='<div class="cmp-kpi"><div class="l">Retrocesos</div><div class="v" style="color:#d93025">▼ '+nDn+'</div></div>';
+  h+='</div>';
+  // ── Descomposición de la variación
+  h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:12px;color:#475569">';
+  h+='<strong style="color:#0f172a">¿Qué explica la variación de '+ppf(dTot)+'?</strong>&nbsp;&nbsp;';
+  h+='Cambios de respuesta: <strong style="color:'+ppc(efResp)+'">'+ppf(efResp)+'</strong>';
+  if(Math.abs(efPond)>=0.05) h+=' &nbsp;·&nbsp; Cambios de criterios/ponderación entre ediciones: <strong style="color:'+ppc(efPond)+'">'+ppf(efPond)+'</strong>';
+  if(Math.abs(inter)>=0.05) h+=' &nbsp;·&nbsp; Interacción entre cambios simultáneos: <strong style="color:'+ppc(inter)+'">'+ppf(inter)+'</strong>';
+  h+='</div>';
+  // ── Tabla por área
+  h+='<div class="cmp-sec">Variación por área</div>';
+  h+='<table class="cmp-table"><tr><th>ÁREA</th><th style="text-align:center">ED. '+esc(baseEd)+'</th><th style="text-align:center">ED. '+esc(cur.edicion)+'</th><th style="text-align:center">Δ</th></tr>';
+  SHEETS().forEach(sh=>{
+    const a1=((prev.scores||{}).areas||{})[sh]; const a2=((cur.scores||{}).areas||{})[sh];
+    if(a1===undefined&&a2===undefined) return;
+    const d=((a2||0)-(a1||0))*100; const nv=!!NV[sh];
+    h+='<tr><td><strong style="color:'+(AC[sh]||'#607d8b')+'">'+esc(sh)+'</strong> · '+esc(AN[sh]||sh)+(nv?' <span class="cmp-chip" style="background:#f1f5f9;color:#94a3b8">NV</span>':'')+'</td>';
+    h+='<td style="text-align:center">'+((a1||0)*100).toFixed(1)+'%</td>';
+    h+='<td style="text-align:center;font-weight:700">'+((a2||0)*100).toFixed(1)+'%</td>';
+    h+='<td style="text-align:center;font-weight:700;color:'+ppc(d)+'">'+ppf(d)+'</td></tr>';
+  });
+  h+='</table>';
+  // ── Tabla por componente
+  h+='<div class="cmp-sec">Componentes que cambiaron ('+rows.length+') · ordenados por impacto en el puntaje</div>';
+  if(!rows.length){
+    h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b">Sin cambios de respuesta entre las dos ediciones.</div>';
+  } else {
+    h+='<table class="cmp-table"><tr><th>CÓDIGO</th><th>ÁREA</th><th>ATRIBUTO BPL</th><th>COMPONENTE</th><th style="text-align:center">ED. '+esc(baseEd)+' → '+esc(cur.edicion)+'</th><th style="text-align:right">IMPACTO</th></tr>';
+    rows.forEach(r=>{
+      h+='<tr>';
+      h+='<td style="font-weight:700;color:'+(r.q.critico?'#d93025':'#334155')+'">'+esc(r.q.comp_num)+(r.q.critico?' ⚠':'')+'</td>';
+      h+='<td><strong style="color:'+(AC[r.q.sheet]||'#607d8b')+'">'+esc(r.q.sheet)+'</strong></td>';
+      h+='<td style="color:#475569">'+esc(r.q.bpl_name)+'</td>';
+      h+='<td style="color:#0f172a">'+esc(r.q.question)+'</td>';
+      h+='<td style="text-align:center;white-space:nowrap">'+chip(r.v1)+' → '+chip(r.v2)+'</td>';
+      h+='<td style="text-align:right;font-weight:800;color:'+(r.nv?'#94a3b8':ppc(r.imp))+'">'+(r.nv?'— NV':ppf(r.imp))+'</td>';
+      h+='</tr>';
+    });
+    // Reconciliación
+    h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;font-weight:700;color:#475569">Suma de impactos</td>';
+    h+='<td style="text-align:right;font-weight:800;color:'+ppc(sumImp)+'">'+ppf(sumImp)+'</td></tr>';
+    if(Math.abs(inter)>=0.05){
+      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Interacción entre cambios simultáneos</td>';
+      h+='<td style="text-align:right;font-weight:700;color:'+ppc(inter)+'">'+ppf(inter)+'</td></tr>';
+    }
+    if(Math.abs(efPond)>=0.05){
+      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Cambios de criterios/ponderación</td>';
+      h+='<td style="text-align:right;font-weight:700;color:'+ppc(efPond)+'">'+ppf(efPond)+'</td></tr>';
+    }
+    h+='<tr style="background:#1e2a38"><td colspan="5" style="text-align:right;font-weight:800;color:#fff">VARIACIÓN TOTAL '+esc(baseEd)+' → '+esc(cur.edicion)+'</td>';
+    h+='<td style="text-align:right;font-weight:800;color:'+(dTot>=0?'#6ee7b7':'#fca5a5')+'">'+ppf(dTot)+'</td></tr>';
+    h+='</table>';
+    h+='<div style="font-size:10.5px;color:#94a3b8;margin-top:8px">Impacto: variación del puntaje total (en puntos porcentuales) atribuible a cada componente, calculada revirtiendo su respuesta a la edición anterior manteniendo el resto constante. Los componentes NV no inciden en el puntaje.</div>';
+  }
+  body.innerHTML=h;
+}
+
 // ── MINI MODAL (reemplaza prompt() en Electron) ─────────
 let _miniResolve = null;
 
@@ -12557,6 +12698,25 @@ async function generateDevolucionPPTX(){
       <button class="btn btn-blue btn-sm" onclick="saveDevModalData()">💾 Guardar</button>
       <button class="btn btn-sm" onclick="generateDevolucionPPTX()" style="background:#0070C0;color:#fff;border:none">📊 Generar PPT</button>
     </div>
+  </div>
+</div>
+
+<!-- CMP MODAL: Δ EDICIONES -->
+<div id="cmp-modal">
+  <div id="cmp-modal-inner">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px;flex-wrap:wrap">
+      <div>
+        <div id="cmp-title" style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#0f172a"></div>
+        <div id="cmp-sub" style="font-size:12px;color:#64748b;margin-top:2px"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;font-weight:700;color:#64748b">Comparar contra:</label>
+        <select id="cmp-base-ed" onchange="renderCmpReport(this.value)"
+          style="padding:5px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;background:#fff"></select>
+        <button onclick="closeCmpModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#9ca3af">✕</button>
+      </div>
+    </div>
+    <div id="cmp-body"></div>
   </div>
 </div>
 <script src="_dev_imgs.js" defer></script>
