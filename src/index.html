@@ -8503,12 +8503,8 @@ function openCmpModal(){
   renderCmpReport(prevs[0].edicion);
 }
 function closeCmpModal(){document.getElementById('cmp-modal').style.display='none';}
-function renderCmpReport(baseEd){
-  const cur=_cmpCurAudit(); if(!cur) return;
-  const prev=saved.find(a=>a.distribuidor===cur.distribuidor&&a.edicion===baseEd);
-  const body=document.getElementById('cmp-body');
-  if(!prev){body.innerHTML='';return;}
-  const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// Cálculo compartido entre la vista y el export a Excel
+function _cmpCompute(cur,prev){
   const ans1=prev.answers||{}, ans2=cur.answers||{};
   const t1=((prev.scores||{}).total||0)*100, t2=((cur.scores||{}).total||0)*100;
   const dTot=t2-t1;
@@ -8518,7 +8514,6 @@ function renderCmpReport(baseEd){
   const t1c=csT(ans1);           // respuestas anteriores, criterios actuales
   const efResp=t2c-t1c;          // efecto atribuible a cambios de respuesta
   const efPond=(t1c-t1)+(t2-t2c);// efecto de cambios de criterios/ponderación entre ediciones
-  // Componentes cuya respuesta cambió
   const norm=v=>v==='si'||v==='no'||v==='na'?v:null;
   const changed=Q.filter(q=>norm(ans1[q.comp_num])!==norm(ans2[q.comp_num]));
   // Impacto contrafactual: cuánto cae/sube el score actual si este componente vuelve a su respuesta anterior
@@ -8534,6 +8529,139 @@ function renderCmpReport(baseEd){
   const inter=efResp-sumImp;     // interacción entre cambios simultáneos (denominadores N/A, etc.)
   const nUp=rows.filter(r=>r.v2==='si'&&r.v1!=='si').length;
   const nDn=rows.filter(r=>r.v1==='si'&&r.v2!=='si').length;
+  return {t1,t2,dTot,efResp,efPond,inter,rows,sumImp,nUp,nDn};
+}
+// Export del comparativo a Excel (ExcelJS, mismo cálculo que la vista)
+async function exportCmpExcel(){
+  if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún, reintentá en unos segundos');return;}
+  const cur=_cmpCurAudit(); if(!cur){showToast('⚠️ Cargá una auditoría primero');return;}
+  const baseEd=(document.getElementById('cmp-base-ed')||{}).value||'';
+  const prev=saved.find(a=>a.distribuidor===cur.distribuidor&&a.edicion===baseEd);
+  if(!prev){showToast('⚠️ No hay edición base para comparar');return;}
+  showToast('⏳ Generando Excel comparativo...');
+  const C=_cmpCompute(cur,prev);
+  const NAVY='FF1E2A38', WHITE='FFFFFFFF', LGRAY='FFF8FAFC';
+  const solid=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
+  const thin=argb=>({style:'thin',color:{argb:argb||'FFE8EDF3'}});
+  const rowB={bottom:thin()};
+  const IMP_FMT='"+"0.00" pp";"−"0.00" pp";"·"';
+  const PCT_FMT='0.0"%"';
+  const impARGB=v=>v>0.005?'FF1D9E6F':v<-0.005?'FFD93025':'FF64748B';
+  const lbl=v=>({si:'SI',no:'NO',na:'N/A'})[v]||'—';
+  const st=(cell,font,fill,align,border)=>{if(font)cell.font=font;if(fill)cell.fill=fill;if(align)cell.alignment=align;if(border)cell.border=border;};
+  const ctr={horizontal:'center',vertical:'middle'}, lft={horizontal:'left',vertical:'middle'};
+
+  const wb=new ExcelJS.Workbook();
+  wb.creator='RED Activa 2.0 · BAP Partners'; wb.created=new Date();
+  const ws=wb.addWorksheet('Δ Ediciones',{views:[{showGridLines:false}],pageSetup:{fitToPage:true,fitToWidth:1}});
+  ws.columns=[{width:2},{width:12},{width:8},{width:30},{width:66},{width:14},{width:12}];
+
+  // Título
+  {const r=ws.addRow(['','Δ EDICIONES · '+cur.distribuidor]); r.height=28; ws.mergeCells('B1:G1');
+   st(r.getCell(2),{name:'Calibri',bold:true,size:13,color:{argb:'FF60A5FA'}},solid(NAVY),lft);
+   [3,4,5,6,7].forEach(i=>st(r.getCell(i),null,solid(NAVY)));}
+  {const r=ws.addRow(['','Edición '+baseEd+' → Edición '+cur.edicion+' · '+(cur.pais||cfg.pais||'')]); r.height=20; ws.mergeCells('B2:G2');
+   st(r.getCell(2),{name:'Calibri',bold:true,size:10,color:{argb:'FF475569'}},solid('FFF0F7FF'),lft);
+   [3,4,5,6,7].forEach(i=>st(r.getCell(i),null,solid('FFF0F7FF')));}
+  ws.addRow([]).height=8;
+
+  // Resumen de la variación
+  const sumRows=[
+    ['Score Edición '+baseEd, C.t1, PCT_FMT,'FF475569'],
+    ['Score Edición '+cur.edicion, C.t2, PCT_FMT,'FF1E2A38'],
+    ['Variación total', C.dTot, IMP_FMT, impARGB(C.dTot)],
+    ['Mejoras (pasan a SI)', C.nUp, null,'FF1D9E6F'],
+    ['Retrocesos (dejan de ser SI)', C.nDn, null,'FFD93025'],
+    ['Efecto cambios de respuesta', C.efResp, IMP_FMT, impARGB(C.efResp)],
+  ];
+  if(Math.abs(C.efPond)>=0.05) sumRows.push(['Efecto cambios de criterios/ponderación', C.efPond, IMP_FMT, impARGB(C.efPond)]);
+  if(Math.abs(C.inter)>=0.05) sumRows.push(['Interacción entre cambios simultáneos', C.inter, IMP_FMT, impARGB(C.inter)]);
+  sumRows.forEach(([label,val,fmt,argb])=>{
+    const r=ws.addRow(['',label,'','',val]); r.height=18;
+    ws.mergeCells(`B${r.number}:D${r.number}`);
+    st(r.getCell(2),{name:'Calibri',size:10,color:{argb:'FF475569'}},solid(LGRAY),lft,rowB);
+    [3,4].forEach(i=>st(r.getCell(i),null,solid(LGRAY),null,rowB));
+    st(r.getCell(5),{name:'Calibri',bold:true,size:11,color:{argb}},solid(LGRAY),lft,rowB);
+    if(fmt) r.getCell(5).numFmt=fmt;
+    [6,7].forEach(i=>st(r.getCell(i),null,solid(LGRAY),null,rowB));
+  });
+  ws.addRow([]).height=10;
+
+  // Tabla por área
+  {const r=ws.addRow(['','ÁREA','','','ED. '+baseEd,'ED. '+cur.edicion,'Δ']); r.height=20;
+   ws.mergeCells(`B${r.number}:D${r.number}`);
+   [2,3,4,5,6,7].forEach(i=>st(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solid(NAVY),ctr));
+   r.getCell(2).alignment=lft;}
+  SHEETS().forEach((sh,si)=>{
+    const a1=((prev.scores||{}).areas||{})[sh]; const a2=((cur.scores||{}).areas||{})[sh];
+    if(a1===undefined&&a2===undefined) return;
+    const d=((a2||0)-(a1||0))*100; const nv=!!NV[sh];
+    const bg=si%2===0?LGRAY:'FFFFFFFF';
+    const r=ws.addRow(['',sh+' · '+(AN[sh]||sh)+(nv?' (NV)':''),'','',(a1||0)*100,(a2||0)*100,d]); r.height=18;
+    ws.mergeCells(`B${r.number}:D${r.number}`);
+    st(r.getCell(2),{name:'Calibri',bold:true,size:10,italic:nv,color:{argb:'FF'+(AC[sh]||'#607d8b').replace('#','').toUpperCase()}},solid(bg),lft,rowB);
+    [3,4].forEach(i=>st(r.getCell(i),null,solid(bg),null,rowB));
+    st(r.getCell(5),{name:'Calibri',size:10,color:{argb:'FF475569'}},solid(bg),ctr,rowB); r.getCell(5).numFmt=PCT_FMT;
+    st(r.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:'FF1E2A38'}},solid(bg),ctr,rowB); r.getCell(6).numFmt=PCT_FMT;
+    st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:impARGB(d)}},solid(bg),ctr,rowB); r.getCell(7).numFmt=IMP_FMT;
+  });
+  ws.addRow([]).height=10;
+
+  // Tabla por componente
+  {const r=ws.addRow(['','CÓDIGO','ÁREA','ATRIBUTO BPL','COMPONENTE','ED. '+baseEd+' → '+cur.edicion,'IMPACTO']); r.height=20;
+   [2,3,4,5,6,7].forEach(i=>st(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solid(NAVY),ctr));
+   r.getCell(5).alignment=lft;
+   if(C.rows.length) ws.autoFilter={from:{row:r.number,column:2},to:{row:r.number+C.rows.length,column:7}};}
+  C.rows.forEach((rw,ri)=>{
+    const bg=ri%2===0?'FFFFFFFF':LGRAY;
+    const r=ws.addRow(['',rw.q.comp_num+(rw.q.critico?' ⚠':''),rw.q.sheet,rw.q.bpl_name,rw.q.question,lbl(rw.v1)+' → '+lbl(rw.v2),rw.nv?null:rw.imp]);
+    st(r.getCell(2),{name:'Calibri',bold:true,size:9,color:{argb:rw.q.critico?'FFD93025':'FF334155'}},solid(bg),ctr,rowB);
+    st(r.getCell(3),{name:'Calibri',bold:true,size:9,color:{argb:'FF'+(AC[rw.q.sheet]||'#607d8b').replace('#','').toUpperCase()}},solid(bg),ctr,rowB);
+    st(r.getCell(4),{name:'Calibri',size:9,color:{argb:'FF475569'}},solid(bg),lft,rowB);
+    st(r.getCell(5),{name:'Calibri',size:10,color:{argb:'FF1E2A38'}},solid(bg),{horizontal:'left',vertical:'top',wrapText:true},rowB);
+    st(r.getCell(6),{name:'Calibri',bold:true,size:9,color:{argb:rw.v2==='si'?'FF1D9E6F':rw.v2==='no'?'FFD93025':'FF64748B'}},solid(bg),ctr,rowB);
+    if(rw.nv){ r.getCell(7).value='— NV'; st(r.getCell(7),{name:'Calibri',size:9,color:{argb:'FF94A3B8'}},solid(bg),ctr,rowB); }
+    else { st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:impARGB(rw.imp)}},solid(bg),{horizontal:'right',vertical:'middle'},rowB); r.getCell(7).numFmt=IMP_FMT; }
+  });
+  // Reconciliación
+  const recon=[['Suma de impactos',C.sumImp]];
+  if(Math.abs(C.inter)>=0.05) recon.push(['+ Interacción entre cambios simultáneos',C.inter]);
+  if(Math.abs(C.efPond)>=0.05) recon.push(['+ Cambios de criterios/ponderación',C.efPond]);
+  recon.forEach(([label,val])=>{
+    const r=ws.addRow(['','','','','',label,val]); r.height=18;
+    st(r.getCell(6),{name:'Calibri',bold:true,size:9,color:{argb:'FF475569'}},solid('FFF1F5F9'),{horizontal:'right',vertical:'middle'});
+    st(r.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:impARGB(val)}},solid('FFF1F5F9'),{horizontal:'right',vertical:'middle'});
+    r.getCell(7).numFmt=IMP_FMT;
+  });
+  {const r=ws.addRow(['','','','','','VARIACIÓN TOTAL',C.dTot]); r.height=20;
+   st(r.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solid(NAVY),{horizontal:'right',vertical:'middle'});
+   st(r.getCell(7),{name:'Calibri',bold:true,size:11,color:{argb:C.dTot>=0?'FF6EE7B7':'FFFCA5A5'}},solid(NAVY),{horizontal:'right',vertical:'middle'});
+   r.getCell(7).numFmt=IMP_FMT;}
+
+  // Descarga
+  try{
+    const fname='Delta_Ediciones_'+cur.distribuidor.replace(/[^a-zA-Z0-9]/g,'_')+'_'+baseEd+'_vs_'+cur.edicion+'.xlsx';
+    const buffer=await wb.xlsx.writeBuffer();
+    if(window.electronAPI?.saveExcel){
+      window.electronAPI.saveExcel({buffer:Array.from(new Uint8Array(buffer)),filename:fname});
+    } else {
+      const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=fname;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+    showToast('📊 Excel generado: '+fname);
+  }catch(e){showToast('❌ Error Excel: '+e.message);console.error(e);}
+}
+function renderCmpReport(baseEd){
+  const cur=_cmpCurAudit(); if(!cur) return;
+  const prev=saved.find(a=>a.distribuidor===cur.distribuidor&&a.edicion===baseEd);
+  const body=document.getElementById('cmp-body');
+  if(!prev){body.innerHTML='';return;}
+  const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const {t1,t2,dTot,efResp,efPond,inter,rows,sumImp,nUp,nDn}=_cmpCompute(cur,prev);
   // Helpers de formato
   const ppf=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(2)+' pp';
   const ppc=v=>v>0.005?'#1d9e6f':v<-0.005?'#d93025':'#64748b';
@@ -12713,6 +12841,8 @@ async function generateDevolucionPPTX(){
         <label style="font-size:11px;font-weight:700;color:#64748b">Comparar contra:</label>
         <select id="cmp-base-ed" onchange="renderCmpReport(this.value)"
           style="padding:5px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;background:#fff"></select>
+        <button onclick="exportCmpExcel()" title="Exportar este comparativo a Excel"
+          style="background:#0070C0;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">📊 Excel</button>
         <button onclick="closeCmpModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#9ca3af">✕</button>
       </div>
     </div>
