@@ -8496,10 +8496,22 @@ function openCmpModal(){
   if(!cur){showToast('⚠️ Cargá una auditoría primero');return;}
   const prevs=saved.filter(a=>a.distribuidor===cur.distribuidor&&(a.edicion||'')<(cur.edicion||''))
                    .sort((a,b)=>(b.edicion||'').localeCompare(a.edicion||''));
-  if(!prevs.length){showToast('⚠️ No hay ediciones anteriores de '+cur.distribuidor+' para comparar');return;}
   const sel=document.getElementById('cmp-base-ed');
-  sel.innerHTML=prevs.map(a=>'<option value="'+a.edicion+'">Edición '+a.edicion+'</option>').join('');
   document.getElementById('cmp-modal').style.display='flex';
+  if(!prevs.length){
+    sel.innerHTML=''; sel.style.display='none';
+    document.getElementById('cmp-title').textContent=cur.distribuidor;
+    document.getElementById('cmp-sub').textContent='Comparativo entre ediciones';
+    document.getElementById('cmp-body').innerHTML=
+      '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;text-align:center">'+
+      '<div style="font-size:34px;margin-bottom:8px">🔀</div>'+
+      '<div style="font-weight:700;color:#0f172a;margin-bottom:6px">Sin ediciones anteriores para comparar</div>'+
+      '<div style="font-size:12.5px;color:#64748b;max-width:520px;margin:0 auto">Este distribuidor solo tiene guardada la edición <strong>'+cur.edicion+'</strong>. '+
+      'El comparativo Δ Ediciones se habilita cuando existan al menos dos auditorías del mismo distribuidor en ediciones distintas (por ejemplo, al cargar la evaluación '+(Number(cur.edicion)+1||'siguiente')+').</div></div>';
+    return;
+  }
+  sel.style.display='';
+  sel.innerHTML=prevs.map(a=>'<option value="'+a.edicion+'">Edición '+a.edicion+'</option>').join('');
   renderCmpReport(prevs[0].edicion);
 }
 function closeCmpModal(){document.getElementById('cmp-modal').style.display='none';}
