@@ -446,10 +446,12 @@ body.sb-mini #sb-pending-panel{display:none!important;}
 .mx-tbl th,.mx-tbl td{border-right:1px solid var(--g200);border-bottom:1px solid var(--g200);padding:4px 7px;white-space:nowrap}
 .mx-tbl thead th{position:sticky;top:0;z-index:6;background:var(--navy);color:#fff;font-family:'Barlow Condensed',sans-serif;
   font-size:10.5px;font-weight:700;text-align:center;vertical-align:bottom;height:96px}
-.mx-tbl thead th.mx-hlbl{left:0;z-index:8;text-align:left;min-width:330px;max-width:330px;white-space:normal;vertical-align:middle}
+.mx-tbl thead th.mx-hlbl{left:0;z-index:8;text-align:left;vertical-align:middle}
 .mx-tbl thead th.mx-hprom{right:0;z-index:8;background:var(--blue2)}
-.mx-lbl{position:sticky;left:0;z-index:5;background:#fff;min-width:330px;max-width:330px;white-space:normal;
-  box-shadow:2px 0 4px rgba(0,0,0,.06);text-align:left}
+.mx-lbl{position:sticky;left:0;z-index:5;background:#fff;
+  box-shadow:2px 0 4px rgba(0,0,0,.06);text-align:left;overflow:hidden}
+/* El ancho se fija en un div interno: max-width sobre <td> lo ignora el layout de tabla */
+.mx-lbltxt{width:330px;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
 .mx-prom{position:sticky;right:0;z-index:5;text-align:center;font-weight:800;background:#eef4fb;
   box-shadow:-2px 0 4px rgba(0,0,0,.06)}
 .mx-r-area>td{background:#1e2a38;color:#fff;font-weight:800;font-size:11.5px}
@@ -5506,7 +5508,8 @@ function _mxFilters(){
   const paEl=document.getElementById('nw-pais-filter')||document.getElementById('gl-pais');
   return {ed:(edEl||{}).value||'', pais:_userPais||(paEl||{}).value||''};
 }
-function _mxData(){
+// mode: 'core' = áreas vinculantes (default) · 'nv' = solo No Vinculantes
+function _mxData(mode){
   const {ed,pais}=_mxFilters();
   const audits=saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
                     .sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
@@ -5518,7 +5521,7 @@ function _mxData(){
   });
   // Jerarquía desde Q
   const areas=[];
-  SHEETS().forEach(sh=>{
+  (mode==='nv'?SHEETS_NV():SHEETS_CORE()).forEach(sh=>{
     const shQs=Q.filter(q=>q.sheet===sh);
     if(!shQs.length) return;
     const ats=[];
@@ -5540,12 +5543,40 @@ function _mxData(){
 }
 function _mxPct(v){return v===null||v===undefined?null:v*100;}
 function _mxAvg(arr){const v=arr.filter(x=>x!==null&&x!==undefined&&!isNaN(x));return v.length?v.reduce((s,x)=>s+x,0)/v.length:null;}
-function renderMatrizRed(){
-  const wrap=document.getElementById('matriz-red-wrap');
+function _mxEnsureNVCard(){
+  // La solapa NV reescribe su panel entero: agregamos la tarjeta al final tras cada render
+  const panel=document.getElementById('nw-panel-nv');
+  if(!panel) return null;
+  let card=document.getElementById('matriz-nv-card');
+  if(!card){
+    card=document.createElement('div');
+    card.id='matriz-nv-card'; card.className='sc-card'; card.style.marginTop='14px';
+    card.innerHTML=
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">'+
+        '<div class="sc-h3" style="margin:0;flex:1">Matriz Comparativa · No Vinculante × Distribuidor</div>'+
+        '<label style="font-size:11px;color:var(--g500);display:flex;align-items:center;gap:5px">'+
+          '<input type="checkbox" id="mx-only-comp-nv" onchange="renderMatrizRed(\'nv\')"> Solo componentes</label>'+
+        '<button class="btn btn-sm btn-out" onclick="mxToggleAll(true,\'nv\')">➕ Expandir</button>'+
+        '<button class="btn btn-sm btn-out" onclick="mxToggleAll(false,\'nv\')">➖ Colapsar</button>'+
+        '<button class="btn btn-sm btn-blue" onclick="exportMatrizRedExcel(\'nv\')">📊 Excel</button>'+
+      '</div>'+
+      '<div id="matriz-nv-wrap"></div>'+
+      '<div style="margin-top:8px;display:flex;gap:14px;font-size:10px;color:var(--g500);flex-wrap:wrap">'+
+        '<span>Área / Atributo / BPL: % alcanzado</span><span>Componente: SI · NO · N/A</span>'+
+        '<span>Última columna: promedio de la red</span></div>';
+  }
+  if(card.parentNode!==panel) panel.appendChild(card);
+  return document.getElementById('matriz-nv-wrap');
+}
+function renderMatrizRed(mode){
+  mode=mode==='nv'?'nv':'core';
+  const wrap=mode==='nv'?_mxEnsureNVCard():document.getElementById('matriz-red-wrap');
   if(!wrap) return;
-  const {cols,areas}=_mxData();
+  const {cols,areas}=_mxData(mode);
+  if(!areas.length){wrap.innerHTML='<p style="font-size:12px;color:var(--g400)">Esta edición no tiene áreas No Vinculantes.</p>';return;}
   if(!cols.length){wrap.innerHTML='<p style="font-size:12px;color:var(--g400)">No hay auditorías para la edición / país seleccionados.</p>';return;}
-  const onlyComp=!!(document.getElementById('mx-only-comp')||{}).checked;
+  const onlyComp=!!(document.getElementById(mode==='nv'?'mx-only-comp-nv':'mx-only-comp')||{}).checked;
+  const CK=mode+'|';   // prefijo de claves de colapso, para que los dos modos no se pisen
   const esc=s=>(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const cellPct=p=>{
     if(p===null) return '<td class="mx-v" style="color:#cbd5e1">—</td>';
@@ -5558,48 +5589,48 @@ function renderMatrizRed(){
     return '<td class="mx-v" style="background:'+c[1]+';color:'+c[2]+'">'+c[0]+'</td>';
   };
   let h='<div class="mx-wrap"><table class="mx-tbl"><thead><tr>';
-  h+='<th class="mx-hlbl">ÁREA / ATRIBUTO / BPL / COMPONENTE</th>';
+  h+='<th class="mx-hlbl"><div class="mx-lbltxt">ÁREA / ATRIBUTO / BPL / COMPONENTE</div></th>';
   cols.forEach(c=>{
     const nm=esc(c.a.distribuidor);
     h+='<th title="'+nm+'"><div style="writing-mode:vertical-rl;transform:rotate(180deg);max-height:88px;overflow:hidden;text-overflow:ellipsis;margin:0 auto">'+nm+'</div></th>';
   });
   h+='<th class="mx-hprom">PROM.<br>RED</th></tr></thead><tbody>';
-  const tog=(key,open)=>'<span class="mx-tog" onclick="mxToggle(\''+key+'\')">'+(open?'▼':'▶')+'</span>';
+  const tog=(key,open)=>'<span class="mx-tog" onclick="mxToggle(\''+key+'\',\''+mode+'\')">'+(open?'▼':'▶')+'</span>';
   areas.forEach(ar=>{
-    const aOpen=!_mxCollapsed['A_'+ar.sh];
+    const aOpen=!_mxCollapsed[CK+'A_'+ar.sh];
     if(!onlyComp){
       const vals=cols.map(c=>_mxPct((c.sc.areas||{})[ar.sh]));
-      h+='<tr class="mx-r-area"><td class="mx-lbl">'+tog('A_'+ar.sh,aOpen)+
-         '<strong>'+esc(ar.sh)+'</strong> · '+esc(ar.name)+(ar.nv?' <span style="opacity:.7;font-weight:400">(No Vinculante)</span>':'')+'</td>';
+      h+='<tr class="mx-r-area"><td class="mx-lbl"><div class="mx-lbltxt">'+tog(CK+'A_'+ar.sh,aOpen)+
+         '<strong>'+esc(ar.sh)+'</strong> · '+esc(ar.name)+'</div></td>';
       vals.forEach(p=>{h+=p===null?'<td class="mx-v">—</td>':'<td class="mx-v">'+p.toFixed(1)+'%</td>';});
       const av=_mxAvg(vals);
       h+='<td class="mx-prom">'+(av===null?'—':av.toFixed(1)+'%')+'</td></tr>';
     }
     if(!aOpen&&!onlyComp) return;
     ar.ats.forEach(at=>{
-      const tOpen=!_mxCollapsed['T_'+at.key];
+      const tOpen=!_mxCollapsed[CK+'T_'+at.key];
       if(!onlyComp){
         const vals=cols.map(c=>_mxPct(((c.sc.bpls||{})[at.key]||{}).score));
-        h+='<tr class="mx-r-at"><td class="mx-lbl" style="padding-left:20px">'+tog('T_'+at.key,tOpen)+
-           '<span class="mx-code">'+at.num+'</span>'+esc(at.name)+'</td>';
+        h+='<tr class="mx-r-at"><td class="mx-lbl"><div class="mx-lbltxt" style="padding-left:14px">'+tog(CK+'T_'+at.key,tOpen)+
+           '<span class="mx-code">'+at.num+'</span>'+esc(at.name)+'</div></td>';
         vals.forEach(p=>h+=cellPct(p));
         const av=_mxAvg(vals);
         h+='<td class="mx-prom">'+(av===null?'—':av.toFixed(1)+'%')+'</td></tr>';
       }
       if(!tOpen&&!onlyComp) return;
       at.subs.forEach(sb=>{
-        const sOpen=!_mxCollapsed['S_'+sb.key];
+        const sOpen=!_mxCollapsed[CK+'S_'+sb.key];
         if(!onlyComp){
           const vals=cols.map(c=>{const s=(c.sc.subattrs||{})[sb.key];return s?_mxPct(s.pct):null;});
-          h+='<tr class="mx-r-sub"><td class="mx-lbl" style="padding-left:38px">'+tog('S_'+sb.key,sOpen)+esc(sb.label)+'</td>';
+          h+='<tr class="mx-r-sub"><td class="mx-lbl"><div class="mx-lbltxt" style="padding-left:28px">'+tog(CK+'S_'+sb.key,sOpen)+esc(sb.label)+'</div></td>';
           vals.forEach(p=>h+=cellPct(p));
           const av=_mxAvg(vals);
           h+='<td class="mx-prom">'+(av===null?'—':av.toFixed(1)+'%')+'</td></tr>';
         }
         if(!sOpen&&!onlyComp) return;
         sb.comps.forEach(q=>{
-          h+='<tr class="mx-r-comp"><td class="mx-lbl" style="padding-left:'+(onlyComp?8:56)+'px">'+
-             '<span class="mx-code'+(q.critico?' mx-crit':'')+'">'+esc(q.comp_num)+(q.critico?' ⚠':'')+'</span>'+esc(q.question)+'</td>';
+          h+='<tr class="mx-r-comp"><td class="mx-lbl"><div class="mx-lbltxt" style="padding-left:'+(onlyComp?0:42)+'px">'+
+             '<span class="mx-code'+(q.critico?' mx-crit':'')+'">'+esc(q.comp_num)+(q.critico?' ⚠':'')+'</span>'+esc(q.question)+'</div></td>';
           const raw=cols.map(c=>c.ans[q.comp_num]||null);
           raw.forEach(v=>h+=cellAns(v));
           // Promedio del componente: % de SI sobre respondidas sin N/A
@@ -5611,29 +5642,34 @@ function renderMatrizRed(){
     });
   });
   // Fila final: total ponderado por distribuidor
-  const totVals=cols.map(c=>_mxPct(c.sc.total));
-  h+='<tr class="mx-r-area"><td class="mx-lbl"><strong>TOTAL PONDERADO</strong></td>';
+  const totVals=mode==='nv'
+    ? cols.map(c=>_mxAvg(areas.map(ar=>_mxPct((c.sc.areas||{})[ar.sh]))))
+    : cols.map(c=>_mxPct(c.sc.total));
+  h+='<tr class="mx-r-area"><td class="mx-lbl"><div class="mx-lbltxt"><strong>'+(mode==='nv'?'PROMEDIO NO VINCULANTE':'TOTAL PONDERADO')+'</strong></div></td>';
   totVals.forEach(p=>h+=p===null?'<td class="mx-v">—</td>':'<td class="mx-v">'+p.toFixed(1)+'%</td>');
   const totAv=_mxAvg(totVals);
   h+='<td class="mx-prom">'+(totAv===null?'—':totAv.toFixed(1)+'%')+'</td></tr>';
   h+='</tbody></table></div>';
   wrap.innerHTML=h;
 }
-function mxToggle(key){_mxCollapsed[key]=!_mxCollapsed[key];renderMatrizRed();}
-function mxToggleAll(open){
-  const {areas}=_mxData();
-  Object.keys(_mxCollapsed).forEach(k=>delete _mxCollapsed[k]);
+function mxToggle(key,mode){_mxCollapsed[key]=!_mxCollapsed[key];renderMatrizRed(mode);}
+function mxToggleAll(open,mode){
+  mode=mode==='nv'?'nv':'core';
+  const CK=mode+'|';
+  const {areas}=_mxData(mode);
+  Object.keys(_mxCollapsed).forEach(k=>{if(k.indexOf(CK)===0) delete _mxCollapsed[k];});
   if(!open) areas.forEach(ar=>{
-    _mxCollapsed['A_'+ar.sh]=true;
-    ar.ats.forEach(at=>{_mxCollapsed['T_'+at.key]=true;at.subs.forEach(sb=>{_mxCollapsed['S_'+sb.key]=true;});});
+    _mxCollapsed[CK+'A_'+ar.sh]=true;
+    ar.ats.forEach(at=>{_mxCollapsed[CK+'T_'+at.key]=true;at.subs.forEach(sb=>{_mxCollapsed[CK+'S_'+sb.key]=true;});});
   });
-  renderMatrizRed();
+  renderMatrizRed(mode);
 }
 
-async function exportMatrizRedExcel(){
+async function exportMatrizRedExcel(mode){
+  mode=mode==='nv'?'nv':'core';
   if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún, reintentá en unos segundos');return;}
-  const {cols,areas}=_mxData();
-  if(!cols.length){showToast('⚠️ No hay auditorías para exportar');return;}
+  const {cols,areas}=_mxData(mode);
+  if(!cols.length||!areas.length){showToast('⚠️ No hay datos para exportar');return;}
   showToast('⏳ Generando matriz...');
   const NAVY='FF1E2A38',WHITE='FFFFFFFF';
   const solid=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
@@ -5645,11 +5681,11 @@ async function exportMatrizRedExcel(){
   const heatFG=p=>p>=85?'FF1B5E20':p>=70?'FF33691E':p>=50?'FFF57F17':p>=30?'FFBF360C':'FFB71C1C';
   const wb=new ExcelJS.Workbook();
   wb.creator='RED Activa 2.0 · BAP Partners'; wb.created=new Date();
-  const ws=wb.addWorksheet('Matriz Red',{views:[{showGridLines:false,state:'frozen',xSplit:2,ySplit:2}]});
+  const ws=wb.addWorksheet(mode==='nv'?'Matriz NV':'Matriz Red',{views:[{showGridLines:false,state:'frozen',xSplit:2,ySplit:2}]});
   ws.columns=[{width:11},{width:62},...cols.map(()=>({width:13})),{width:12}];
   const {ed,pais}=_mxFilters();
   {const r=ws.addRow([]);
-   r.getCell(1).value='MATRIZ COMPARATIVA · Cuestionario × Distribuidor'+(pais?' · '+pais:'')+(ed?' · Edición '+ed:'');
+   r.getCell(1).value='MATRIZ COMPARATIVA · '+(mode==='nv'?'No Vinculante':'Cuestionario')+' × Distribuidor'+(pais?' · '+pais:'')+(ed?' · Edición '+ed:'');
    r.height=26; ws.mergeCells(1,1,1,cols.length+3);
    st(r.getCell(1),{name:'Calibri',bold:true,size:13,color:{argb:'FF60A5FA'}},solid(NAVY),{horizontal:'left',vertical:'middle'});}
   {const r=ws.addRow([]);
@@ -5693,7 +5729,7 @@ async function exportMatrizRedExcel(){
     return r;
   };
   areas.forEach(ar=>{
-    addRow(ar.sh,(AN[ar.sh]||ar.sh)+(ar.nv?' (No Vinculante)':''),cols.map(c=>_mxPct((c.sc.areas||{})[ar.sh])),'area',false,0);
+    addRow(ar.sh,AN[ar.sh]||ar.sh,cols.map(c=>_mxPct((c.sc.areas||{})[ar.sh])),'area',false,0);
     ar.ats.forEach(at=>{
       addRow(String(at.num),at.name,cols.map(c=>_mxPct(((c.sc.bpls||{})[at.key]||{}).score)),'at',true,1);
       at.subs.forEach(sb=>{
@@ -5704,10 +5740,12 @@ async function exportMatrizRedExcel(){
       });
     });
   });
-  addRow('','TOTAL PONDERADO',cols.map(c=>_mxPct(c.sc.total)),'area',false,0);
+  addRow('',mode==='nv'?'PROMEDIO NO VINCULANTE':'TOTAL PONDERADO',
+    mode==='nv'?cols.map(c=>_mxAvg(areas.map(ar=>_mxPct((c.sc.areas||{})[ar.sh]))))
+              :cols.map(c=>_mxPct(c.sc.total)),'area',false,0);
   ws.autoFilter={from:{row:2,column:1},to:{row:2,column:cols.length+3}};
   try{
-    const fname='Matriz_Red'+(pais?'_'+pais:'')+(ed?'_'+ed:'')+'.xlsx';
+    const fname='Matriz_'+(mode==='nv'?'NV':'Red')+(pais?'_'+pais:'')+(ed?'_'+ed:'')+'.xlsx';
     const buffer=await wb.xlsx.writeBuffer();
     if(window.electronAPI?.saveExcel){
       window.electronAPI.saveExcel({buffer:Array.from(new Uint8Array(buffer)),filename:fname});
@@ -11255,8 +11293,8 @@ function dbRenderTab(t){
     case 'criticos':      dbRenderCriticos();break;
     case 'distribuidores':dbRenderDistribuidores();break;
     case 'analisis':      dbRenderAnalisisEspecial();break;
-    case 'nv':            dbRenderNV();break;
-    case 'matriz':        renderMatrizRed();break;
+    case 'nv':            dbRenderNV();renderMatrizRed('nv');break;
+    case 'matriz':        renderMatrizRed('core');break;
   }
 }
 
