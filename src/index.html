@@ -5758,7 +5758,7 @@ function importEVFile(input){
   const files=input.files; if(!files||!files.length) return;
   const log=document.getElementById('ev-import-log');
   log.innerHTML='<span style="color:var(--g500)">Procesando...</span>';
-  let totalEV=0, totalAE=0, filesOK=0, filesFail=0;
+  let totalEV=0, totalAE=0, filesOK=0, filesFail=0, filesSkip=0;
   let pending=files.length;
 
   Array.from(files).forEach(function(file){
@@ -5797,7 +5797,7 @@ function importEVFile(input){
         if(!areaSheets.length){
           filesFail++; pending--;
           log.innerHTML+=`<br>❌ <strong>${fname}</strong>: no se encontraron solapas de área (${areaNames.join(', ')})`;
-          if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail);
+          if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail,filesSkip);
           return;
         }
 
@@ -5866,7 +5866,7 @@ function importEVFile(input){
         if(answCount===0){
           log.innerHTML+=`<br>⚠️ <strong>${fname}</strong> (${fileType}): sin respuestas válidas en columna F`;
           filesFail++; pending--;
-          if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail);
+          if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail,filesSkip);
           return;
         }
 
@@ -5874,10 +5874,26 @@ function importEVFile(input){
         const sc=computeScores(answers);
 
         if(fileType==='EV'){
-          const _evIdx=saved.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear;});
-          const _evId=_evIdx>=0?saved[_evIdx].id:String(Date.now()+Math.random());
-          const audit={id:_evId,distribuidor:distName,fecha,auditor:'',edicion:edYear,pais:cfg.pais||'',answers,comments:evComments,scores:sc};
-          if(_evIdx>=0) saved[_evIdx]=audit; else saved.push(audit);
+          const _norm=function(s){return (s||'').trim().toUpperCase();};
+          const _evIdx=saved.findIndex(function(a){return _norm(a.distribuidor)===_norm(distName)&&a.edicion===edYear;});
+          const _prevA=_evIdx>=0?saved[_evIdx]:null;
+          // Auditoría congelada = resultado oficial cerrado: no se pisa ni la estructura ni las respuestas
+          if(_prevA&&_prevA.frozen){
+            log.innerHTML+=`<br>🔒 <strong>${fname}</strong>: ${distName} ${edYear} ya está <strong>congelada</strong> (${(((_prevA.scores||{}).total||0)*100).toFixed(1)}%) — no se modificó. Descongelala en Guardadas si querés reimportarla.`;
+            filesSkip++; pending--;
+            if(!pending){ _evImportDone(log,totalEV,totalAE,filesOK,filesFail,filesSkip); }
+            return;
+          }
+          if(_prevA){
+            // Ya existe y NO está congelada: actualizar respuestas conservando id, fecha, auditor, pesos y devolución
+            saved[_evIdx]=Object.assign({},_prevA,{
+              answers,
+              comments:Object.assign({},_prevA.comments||{},evComments),
+              scores:sc
+            });
+          } else {
+            saved.push({id:String(Date.now()+Math.random()),distribuidor:distName,fecha,auditor:'',edicion:edYear,pais:cfg.pais||'',answers,comments:evComments,scores:sc});
+          }
           totalEV++;
         } else {
           const _aeIdx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear&&a.source!=='portal';});
@@ -5891,24 +5907,25 @@ function importEVFile(input){
         filesOK++; pending--;
         if(!pending){
           persist(); updateAudCnt(); renderSaved(); renderGlobal(); renderAEList();
-          _evImportDone(log,totalEV,totalAE,filesOK,filesFail);
+          _evImportDone(log,totalEV,totalAE,filesOK,filesFail,filesSkip);
           renderCmpColumns();
         }
       }catch(err){
         filesFail++; pending--;
         log.innerHTML+=`<br>❌ <strong>${fname}</strong>: ${err.message}`;
-        if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail);
+        if(!pending) _evImportDone(log,totalEV,totalAE,filesOK,filesFail,filesSkip);
       }
     };
     reader.readAsArrayBuffer(file);
   });
   input.value='';
 }
-function _evImportDone(log,ev,ae,ok,fail){
+function _evImportDone(log,ev,ae,ok,fail,skip){
   let summary=`<br><strong>✅ ${ok} archivo(s) OK</strong> — ${ev} evaluaciones (EV) + ${ae} autoevaluaciones (AE) importadas.`;
+  if(skip>0) summary+=` <span style="color:#92400e;font-weight:700">${skip} omitido(s) por estar congelado(s).</span>`;
   if(fail>0) summary+=` <span style="color:#c62828;font-weight:700">${fail} con error.</span>`;
   log.innerHTML=log.innerHTML+summary;
-  showToast('✅ EV/AE importado: '+(ev+ae)+' registros');
+  showToast(skip>0&&ev+ae===0?'🔒 Sin cambios: auditoría congelada':'✅ EV/AE importado: '+(ev+ae)+' registros');
 }
 
 /* Limpiar respuestas activas (no borra ediciones guardadas) */
