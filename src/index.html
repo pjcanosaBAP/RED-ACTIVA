@@ -1465,26 +1465,6 @@ body.readonly .admin-only{display:none!important;}
 
       <!-- SUB-TAB: Análisis de Red -->
       <div id="global-sub-red" style="display:none">
-        <!-- Matriz Componentes × Distribuidores -->
-        <div class="sc-card" style="margin-bottom:14px">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <div class="sc-h3" style="margin:0;flex:1">Matriz Comparativa · Cuestionario × Distribuidor</div>
-            <label style="font-size:11px;color:var(--g500);display:flex;align-items:center;gap:5px">
-              <input type="checkbox" id="mx-only-comp" onchange="renderMatrizRed()"> Solo componentes
-            </label>
-            <button class="btn btn-sm btn-out" onclick="mxToggleAll(true)">➕ Expandir</button>
-            <button class="btn btn-sm btn-out" onclick="mxToggleAll(false)">➖ Colapsar</button>
-            <button class="btn btn-sm btn-blue" onclick="exportMatrizRedExcel()">📊 Excel</button>
-          </div>
-          <div id="matriz-red-wrap">
-            <p style="font-size:12px;color:var(--g400)">No hay auditorías.</p>
-          </div>
-          <div style="margin-top:8px;display:flex;gap:14px;font-size:10px;color:var(--g500);flex-wrap:wrap">
-            <span>Área / Atributo / BPL: % alcanzado</span>
-            <span>Componente: SI · NO · N/A</span>
-            <span>Última columna: promedio de la red</span>
-          </div>
-        </div>
         <!-- Cross table -->
         <div class="sc-card" style="margin-bottom:14px">
           <div class="sc-h3">Tabla de Doble Entrada · Distribuidor × BPL Crítico</div>
@@ -1906,6 +1886,7 @@ body.readonly .admin-only{display:none!important;}
       <button class="sn-tab" data-tab="distribuidores" onclick="dbRenderTab('distribuidores')">🏢 Distribuidores</button>
       <button class="sn-tab" data-tab="analisis" onclick="dbRenderTab('analisis')">🔍 Análisis</button>
       <button class="sn-tab" data-tab="nv" onclick="dbRenderTab('nv')">⚪ No Vinc.</button>
+      <button class="sn-tab" data-tab="matriz" onclick="dbRenderTab('matriz')">🧮 Matriz</button>
     </div>
     <!-- Panels (populated by JS) -->
     <div id="nw-panels">
@@ -1916,6 +1897,27 @@ body.readonly .admin-only{display:none!important;}
       <div id="nw-panel-distribuidores" class="nw-panel" style="display:none"></div>
       <div id="nw-panel-analisis" class="nw-panel" style="display:none"></div>
       <div id="nw-panel-nv" class="nw-panel" style="display:none"></div>
+      <div id="nw-panel-matriz" class="nw-panel" style="display:none">
+        <div class="sc-card">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <div class="sc-h3" style="margin:0;flex:1">Matriz Comparativa · Cuestionario × Distribuidor</div>
+            <label style="font-size:11px;color:var(--g500);display:flex;align-items:center;gap:5px">
+              <input type="checkbox" id="mx-only-comp" onchange="renderMatrizRed()"> Solo componentes
+            </label>
+            <button class="btn btn-sm btn-out" onclick="mxToggleAll(true)">➕ Expandir</button>
+            <button class="btn btn-sm btn-out" onclick="mxToggleAll(false)">➖ Colapsar</button>
+            <button class="btn btn-sm btn-blue" onclick="exportMatrizRedExcel()">📊 Excel</button>
+          </div>
+          <div id="matriz-red-wrap">
+            <p style="font-size:12px;color:var(--g400)">No hay auditorías.</p>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:14px;font-size:10px;color:var(--g500);flex-wrap:wrap">
+            <span>Área / Atributo / BPL: % alcanzado</span>
+            <span>Componente: SI · NO · N/A</span>
+            <span>Última columna: promedio de la red</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="nw-empty" style="text-align:center;padding:60px;color:var(--g400);display:none">
       No hay auditorías guardadas. Guardá al menos una auditoría para ver el dashboard de red.
@@ -5498,9 +5500,14 @@ function _mxSanW(w){
   const wc=w.wcfg||{};
   return {aw:w.aw,wcfg:{at:wc.at||{},bpl:wc.bpl||{},comp:wc.comp||{}}};
 }
+function _mxFilters(){
+  // Prioriza los filtros de la solapa Red (panel-network); cae a los del panel global
+  const edEl=document.getElementById('nw-ed-filter')||document.getElementById('gl-edicion');
+  const paEl=document.getElementById('nw-pais-filter')||document.getElementById('gl-pais');
+  return {ed:(edEl||{}).value||'', pais:_userPais||(paEl||{}).value||''};
+}
 function _mxData(){
-  const ed=(document.getElementById('gl-edicion')||{}).value||'';
-  const pais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
+  const {ed,pais}=_mxFilters();
   const audits=saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
                     .sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
   // Score recalculado por distribuidor, con sus propios pesos, para tener subattrs
@@ -5640,8 +5647,7 @@ async function exportMatrizRedExcel(){
   wb.creator='RED Activa 2.0 · BAP Partners'; wb.created=new Date();
   const ws=wb.addWorksheet('Matriz Red',{views:[{showGridLines:false,state:'frozen',xSplit:2,ySplit:2}]});
   ws.columns=[{width:11},{width:62},...cols.map(()=>({width:13})),{width:12}];
-  const ed=(document.getElementById('gl-edicion')||{}).value||'';
-  const pais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
+  const {ed,pais}=_mxFilters();
   {const r=ws.addRow([]);
    r.getCell(1).value='MATRIZ COMPARATIVA · Cuestionario × Distribuidor'+(pais?' · '+pais:'')+(ed?' · Edición '+ed:'');
    r.height=26; ws.mergeCells(1,1,1,cols.length+3);
@@ -5716,7 +5722,6 @@ async function exportMatrizRedExcel(){
 }
 
 function renderGlobalRed(){
-  renderMatrizRed();
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const pais=(document.getElementById('gl-pais')||{}).value||'';
   const audits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
@@ -11251,6 +11256,7 @@ function dbRenderTab(t){
     case 'distribuidores':dbRenderDistribuidores();break;
     case 'analisis':      dbRenderAnalisisEspecial();break;
     case 'nv':            dbRenderNV();break;
+    case 'matriz':        renderMatrizRed();break;
   }
 }
 
