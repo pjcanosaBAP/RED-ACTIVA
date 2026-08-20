@@ -4601,13 +4601,20 @@ async function _sbPushConfig(){
         try{ structures[k]=JSON.parse(localStorage.getItem(k)); }catch(e){}
       }
     }
+    // Preservar claves que sólo viven en el servidor (ej. admin_pin del portal AE)
+    let _serverOnly = {};
+    try{
+      const {data:prev} = await _sbc.from('app_config').select('data').eq('id',1).maybeSingle();
+      if(prev && prev.data && prev.data.admin_pin) _serverOnly.admin_pin = prev.data.admin_pin;
+    }catch(e){ console.warn('[SB] _sbPushConfig preserve:', e); }
     const data = {
       pais: cfg.pais||'URUGUAY',
       anio: cfg.anio||2025,
       dists: _distsObj(),
       thr: {...THR},
       aw: {...AW},
-      structures
+      structures,
+      ..._serverOnly
     };
     const {error} = await _sbc.from('app_config')
       .upsert({id:1, data, updated_at:new Date().toISOString()});
