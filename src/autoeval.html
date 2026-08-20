@@ -243,7 +243,7 @@ select.inp{cursor:pointer}
       <button style="background:none;border:none;color:#475569;font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;padding:4px 10px;border-radius:6px;transition:color .2s" onmouseover="this.style.color='#a78bfa'" onmouseout="this.style.color='#475569'" onclick="showAdminPin()">🔐 Acceso administrador</button>
     </div>
     <div id="admin-pin-wrap" style="display:none;margin-top:10px;padding:16px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:10px">
-      <label class="inp-label" style="color:#a78bfa">PIN de administrador</label>
+      <label class="inp-label" style="color:#a78bfa">PIN de administrador <span style="color:#64748b;font-weight:400">(CEL)</span></label>
       <input type="password" id="inp-admin-pin" class="inp inp-pin" maxlength="8"
         inputmode="numeric" placeholder="••••"
         onkeydown="if(event.key==='Enter')adminLogin()">
