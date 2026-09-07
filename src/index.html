@@ -11782,6 +11782,8 @@ function dbRenderCriticos(){
 
 // ── Δ CRÍTICOS (edición actual vs anterior) ───────────────────────────────────
 let _dcOpts={inc:true,chg:false,mov:false};
+const DC_SHORT={1:'Camiones alto tonelaje',2:'Días de stock',3:'EPP y Extintores',4:'Equipo Manipuleo',5:'Coord. Abastecimiento',6:'Inventario',7:'Proc. Document.',8:'Indicadores',9:'Control de Temp.',10:'Rechazos y dev.',11:'No aptos',12:'Control de plagas'};
+const dcName=n=>DC_SHORT[n]||('C'+n);
 function dcToggle(k,v){_dcOpts[k]=v;dbRenderDeltaCriticos();}
 
 function _dcData(){
@@ -11851,12 +11853,12 @@ function dbRenderDeltaCriticos(){
   const TH='padding:7px 6px;text-align:center;font-size:9.5px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px;background:#f0f4f8;border-bottom:2px solid #d1dae6';
   const GB='border-left:2px solid #d1dae6';
   const BC="font-family:'Barlow Condensed',sans-serif";
-  let h='<table style="border-collapse:separate;border-spacing:0;width:100%;font-size:11px"><thead><tr>'+
+  let h='<table id="dc-table" style="border-collapse:separate;border-spacing:0;width:100%;font-size:11px"><thead><tr>'+
     '<th style="'+TH+';text-align:left;padding-left:11px;min-width:190px;position:sticky;left:0;z-index:3">Distribuidor</th>'+
     '<th style="'+TH+'">Score</th>';
   let pv='';
   cols.forEach(function(c){const g=c.sheet!==pv?';'+GB:'';pv=c.sheet;
-    h+='<th style="'+TH+g+';min-width:34px;color:'+(AC[c.sheet]||'#7a90a8')+'" title="'+c.sheet+' - '+c.s+'">C'+c.n+'</th>';});
+    h+='<th style="'+TH+g+';width:74px;min-width:74px;white-space:normal;text-transform:none;letter-spacing:0;line-height:1.2;font-size:9.5px;padding:7px 5px;color:'+(AC[c.sheet]||'#7a90a8')+'" title="C'+c.n+' · '+c.sheet+' - '+c.s+'">'+dcName(c.n)+'</th>';});
   h+='<th style="'+TH+';'+GB+'">'+D.prev+'</th><th style="'+TH+'">'+D.cur+' ↓</th><th style="'+TH+'">Δ</th></tr></thead><tbody>';
   rows.forEach(function(x,ri){
     const a=cnt(x.r.p1),b=cnt(x.r.p2),dd=b-a,bg=ri%2?'#fafbfd':'#fff';
@@ -11867,8 +11869,7 @@ function dbRenderDeltaCriticos(){
       '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';font-size:10.5px;color:#7a90a8;white-space:nowrap">'+x.r.t1.toFixed(1)+'→'+x.r.t2.toFixed(1)+'</td>';
     let pw='';
     cols.forEach(function(c){const s=x.st[c.i];const g=c.sheet!==pw?';'+GB:'';pw=c.sheet;
-      h+='<td style="padding:0;border-bottom:1px solid #e8edf3;background:'+bg+g+'" title="C'+c.n+' - '+c.s+'">'+
-         '<div style="display:flex;align-items:center;justify-content:center;height:30px;font-size:13px;font-weight:700;'+SC[s]+'">'+GL[s]+'</div></td>';});
+      h+='<td style="border-bottom:1px solid #e8edf3;text-align:center;vertical-align:middle;height:30px;font-size:13px;font-weight:700;background:'+bg+g+';'+SC[s]+'" title="'+dcName(c.n)+' - '+c.s+'">'+GL[s]+'</td>';});
     h+='<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';'+GB+';'+BC+';font-size:14px;font-weight:700;color:#7a90a8">'+a+'</td>'+
        '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';'+BC+';font-size:14px;font-weight:700;color:#1a2e4a">'+b+'</td>'+
        '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+'"><span style="'+BC+';font-size:14px;font-weight:700;padding:1px 6px;border-radius:3px;'+dc+'">'+(dd>0?'+':'')+(dd||'=')+'</span></td></tr>';
@@ -11894,7 +11895,7 @@ function dbRenderDeltaCriticos(){
     '<span>'+k[1]+'<span style="'+BC+';font-size:13px;font-weight:700;color:#7a90a8;margin-left:6px;background:#eef2f7;border-radius:3px;padding:0 6px">'+tally(k[0])+'</span></span></span>';}).join('');
   const legHtml=col.map(function(c){return '<span style="display:flex;gap:7px;align-items:baseline;min-width:0">'+
     '<span style="'+BC+';font-weight:700;font-size:12px;min-width:26px;color:'+(AC[c.sheet]||'#7a90a8')+'">C'+c.n+'</span>'+
-    '<span style="color:#7a90a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+c.s+'">'+c.s+'</span></span>';}).join('');
+    '<span style="color:#7a90a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+c.s+'"><b style="color:#3d5573">'+dcName(c.n)+'</b> · '+c.s+'</span></span>';}).join('');
   const ck=function(k,lbl){return '<label style="font-size:11px;color:#3d5573;display:flex;align-items:center;gap:5px;cursor:pointer">'+
     '<input type="checkbox"'+(O[k]?' checked':'')+' onchange="dcToggle(\''+k+'\',this.checked)"> '+lbl+'</label>';};
 
@@ -11904,7 +11905,8 @@ function dbRenderDeltaCriticos(){
     '<span class="db-badge db-badge-warn">'+D.prev+' → '+D.cur+'</span></div>'+
     '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
       ck('inc','Excluir auditorías incompletas')+ck('chg','Solo BPL con cambios')+ck('mov','Solo distribuidores que se movieron')+
-      '<span style="flex:1"></span><button class="btn btn-sm btn-blue" onclick="exportDeltaCriticosExcel()">📊 Excel</button>'+
+      '<span style="flex:1"></span><button class="btn btn-sm" onclick="copyDeltaCriticos()">📋 Copiar tabla</button>'+
+      '<button class="btn btn-sm btn-blue" onclick="exportDeltaCriticosExcel()">📊 Excel</button>'+
       '<span style="font-size:10.5px;color:#b0bcc8">'+rows.length+' distribuidores · '+cols.length+' BPL críticas · ordenado por '+D.cur+' ↓</span></div>'+
     '<div style="overflow-x:auto">'+h+'</div>'+
     '<div style="margin-top:13px;padding-top:11px;border-top:1px solid #e8edf3;display:flex;flex-direction:column;gap:11px">'+
@@ -11913,13 +11915,31 @@ function dbRenderDeltaCriticos(){
     '</div></div>';
 }
 
+function copyDeltaCriticos(){
+  const t=document.getElementById('dc-table'); if(!t){showToast('⚠️ No hay tabla para copiar');return;}
+  const html='<meta charset="utf-8">'+t.outerHTML;
+  const txt=Array.prototype.map.call(t.querySelectorAll('tr'),function(tr){
+    return Array.prototype.map.call(tr.children,function(c){return (c.innerText||c.textContent||'').replace(/\s+/g,' ').trim();}).join('\t');}).join('\n');
+  const fallback=function(){
+    const sel=window.getSelection(); const r=document.createRange();
+    r.selectNode(t); sel.removeAllRanges(); sel.addRange(r);
+    let ok=false; try{ok=document.execCommand('copy');}catch(e){}
+    sel.removeAllRanges();
+    showToast(ok?'✅ Tabla copiada':'⚠️ No se pudo copiar');
+  };
+  if(navigator.clipboard&&window.ClipboardItem){
+    navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})])
+      .then(function(){showToast('✅ Tabla copiada — pegala en Excel o PowerPoint');},fallback);
+  } else fallback();
+}
+
 function exportDeltaCriticosExcel(){
   const D=_dcData(); if(D.err||!D.rows||!D.rows.length){showToast('⚠️ No hay dos ediciones para comparar');return;}
   const O=_dcOpts, rows0=D.rows.filter(r=>!(O.inc&&r.inc));
   const stOf=(a,b)=>(a==='.'||b==='.')?'S/D':(a==='1'&&b==='1')?'IGUAL CUMPLE':(a==='1'&&b==='0')?'PERDIDO':(a==='0'&&b==='1')?'RECUPERADO':'IGUAL NO CUMPLE';
   const cnt=p=>p.filter(c=>c==='1').length;
   const CN=CRIT_LIST.map(c=>+String(c.tag).replace(/\D/g,''));
-  const hdr=['Distribuidor','Score '+D.prev,'Score '+D.cur].concat(CRIT_LIST.map((c,i)=>'C'+CN[i]+' - '+(c.subattr||c.bpl_name)))
+  const hdr=['Distribuidor','Score '+D.prev,'Score '+D.cur].concat(CRIT_LIST.map((c,i)=>'C'+CN[i]+' '+dcName(CN[i])))
             .concat(['Críticos '+D.prev,'Críticos '+D.cur,'Delta','Auditoría incompleta']);
   const body=rows0.slice().sort((x,y)=>cnt(y.p2)-cnt(x.p2)||cnt(y.p1)-cnt(x.p1)||x.n.localeCompare(y.n))
     .map(r=>[r.n,+r.t1.toFixed(1),+r.t2.toFixed(1)].concat(CRIT_LIST.map((c,i)=>stOf(r.p1[i],r.p2[i])))
