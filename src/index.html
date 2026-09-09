@@ -9118,8 +9118,12 @@ function renderCmpReport(baseEd){
     if(!bplMap[k]) bplMap[k]={code:code,sheet:q.sheet,attr:q.bpl_name||'',bpl:q.subattr||'',imp:0,n:0,crit:false};
     bplMap[k].imp+=r.imp; bplMap[k].n++; if(q.critico) bplMap[k].crit=true;
   });
-  const bplRows=Object.keys(bplMap).map(k=>bplMap[k]).sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
-  h+='<div class="cmp-sec">BPL que explican la variación ('+bplRows.length+') · ordenadas por impacto</div>';
+  const _AO=['IFT','PLG','GST','IDP'];
+  const _oa=s=>{const i=_AO.indexOf(s);return i<0?9:i;};
+  const _seg=(c,n)=>{const p=String(c).split('.');return parseInt(p[n],10)||0;};
+  const bplRows=Object.keys(bplMap).map(k=>bplMap[k])
+    .sort((a,b)=>_oa(a.sheet)-_oa(b.sheet)||_seg(a.code,0)-_seg(b.code,0)||_seg(a.code,1)-_seg(b.code,1)||a.code.localeCompare(b.code));
+  h+='<div class="cmp-sec">BPL que explican la variación ('+bplRows.length+') · ordenadas por área, atributo y BPL</div>';
   if(!bplRows.length){
     h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b">Ningún cambio de respuesta con impacto en el puntaje entre las dos ediciones.</div>';
   } else {
