@@ -9110,33 +9110,40 @@ function renderCmpReport(baseEd){
     h+='<td style="text-align:center;font-weight:700;color:'+ppc(d)+'">'+ppf(d)+'</td></tr>';
   });
   h+='</table>';
-  // ── Tabla por componente (solo los que mueven el puntaje)
-  h+='<div class="cmp-sec">Componentes que explican la variación ('+cmpRows.length+') · ordenados por impacto</div>';
-  if(!cmpRows.length){
+  // ── Tabla por BPL (suma de los componentes que mueven el puntaje)
+  const bplMap={};
+  cmpRows.forEach(r=>{
+    const q=r.q, code=String(q.comp_num||'').split('.').slice(0,2).join('.');
+    const k=q.sheet+'|'+code;
+    if(!bplMap[k]) bplMap[k]={code:code,sheet:q.sheet,attr:q.bpl_name||'',bpl:q.subattr||'',imp:0,n:0,crit:false};
+    bplMap[k].imp+=r.imp; bplMap[k].n++; if(q.critico) bplMap[k].crit=true;
+  });
+  const bplRows=Object.keys(bplMap).map(k=>bplMap[k]).sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
+  h+='<div class="cmp-sec">BPL que explican la variación ('+bplRows.length+') · ordenadas por impacto</div>';
+  if(!bplRows.length){
     h+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b">Ningún cambio de respuesta con impacto en el puntaje entre las dos ediciones.</div>';
   } else {
-    h+='<table class="cmp-table"><tr><th>CÓDIGO</th><th>ÁREA</th><th>ATRIBUTO BPL</th><th>COMPONENTE</th><th style="text-align:center">ED. '+esc(baseEd)+' → '+esc(cur.edicion)+'</th><th style="text-align:right">IMPACTO</th></tr>';
-    cmpRows.forEach(r=>{
+    h+='<table class="cmp-table"><tr><th>CÓDIGO</th><th>ÁREA</th><th>ATRIBUTO</th><th>BPL</th><th style="text-align:right">IMPACTO</th></tr>';
+    bplRows.forEach(b=>{
       h+='<tr>';
-      h+='<td style="font-weight:700;color:'+(r.q.critico?'#d93025':'#334155')+'">'+esc(r.q.comp_num)+(r.q.critico?' ⚠':'')+'</td>';
-      h+='<td><strong style="color:'+(AC[r.q.sheet]||'#607d8b')+'">'+esc(r.q.sheet)+'</strong></td>';
-      h+='<td style="color:#475569">'+esc(r.q.bpl_name)+'</td>';
-      h+='<td style="color:#0f172a">'+esc(r.q.question)+'</td>';
-      h+='<td style="text-align:center;white-space:nowrap">'+chip(r.v1)+' → '+chip(r.v2)+'</td>';
-      h+='<td style="text-align:right;font-weight:800;color:'+ppc(r.imp)+'">'+ppf(r.imp)+'</td>';
+      h+='<td style="font-weight:700;white-space:nowrap;color:'+(b.crit?'#d93025':'#334155')+'">'+esc(b.code)+(b.crit?' ⚠':'')+'</td>';
+      h+='<td><strong style="color:'+(AC[b.sheet]||'#607d8b')+'">'+esc(b.sheet)+'</strong></td>';
+      h+='<td style="color:#475569">'+esc(b.attr)+'</td>';
+      h+='<td style="color:#0f172a">'+esc(b.bpl)+' <span style="color:#b0bcc8;font-size:10.5px;white-space:nowrap">· '+b.n+' comp.</span></td>';
+      h+='<td style="text-align:right;font-weight:800;color:'+ppc(b.imp)+'">'+ppf(b.imp)+'</td>';
       h+='</tr>';
     });
     // Reconciliación
-    h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;font-weight:700;color:#475569">Suma de impactos</td>';
+    h+='<tr style="background:#f8fafc"><td colspan="4" style="text-align:right;font-weight:700;color:#475569">Suma de impactos</td>';
     h+='<td style="text-align:right;font-weight:800;color:'+ppc(sumShown)+'">'+ppf(sumShown)+'</td></tr>';
     if(Math.abs(otros)>=0.05){
-      h+='<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;color:#64748b">+ Otros ajustes de medición entre ediciones</td>';
+      h+='<tr style="background:#f8fafc"><td colspan="4" style="text-align:right;color:#64748b">+ Otros ajustes de medición entre ediciones</td>';
       h+='<td style="text-align:right;font-weight:700;color:'+ppc(otros)+'">'+ppf(otros)+'</td></tr>';
     }
-    h+='<tr style="background:#1e2a38"><td colspan="5" style="text-align:right;font-weight:800;color:#fff">VARIACIÓN TOTAL '+esc(baseEd)+' → '+esc(cur.edicion)+'</td>';
+    h+='<tr style="background:#1e2a38"><td colspan="4" style="text-align:right;font-weight:800;color:#fff">VARIACIÓN TOTAL '+esc(baseEd)+' → '+esc(cur.edicion)+'</td>';
     h+='<td style="text-align:right;font-weight:800;color:'+(dTot>=0?'#6ee7b7':'#fca5a5')+'">'+ppf(dTot)+'</td></tr>';
     h+='</table>';
-    h+='<div style="font-size:10.5px;color:#94a3b8;margin-top:8px">Impacto: cuánto sube o baja el puntaje total (en puntos porcentuales) por el cambio de respuesta de ese componente, manteniendo el resto constante. "Otros ajustes de medición" agrupa lo que no depende de las respuestas: cambios de pesos/criterios entre ediciones y efectos combinados.</div>';
+    h+='<div style="font-size:10.5px;color:#94a3b8;margin-top:8px">Impacto: suma de lo que sube o baja el puntaje total (en puntos porcentuales) por los cambios de respuesta de los componentes de esa BPL, manteniendo el resto constante. El detalle componente por componente está en el Excel. "Otros ajustes de medición" agrupa lo que no depende de las respuestas: cambios de pesos/criterios entre ediciones y efectos combinados.</div>';
   }
   body.innerHTML=h;
   }catch(e){
