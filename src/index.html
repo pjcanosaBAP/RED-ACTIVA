@@ -11883,6 +11883,7 @@ function _dcData(){
     const a1=pick(d,prev),a2=pick(d,cur);
     const resp=Object.keys(a2.answers||{}).filter(function(k){const v=(a2.answers||{})[k];return v==='si'||v==='no';}).length;
     return {n:d, t1:((a1.scores||{}).total||0)*100, t2:((a2.scores||{}).total||0)*100,
+      c1:recomputeCategory(a1)||'', c2:recomputeCategory(a2)||'',
       p1:CRIT_LIST.map(c=>state(a1,c)), p2:CRIT_LIST.map(c=>state(a2,c)),
       inc:resp < nQ*0.5, resp:resp};
   });
@@ -11908,6 +11909,9 @@ function dbRenderDeltaCriticos(){
             lost:'background:#d93025;color:#fff', won:'background:#1d9e6f;color:#fff',
             na:'color:#dde4ec;font-size:14px'};
   const cnt=p=>p.filter(c=>c==='1').length;
+  const CATC={PROACTIVO:'#2e7d32',ACTIVO:'#00695c',REACTIVO:'#e65100',INACTIVO:'#c62828'};
+  const catAb=c=>({PROACTIVO:'PRO',ACTIVO:'ACT',REACTIVO:'REA',INACTIVO:'INA'})[c]||'—';
+  const catChip=c=>'<span title="'+(c||'sin dato')+'" style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9.5px;font-weight:700;letter-spacing:.3px;background:'+((CATC[c]||'#7a90a8')+'1a')+';color:'+(CATC[c]||'#b0bcc8')+'">'+catAb(c)+'</span>';
   const cells=rows0.map(r=>({r:r,st:CRIT_LIST.map((c,i)=>stOf(r.p1[i],r.p2[i]))}));
   const t1=rows0.reduce((s,r)=>s+cnt(r.p1),0), t2=rows0.reduce((s,r)=>s+cnt(r.p2),0);
   const CN=CRIT_LIST.map(c=>+String(c.tag).replace(/\D/g,''));
@@ -11930,7 +11934,8 @@ function dbRenderDeltaCriticos(){
   const BC="font-family:'Barlow Condensed',sans-serif";
   let h='<table id="dc-table" style="border-collapse:separate;border-spacing:0;width:100%;font-size:11px"><thead><tr>'+
     '<th style="'+TH+';text-align:left;padding-left:11px;min-width:190px;position:sticky;left:0;z-index:3">Distribuidor</th>'+
-    '<th style="'+TH+'">Score</th>';
+    '<th style="'+TH+'">Score</th>'+
+    '<th style="'+TH+'" title="Categoría alcanzada en '+D.prev+' y en '+D.cur+'">Categoría</th>';
   let pv='';
   cols.forEach(function(c){const g=c.sheet!==pv?';'+GB:'';pv=c.sheet;
     h+='<th style="'+TH+g+';width:74px;min-width:74px;white-space:normal;text-transform:none;letter-spacing:0;line-height:1.2;font-size:9.5px;padding:7px 5px;color:'+(AC[c.sheet]||'#7a90a8')+'" title="C'+c.n+' · '+c.sheet+' - '+c.s+'">'+dcName(c.n)+'</th>';});
@@ -11941,7 +11946,8 @@ function dbRenderDeltaCriticos(){
     h+='<tr style="'+(x.r.inc?'opacity:.62':'')+'">'+
       '<td style="padding:5px 10px 5px 11px;border-bottom:1px solid #e8edf3;background:'+bg+';position:sticky;left:0;z-index:2;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:#1a2e4a" title="'+x.r.n+'">'+x.r.n+
       (x.r.inc?' <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#e8920a1e;color:#a06400">incompleta</span>':'')+'</td>'+
-      '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';font-size:10.5px;color:#7a90a8;white-space:nowrap">'+x.r.t1.toFixed(1)+'→'+x.r.t2.toFixed(1)+'</td>';
+      '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';font-size:10.5px;color:#7a90a8;white-space:nowrap">'+x.r.t1.toFixed(1)+'→'+x.r.t2.toFixed(1)+'</td>'+
+      '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+';white-space:nowrap">'+catChip(x.r.c1)+'<span style="color:#b0bcc8;font-size:9.5px;margin:0 2px">→</span>'+catChip(x.r.c2)+'</td>';
     let pw='';
     cols.forEach(function(c){const s=x.st[c.i];const g=c.sheet!==pw?';'+GB:'';pw=c.sheet;
       h+='<td style="border-bottom:1px solid #e8edf3;text-align:center;vertical-align:middle;height:30px;font-size:13px;font-weight:700;background:'+bg+g+';'+SC[s]+'" title="'+dcName(c.n)+' - '+c.s+'">'+GL[s]+'</td>';});
@@ -11950,7 +11956,7 @@ function dbRenderDeltaCriticos(){
        '<td style="text-align:center;border-bottom:1px solid #e8edf3;background:'+bg+'"><span style="'+BC+';font-size:14px;font-weight:700;padding:1px 6px;border-radius:3px;'+dc+'">'+(dd>0?'+':'')+(dd||'=')+'</span></td></tr>';
   });
   const TF='background:#f0f4f8;border-top:2px solid #d1dae6;padding:6px 4px;text-align:center';
-  h+='</tbody><tfoot><tr><td style="'+TF+';text-align:left;padding-left:11px;font-size:9.5px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px;position:sticky;left:0;z-index:2">Cumplen la BPL</td><td style="'+TF+'"></td>';
+  h+='</tbody><tfoot><tr><td style="'+TF+';text-align:left;padding-left:11px;font-size:9.5px;font-weight:700;color:#7a90a8;text-transform:uppercase;letter-spacing:.4px;position:sticky;left:0;z-index:2">Cumplen la BPL</td><td style="'+TF+'"></td><td style="'+TF+'"></td>';
   let pf='';
   cols.forEach(function(c){const g=c.sheet!==pf?';'+GB:'';pf=c.sheet;
     const cc=c.d<0?'#d93025':c.d>0?'#1d9e6f':'#b0bcc8';
@@ -11986,6 +11992,9 @@ function dbRenderDeltaCriticos(){
     '<div style="overflow-x:auto">'+h+'</div>'+
     '<div style="margin-top:13px;padding-top:11px;border-top:1px solid #e8edf3;display:flex;flex-direction:column;gap:11px">'+
       '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:#3d5573;align-items:center">'+keyHtml+'</div>'+
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:#7a90a8;align-items:center;border-top:1px dashed #e8edf3;padding-top:10px">'+
+        '<b style="color:#3d5573">Categoría ('+D.prev+' → '+D.cur+'):</b>'+
+        ['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'].map(function(c){return catChip(c)+' <span>'+c.charAt(0)+c.slice(1).toLowerCase()+'</span>';}).join('')+'</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:10.5px;border-top:1px dashed #e8edf3;padding-top:10px">'+legHtml+'</div>'+
     '</div></div>';
 }
@@ -12014,10 +12023,10 @@ function exportDeltaCriticosExcel(){
   const stOf=(a,b)=>(a==='.'||b==='.')?'S/D':(a==='1'&&b==='1')?'IGUAL CUMPLE':(a==='1'&&b==='0')?'PERDIDO':(a==='0'&&b==='1')?'RECUPERADO':'IGUAL NO CUMPLE';
   const cnt=p=>p.filter(c=>c==='1').length;
   const CN=CRIT_LIST.map(c=>+String(c.tag).replace(/\D/g,''));
-  const hdr=['Distribuidor','Score '+D.prev,'Score '+D.cur].concat(CRIT_LIST.map((c,i)=>'C'+CN[i]+' '+dcName(CN[i])))
+  const hdr=['Distribuidor','Score '+D.prev,'Score '+D.cur,'Categoría '+D.prev,'Categoría '+D.cur].concat(CRIT_LIST.map((c,i)=>'C'+CN[i]+' '+dcName(CN[i])))
             .concat(['Críticos '+D.prev,'Críticos '+D.cur,'Delta','Auditoría incompleta']);
   const body=rows0.slice().sort((x,y)=>cnt(y.p2)-cnt(x.p2)||cnt(y.p1)-cnt(x.p1)||x.n.localeCompare(y.n))
-    .map(r=>[r.n,+r.t1.toFixed(1),+r.t2.toFixed(1)].concat(CRIT_LIST.map((c,i)=>stOf(r.p1[i],r.p2[i])))
+    .map(r=>[r.n,+r.t1.toFixed(1),+r.t2.toFixed(1),r.c1||'—',r.c2||'—'].concat(CRIT_LIST.map((c,i)=>stOf(r.p1[i],r.p2[i])))
       .concat([cnt(r.p1),cnt(r.p2),cnt(r.p2)-cnt(r.p1),r.inc?'SÍ':'']));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hdr].concat(body)),'Delta Criticos');
