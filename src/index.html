@@ -133,6 +133,18 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 7px;font-size:10px;}
 
+/* COPIAR A EXCEL — botón genérico inyectado en cada cuadro/reporte/gráfico */
+.cp-btn{background:#fff;border:1px solid #d1dae6;color:#7a90a8;border-radius:5px;
+  padding:2px 7px;font-size:10px;font-weight:700;font-family:'Barlow',sans-serif;
+  letter-spacing:.3px;cursor:pointer;line-height:1.7;white-space:nowrap;
+  opacity:.4;transition:opacity .15s,background .15s,border-color .15s,color .15s;}
+.cp-btn:hover{opacity:1;background:#eef4fb;border-color:#1a6db5;color:#1a6db5;}
+.cp-host:hover .cp-btn{opacity:1;}
+.cp-btn.cp-float{position:absolute;top:8px;right:10px;z-index:6;}
+.cp-btn.cp-inline{margin-left:auto;}
+.cp-host{position:relative;}
+@media print{.cp-btn{display:none!important;}}
+
 /* PANELS */
 .panel{display:none;} .panel.on{display:block;}
 .content{padding:18px 22px;}
@@ -12007,6 +12019,227 @@ function dbRenderDeltaCriticos(){
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:10.5px;border-top:1px dashed #e8edf3;padding-top:10px">'+legHtml+'</div>'+
     '</div></div>';
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COPIAR A EXCEL — genérico
+// Inyecta un botón 📋 en cada tarjeta/reporte/gráfico con datos copiables.
+// Tablas → se copian tal cual (HTML + TSV). Gráficos Chart.js → se copian los
+// datos que alimentan el gráfico (etiquetas × series), no la imagen.
+// ══════════════════════════════════════════════════════════════════════════════
+const CP_HOST_SEL='.db-card,.sc-card,.an-card,.card';
+const CP_HEAD_SEL='.db-card-hd,.an-card-hd,.card-hd,.sc-h3';
+
+function _cpEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _cpTxt(el){return (el.innerText||el.textContent||'').replace(/\s+/g,' ').trim();}
+
+// Elementos que pertenecen a este host y no a una tarjeta anidada
+function _cpOwn(host,sel){
+  return Array.prototype.filter.call(host.querySelectorAll(sel),function(el){
+    return el.closest(CP_HOST_SEL)===host;
+  });
+}
+function _cpTitle(host){
+  const hd=host.querySelector(CP_HEAD_SEL);
+  if(!hd) return '';
+  const t=hd.querySelector('.db-card-ttl,.an-card-ttl,.card-ttl,.sc-h3');
+  return _cpTxt(t||hd).replace(/\s*ℹ\s*$/,'').replace(/\s*📋\s*Copiar\s*$/i,'').trim();
+}
+
+// Tabla DOM → matriz de celdas (expande colspan para que las columnas peguen alineadas)
+function _cpTableRows(t){
+  const out=[];
+  Array.prototype.forEach.call(t.querySelectorAll('tr'),function(tr){
+    const row=[];
+    Array.prototype.forEach.call(tr.children,function(c){
+      const v=_cpTxt(c); row.push(v);
+      const cs=parseInt(c.getAttribute('colspan')||'1',10);
+      for(let i=1;i<cs;i++) row.push('');
+    });
+    if(row.length) out.push(row);
+  });
+  return out;
+}
+
+// Gráfico Chart.js → matriz de celdas con los datos de las series
+function _cpChartRows(cv,fb){
+  const ch=(window.Chart&&Chart.getChart)?Chart.getChart(cv):null;
+  if(!ch||!ch.data) return null;
+  const ds=(ch.data.datasets||[]).filter(function(s){return s&&s.data&&s.data.length;});
+  if(!ds.length) return null;
+  const flat=function(l){return Array.isArray(l)?l.join(' '):String(l==null?'':l);};
+  const isXY=ds.some(function(s){return s.data.some(function(p){return p&&typeof p==='object'&&p.x!==undefined;});});
+  const rows=[];
+  if(isXY){
+    rows.push(['Serie','Etiqueta','X','Y']);
+    ds.forEach(function(s,si){
+      s.data.forEach(function(p){
+        if(!p||typeof p!=='object') return;
+        rows.push([s.label||('Serie '+(si+1)),flat(p.label||p.name||''),p.x,p.y]);
+      });
+    });
+  }else{
+    const labels=(ch.data.labels||[]).map(flat);
+    rows.push(['Etiqueta'].concat(ds.map(function(s,i){return s.label||(ds.length===1&&fb?fb:'Serie '+(i+1));})));
+    const n=Math.max(labels.length,...ds.map(function(s){return s.data.length;}));
+    for(let i=0;i<n;i++){
+      rows.push([labels[i]!==undefined?labels[i]:''].concat(ds.map(function(s){
+        const v=s.data[i]; return (v&&typeof v==='object')?(v.y!==undefined?v.y:'') : (v===undefined||v===null?'':v);
+      })));
+    }
+  }
+  return rows.length>1?rows:null;
+}
+
+// Reportes armados con divs repetidos (ranking, barras por área, listas de BPL):
+// cada contenedor con >=3 hijos hermanos de la misma clase es un bloque de filas.
+function _cpRepeatBlocks(host){
+  const found=[];
+  const cands=_cpOwn(host,'div,ul,ol');
+  if(cands.length>4000) return [];   // tarjetas enormes (formulario): no vale el escaneo
+  cands.forEach(function(c){
+    if(c.childElementCount<3) return;
+    const kids=Array.prototype.slice.call(c.children);
+    // clase más frecuente entre los hijos = las "filas" del reporte
+    const tally={};
+    // (la clase vacía también cuenta: varios reportes usan divs con estilos inline)
+    kids.forEach(function(k){ const cl=typeof k.className==='string'?k.className:' '; tally[cl]=(tally[cl]||0)+1; });
+    let cls='',n=0;
+    Object.keys(tally).forEach(function(k){ if(tally[k]>n){cls=k;n=tally[k];} });
+    if(cls===' ') cls='';
+    if(n<3||n/kids.length<0.6) return;
+    if(c.querySelector('input,select,textarea')) return;   // formularios, no reportes
+    const rows=_cpRowsOf(kids.filter(function(k){return k.className===cls;}));
+    if(rows) found.push({el:c,rows:rows});
+  });
+  // descarta los que están dentro de otro bloque ya capturado
+  return found.filter(function(f){
+    return !found.some(function(o){return o!==f&&o.el!==f.el&&o.el.contains(f.el);});
+  }).map(function(f){return f.rows;});
+}
+function _cpRowsOf(els){
+  const rows=els.map(function(r){
+    const kids=Array.prototype.filter.call(r.children,function(k){return k.nodeType===1;});
+    return (kids.length?kids.map(_cpTxt):[_cpTxt(r)]).filter(function(v,i,arr){
+      return v!==''||i<arr.length-1;   // descarta celdas vacías de relleno al final
+    });
+  }).filter(function(r){return r.some(function(c){return c!=='';});});
+  // Un reporte trae números; si casi nada los tiene, es maquetado y no datos
+  const ok=rows.filter(function(r){
+    return r.length>=2 && r.some(function(c){return /\d/.test(c);});
+  });
+  return ok.length>=3?rows:null;
+}
+
+// Junta todo lo copiable del host en bloques de filas
+function _cpCollect(host){
+  const blocks=[];
+  _cpOwn(host,'table').forEach(function(t){
+    const r=_cpTableRows(t); if(r.length) blocks.push({rows:r,html:t.outerHTML});
+  });
+  _cpOwn(host,'canvas').forEach(function(cv){
+    const r=_cpChartRows(cv,_cpTitle(host)); if(r) blocks.push({rows:r,html:null});
+  });
+  if(!blocks.length){
+    _cpRepeatBlocks(host).forEach(function(r){ blocks.push({rows:r,html:null}); });
+  }
+  return blocks;
+}
+
+function _cpRowsToHtml(rows){
+  return '<table border="1" style="border-collapse:collapse">'+rows.map(function(r,i){
+    const tag=i===0?'th':'td';
+    return '<tr>'+r.map(function(c){return '<'+tag+'>'+_cpEsc(c)+'</'+tag+'>';}).join('')+'</tr>';
+  }).join('')+'</table>';
+}
+
+function _cpWrite(html,txt){
+  const fallback=function(){
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    let ok=false; try{ok=document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+    showToast(ok?'✅ Copiado — pegalo en Excel':'⚠️ No se pudo copiar');
+  };
+  if(navigator.clipboard&&window.ClipboardItem){
+    navigator.clipboard.write([new ClipboardItem({
+      'text/html':new Blob([html],{type:'text/html'}),
+      'text/plain':new Blob([txt],{type:'text/plain'})})])
+      .then(function(){showToast('✅ Copiado — pegalo en Excel o PowerPoint');},fallback);
+  } else fallback();
+}
+
+function cpCopyHost(btn){
+  const host=btn.closest(CP_HOST_SEL);
+  if(!host){showToast('⚠️ No hay datos para copiar');return;}
+  const blocks=_cpCollect(host);
+  if(!blocks.length){showToast('⚠️ No hay datos para copiar');return;}
+  const title=_cpTitle(host);
+  const htmlParts=[], txtParts=[];
+  if(title){ htmlParts.push('<p><b>'+_cpEsc(title)+'</b></p>'); txtParts.push(title); }
+  blocks.forEach(function(b){
+    htmlParts.push(b.html||_cpRowsToHtml(b.rows));
+    txtParts.push(b.rows.map(function(r){
+      return r.map(function(c){return String(c).replace(/[\t\r\n]+/g,' ');}).join('\t');
+    }).join('\n'));
+  });
+  _cpWrite('<meta charset="utf-8">'+htmlParts.join('<br>'),txtParts.join('\n\n'));
+}
+
+// ── Inyección automática de botones ──────────────────────────────────────────
+let _cpBusy=false,_cpTimer=null;
+function cpInjectButtons(){
+  if(_cpBusy) return;
+  _cpBusy=true;
+  try{
+    Array.prototype.forEach.call(document.querySelectorAll(CP_HOST_SEL),function(host){
+      // ¿ya tiene botón propio? (no cuenta el de una tarjeta anidada)
+      const has=Array.prototype.some.call(host.querySelectorAll('.cp-btn'),function(b){
+        return b.closest(CP_HOST_SEL)===host;
+      });
+      if(has) return;
+      // Tarjetas que ya traen su propio botón de copiar (ej. Delta de Críticos)
+      const own=Array.prototype.some.call(host.querySelectorAll('button'),function(b){
+        return b.closest(CP_HOST_SEL)===host && /copiar/i.test(b.textContent||'');
+      });
+      if(own) return;
+      // Se chequea la presencia de contenido, no que ya haya datos: los gráficos
+      // Chart.js se crean después del render y el botón los lee recién al hacer clic.
+      if(!_cpOwn(host,'table,canvas').length && !_cpRepeatBlocks(host).length) return;
+      const btn=document.createElement('button');
+      btn.type='button'; btn.className='cp-btn'; btn.innerHTML='📋 Copiar';
+      btn.title='Copiar los datos de este cuadro para pegar en Excel';
+      btn.onclick=function(ev){ev.stopPropagation();cpCopyHost(btn);};
+      // Preferencia: dentro de la cabecera si es una fila flex; si no, flotando arriba a la derecha
+      const hd=_cpOwn(host,CP_HEAD_SEL)[0];
+      let slot=null;
+      if(hd){
+        if(getComputedStyle(hd).display.indexOf('flex')>=0) slot=hd;
+        else{
+          const par=hd.parentElement;
+          if(par&&par!==host&&getComputedStyle(par).display.indexOf('flex')>=0) slot=par;
+        }
+      }
+      if(slot){ btn.classList.add('cp-inline'); slot.appendChild(btn); }
+      else{
+        btn.classList.add('cp-float');
+        host.classList.add('cp-host');
+        host.insertBefore(btn,host.firstChild);
+      }
+    });
+  }catch(e){ console.warn('cpInjectButtons',e); }
+  _cpBusy=false;
+}
+function cpSchedule(){ clearTimeout(_cpTimer); _cpTimer=setTimeout(cpInjectButtons,250); }
+function cpInit(){
+  cpInjectButtons();
+  try{
+    new MutationObserver(function(){ if(!_cpBusy) cpSchedule(); })
+      .observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cpInit);
+else cpInit();
 
 function copyDeltaCriticos(){
   const t=document.getElementById('dc-table'); if(!t){showToast('⚠️ No hay tabla para copiar');return;}
