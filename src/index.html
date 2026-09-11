@@ -5524,8 +5524,17 @@ function _mxData(mode){
                     .sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
   // Score recalculado por distribuidor, con sus propios pesos, para tener subattrs
   const cols=audits.map(a=>{
-    let sc=a.scores||{};
+    const stored=a.scores||{};
+    let sc=stored;
     try{ sc=computeScores(a.answers||{},_mxSanW(a.weights)); }catch(e){}
+    // El recálculo corre contra el cuestionario ACTUAL (Q), que puede tener preguntas
+    // agregadas/quitadas respecto de la edición guardada → el total no coincide con la
+    // evaluación. Usamos el recálculo solo para el detalle (atributos / BPL / componentes)
+    // y el total + áreas salen del score oficial guardado.
+    if(sc!==stored){
+      if(typeof stored.total==='number') sc.total=stored.total;
+      if(stored.areas) sc.areas=Object.assign({},sc.areas,stored.areas);
+    }
     return {a,sc,ans:a.answers||{}};
   });
   // Jerarquía desde Q
