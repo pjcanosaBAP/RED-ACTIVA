@@ -1,0 +1,245 @@
+<title>Críticos Año vs Año</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+:root{
+  --page:#e2e8f0; --page-ink:#1a2e4a; --page-mut:#5b7089; --page-line:#c3cedb;
+  --ground:#f0f4f8; --card:#ffffff; --line:#d1dae6; --line-soft:#e8edf3;
+  --navy:#1a2e4a; --ink:#3d5573; --mut:#7a90a8; --faint:#b0bcc8; --accent:#e86820;
+  --ok:#1d9e6f; --bad:#d93025; --warn:#e8920a;
+  --ift:#2f7dc8; --plg:#1d9e6f; --gst:#e8920a; --idp:#7c5cd6;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){ --page:#0d1520; --page-ink:#e8eef5; --page-mut:#8fa3ba; --page-line:#233246; }
+}
+:root[data-theme="dark"]{ --page:#0d1520; --page-ink:#e8eef5; --page-mut:#8fa3ba; --page-line:#233246; }
+
+body{background:var(--page);color:var(--page-ink);font-family:'Barlow',system-ui,sans-serif;}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 20px 56px;}
+.intro{margin-bottom:22px;}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin:0 0 6px;}
+.intro h1{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:700;margin:0 0 8px;letter-spacing:.2px;text-wrap:balance;}
+.intro p{margin:0;font-size:14.5px;line-height:1.55;color:var(--page-mut);max-width:66ch;}
+.note{margin-top:14px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.5;color:var(--page-mut);border-left:3px solid var(--accent);padding:2px 0 2px 11px;max-width:74ch;}
+
+.app{background:var(--ground);border:1px solid var(--page-line);border-radius:10px;overflow:hidden;color:var(--ink);
+  box-shadow:0 10px 30px rgba(10,20,35,.14);}
+.app-bar{background:var(--navy);color:#fff;padding:9px 16px;display:flex;align-items:center;gap:12px;font-size:12px;}
+.app-bar .lg{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:.6px;}
+.app-bar .sp{flex:1;}
+.app-bar .tb{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;color:#9fb4cc;}
+.app-bar .tb.on{background:rgba(232,104,32,.18);color:#ffb184;}
+.subnav{background:#fff;border-bottom:1px solid var(--line);padding:0 14px;display:flex;gap:2px;overflow-x:auto;}
+.sn{padding:9px 12px;font-size:11.5px;font-weight:600;color:var(--mut);white-space:nowrap;border-bottom:2px solid transparent;}
+.sn.on{color:var(--accent);border-bottom-color:var(--accent);}
+.body{padding:14px;display:flex;flex-direction:column;gap:12px;}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:13px 15px;}
+.hd{display:flex;align-items:center;gap:9px;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap;}
+.ttl{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--navy);letter-spacing:.2px;}
+.badge{font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:3px;background:#eef2f7;color:var(--mut);}
+.badge.real{background:#1d9e6f18;color:var(--ok);border:1px solid #1d9e6f38;}
+.hd .sp{flex:1;}
+
+.filters{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:11.5px;}
+.fl{display:flex;flex-direction:column;gap:3px;}
+.fl label{font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);}
+.fl .val{border:1px solid var(--line);border-radius:4px;padding:5px 9px;background:#fbfcfe;font-weight:600;color:var(--navy);font-size:12px;}
+.arrow{color:var(--faint);font-size:15px;align-self:flex-end;padding-bottom:5px;}
+.chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink);cursor:pointer;user-select:none;}
+.chk input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;}
+.chk:focus-within{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+
+.scroll{overflow-x:auto;}
+table.mx{border-collapse:separate;border-spacing:0;font-size:11px;width:100%;}
+table.mx th,table.mx td{white-space:nowrap;}
+.mx thead th{background:var(--ground);border-bottom:2px solid var(--line);font-size:9.5px;font-weight:700;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.4px;padding:7px 6px;}
+.mx th.dist,.mx td.dist{text-align:left;padding-left:11px;min-width:190px;position:sticky;left:0;background:#fff;z-index:2;}
+.mx thead th.dist{background:var(--ground);z-index:3;}
+.mx tbody tr:nth-child(even) td{background:#fafbfd;}
+.mx tbody tr:nth-child(even) td.dist{background:#fafbfd;}
+.mx td{border-bottom:1px solid var(--line-soft);padding:0;text-align:center;height:30px;}
+.mx td.dist{font-size:11.5px;font-weight:500;color:var(--navy);overflow:hidden;text-overflow:ellipsis;max-width:240px;padding-top:4px;padding-bottom:4px;}
+.cn{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;}
+.cgroup{border-left:2px solid var(--line);}
+
+.cell{display:flex;align-items:center;justify-content:center;width:100%;height:30px;font-size:13px;font-weight:700;}
+.st-keep{background:#e6f3ec;color:#3f9273;font-size:12.5px;box-shadow:inset 0 0 0 1px #cfe6da;}
+.st-chronic{background:#fbeceb;color:#c26b62;font-size:12.5px;box-shadow:inset 0 0 0 1px #f2d7d4;}
+.st-lost{background:var(--bad);color:#fff;}
+.st-won{background:var(--ok);color:#fff;}
+.st-na{color:#dde4ec;font-size:14px;}
+
+.dlt{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;padding:1px 6px;border-radius:3px;font-variant-numeric:tabular-nums;}
+.dlt.neg{background:#d9302514;color:var(--bad);} .dlt.pos{background:#1d9e6f14;color:var(--ok);} .dlt.zero{color:var(--faint);}
+.mx tfoot td{background:var(--ground);border-top:2px solid var(--line);padding:6px 4px;font-size:10.5px;font-variant-numeric:tabular-nums;}
+.mx tfoot td.dist{background:var(--ground);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);}
+.pill{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:.3px;}
+.warnrow td{opacity:.62;}
+.inc{background:#e8920a1e;color:#a06400;}
+
+.foot{margin-top:13px;padding-top:11px;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:11px;}
+.key{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--ink);align-items:center;}
+.key .k{display:flex;gap:6px;align-items:center;}
+.key .sw{width:21px;height:21px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.key .qty{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--mut);margin-left:6px;
+  background:#eef2f7;border-radius:3px;padding:0 6px;font-variant-numeric:tabular-nums;}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px;font-size:10.5px;color:var(--ink);
+  border-top:1px dashed var(--line-soft);padding-top:10px;}
+.legend .li{display:flex;gap:7px;align-items:baseline;}
+.legend .tag{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;min-width:26px;}
+.legend .nm{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <p class="eyebrow">Propuesta · solapa Red</p>
+    <h1>Críticos: edición actual vs. anterior</h1>
+    <p>La misma matriz de doble entrada que ya existe, pero cada celda deja de decir “cumple / no cumple” y pasa a decir <em>qué pasó</em> entre las dos ediciones. Datos reales de Chile 2025 → 2026, calculados desde la base.</p>
+    <div class="note"><span>Un solo cuadro. Las filas van ordenadas por <b>cumplimientos de la edición en curso, de mayor a menor</b>, y los cambios se pintan en color pleno mientras lo que se mantuvo queda en tinte suave pero legible.</span></div>
+  </div>
+
+  <div class="app">
+    <div class="app-bar">
+      <span class="lg">RED ACTIVA</span>
+      <span class="tb">Auditoría</span><span class="tb on">Red</span><span class="tb">Config</span>
+      <span class="sp"></span><span style="font-size:11px;color:#9fb4cc">CHILE · 2026</span>
+    </div>
+    <div class="subnav">
+      <span class="sn">Resumen</span><span class="sn">Áreas</span><span class="sn">BPL</span>
+      <span class="sn">Críticos</span><span class="sn on">Δ Críticos</span><span class="sn">Distribuidores</span>
+      <span class="sn">Análisis</span><span class="sn">No Vinculante</span><span class="sn">Matriz</span>
+    </div>
+
+    <div class="body">
+      <div class="card">
+        <div class="filters">
+          <div class="fl"><label>País</label><div class="val">CHILE</div></div>
+          <div class="fl"><label>Edición base</label><div class="val">2025</div></div>
+          <span class="arrow">→</span>
+          <div class="fl"><label>Edición actual</label><div class="val">2026</div></div>
+          <div style="flex:1"></div>
+          <label class="chk"><input type="checkbox" id="f-inc" checked> Excluir auditorías incompletas</label>
+          <label class="chk"><input type="checkbox" id="f-chg"> Solo BPL con cambios</label>
+          <label class="chk"><input type="checkbox" id="f-mov"> Solo distribuidores que se movieron</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <span class="ttl">Matriz Comparativa de Críticos — Distribuidores × BPL Críticas</span>
+          <span class="badge real">datos reales</span>
+          <span class="sp"></span>
+          <span style="font-size:10.5px;color:var(--faint)" id="rowcount"></span>
+        </div>
+        <div class="scroll"><table class="mx" id="mx"></table></div>
+        <div class="foot">
+          <div class="key" id="key"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CR=[
+ {n:1, a:'IFT', s:'ENTORNO - ACCESO'},
+ {n:2, a:'IFT', s:'LAY OUT - CAPACIDAD Y MODULACIÓN'},
+ {n:3, a:'IFT', s:'EPPS Y EXTINGUIDORES'},
+ {n:4, a:'IFT', s:'EQUIPAMIENTO DE MANIPULEO'},
+ {n:5, a:'PLG', s:'COORDINACIÓN DEL ABASTECIMIENTO'},
+ {n:6, a:'PLG', s:'INVENTARIOS ROTATIVOS'},
+ {n:7, a:'GST', s:'PROCESOS DOCUMENTADOS'},
+ {n:8, a:'GST', s:'INDICADORES'},
+ {n:9, a:'IDP', s:'CONTROL DE TEMPERATURAS'},
+ {n:10,a:'IDP', s:'RECHAZOS'},
+ {n:11,a:'IDP', s:'DEVOLUCIONES DE PRODUCTOS NO APTOS'},
+ {n:12,a:'IDP', s:'CONTROL DE PLAGAS'}
+];
+const AC={IFT:'var(--ift)',PLG:'var(--plg)',GST:'var(--gst)',IDP:'var(--idp)'};
+const D=[
+ {n:'SOC.COMERCIALIZADORA Y DIST.OVIEDO SPA',      t1:97.5,t2:89.1,p1:'111111111111',p2:'101111111111',inc:false},
+ {n:'COM. ALDO PATRICIO BALKENHOL FLORES EIRL',    t1:95.7,t2:92.9,p1:'111111111111',p2:'101111111111',inc:false},
+ {n:'SOCIEDAD COMERCIAL MULTIMIX LIMITADA',        t1:84.0,t2:82.6,p1:'101111101111',p2:'101111111101',inc:false},
+ {n:'SOCIEDAD COMERCIAL BOREAS D Y S LTDA.',       t1:82.8,t2:83.9,p1:'101011101110',p2:'101111101111',inc:false},
+ {n:'COMERCIALIZADORA COMCELL E.I.R.L.',           t1:83.6,t2:78.3,p1:'111111000110',p2:'101111000110',inc:false},
+ {n:'DIST DE ALIMENTOS ALCOHOLADO DISALCO SPA',    t1:72.6,t2:74.2,p1:'100111001110',p2:'101111001110',inc:false},
+ {n:'DISTRIB. Y COMERC. DISALVO LTDA.',            t1:72.4,t2:67.9,p1:'101111000100',p2:'101011000100',inc:false},
+ {n:'COMERCIAL DISGAL LIMITADA',                   t1:70.3,t2:69.8,p1:'101011000110',p2:'101011000111',inc:false},
+ {n:'DISTRIB.COM. MAURICIO A.RIFFO FISSORE EIRL',  t1:67.5,t2:65.4,p1:'111110000100',p2:'100111000100',inc:false},
+ {n:'SAAVEDRA PANTOJA RAUL',                       t1:66.3,t2:56.3,p1:'101011001100',p2:'000011000100',inc:false},
+ {n:'DILEKU SPA',                                  t1:75.0,t2:58.5,p1:'111111001100',p2:'101110000100',inc:false},
+ {n:'SOC.COM.SERGIO AGUIRRE ZEBALLO',              t1:84.2,t2:38.5,p1:'111011011100',p2:'.0.0.1010...',inc:true},
+ {n:'DIST.Y COMERCIALIZADORA ACUÑA GONZALEZ L',    t1:70.4,t2: 1.4,p1:'110111010000',p2:'.0..........',inc:true}
+];
+const st=(a,b)=> (a==='.'||b==='.') ? 'na' : (a==='1'&&b==='1') ? 'keep' : (a==='1'&&b==='0') ? 'lost'
+                 : (a==='0'&&b==='1') ? 'won' : 'chronic';
+const GL={keep:'✓',chronic:'✗',lost:'▼',won:'▲',na:'·'};
+const cnt=p=>[...p].filter(c=>c==='1').length;
+const $=id=>document.getElementById(id);
+
+function render(){
+  const rows0=D.filter(d=>!($('f-inc').checked&&d.inc));
+  const cells=rows0.map(d=>({d,st:CR.map((_,i)=>st(d.p1[i],d.p2[i]))}));
+  const t1=rows0.reduce((s,d)=>s+cnt(d.p1),0), t2=rows0.reduce((s,d)=>s+cnt(d.p2),0);
+
+  const col=CR.map(function(c,i){
+    const a=rows0.filter(d=>d.p1[i]==='1').length, b=rows0.filter(d=>d.p2[i]==='1').length;
+    const nl=cells.filter(r=>r.st[i]==='lost').length, nw=cells.filter(r=>r.st[i]==='won').length;
+    return {n:c.n,a2:c.a,s:c.s,i:i,a:a,b:b,d:b-a,moved:(nl+nw)>0};
+  });
+  const cols=$('f-chg').checked?col.filter(c=>c.moved):col;
+
+  // orden: cumplimientos de la edición en curso, de mayor a menor
+  let rows=cells.slice().sort(function(x,y){
+    return cnt(y.d.p2)-cnt(x.d.p2)
+        || cnt(y.d.p1)-cnt(x.d.p1)
+        || x.d.n.localeCompare(y.d.n);});
+  if($('f-mov').checked) rows=rows.filter(r=>r.st.some(s=>s==='lost'||s==='won'));
+
+  let h='<thead><tr><th class="dist">Distribuidor</th><th>Score</th>';
+  let prev='';
+  cols.forEach(function(c){ const g=c.a2!==prev?'cgroup':''; prev=c.a2;
+    h+='<th class="'+g+'" style="color:'+AC[c.a2]+';min-width:34px" title="'+c.a2+' · '+c.s+'">C'+c.n+'</th>'; });
+  h+='<th class="cgroup">2025</th><th>2026 ↓</th><th>Δ</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    const a=cnt(r.d.p1),b=cnt(r.d.p2),dd=b-a;
+    h+='<tr class="'+(r.d.inc?'warnrow':'')+'"><td class="dist" title="'+r.d.n+'">'+r.d.n+(r.d.inc?' <span class="pill inc">incompleta</span>':'')+'</td>';
+    h+='<td><span style="font-size:10.5px;color:var(--mut);font-variant-numeric:tabular-nums">'+r.d.t1.toFixed(1)+'→'+r.d.t2.toFixed(1)+'</span></td>';
+    let pv='';
+    cols.forEach(function(c){ const s=r.st[c.i]; const g=c.a2!==pv?'cgroup':''; pv=c.a2;
+      h+='<td class="'+g+'" title="C'+c.n+' · '+c.s+'"><div class="cell st-'+s+'">'+GL[s]+'</div></td>'; });
+    h+='<td class="cgroup"><span class="cn" style="color:var(--mut)">'+a+'</span></td>';
+    h+='<td><span class="cn" style="color:var(--navy)">'+b+'</span></td>';
+    h+='<td><span class="dlt '+(dd<0?'neg':dd>0?'pos':'zero')+'">'+(dd>0?'+':'')+(dd||'=')+'</span></td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td class="dist">Cumplen la BPL</td><td style="background:var(--ground)"></td>';
+  let pf='';
+  cols.forEach(function(c){ const g=c.a2!==pf?'cgroup':''; pf=c.a2;
+    const col2=c.d<0?'var(--bad)':c.d>0?'var(--ok)':'var(--faint)';
+    h+='<td class="'+g+'"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;color:var(--mut)">'+c.a+'<span style="color:var(--faint)">→</span><span style="color:var(--navy)">'+c.b+'</span></div>'+
+       '<div style="font-size:10px;font-weight:700;color:'+col2+'">'+(c.d>0?'+':'')+(c.d||'—')+'</div></td>'; });
+  h+='<td class="cgroup"><span class="cn">'+t1+'</span></td><td><span class="cn">'+t2+'</span></td>'+
+     '<td><span class="dlt '+(t2<t1?'neg':t2>t1?'pos':'zero')+'">'+(t2-t1>0?'+':'')+(t2-t1)+'</span></td></tr></tfoot>';
+  $('mx').innerHTML=h;
+  $('rowcount').textContent=rows.length+' distribuidores · '+cols.length+' BPL críticas · ordenado por cumplimientos 2026 ↓';
+
+  const tally=s=>cells.reduce((n,r)=>n+r.st.filter(x=>x===s).length,0);
+  const KEY=[
+    ['lost','▼','<b>Perdido</b> — cumplía y dejó de cumplir',tally('lost')],
+    ['won','▲','<b>Recuperado</b> — no cumplía y ahora sí',tally('won')],
+    ['keep','✓','<b>Igual</b> — se mantiene cumpliendo',tally('keep')],
+    ['chronic','✗','<b>Igual</b> — sigue sin cumplir',tally('chronic')],
+    ['na','·','Sin dato en alguna edición',tally('na')]
+  ];
+  $('key').innerHTML=KEY.map(function(k){
+    return '<div class="k"><span class="sw st-'+k[0]+'">'+k[1]+'</span><span>'+k[2]+
+      '<span class="qty">'+k[3]+'</span></span></div>';}).join('');
+
+  $('legend').innerHTML=CR.map(c=>'<div class="li"><span class="tag" style="color:'+AC[c.a]+'">C'+c.n+'</span><span class="nm" title="'+c.s+'">'+c.s+'</span></div>').join('');
+}
+['f-inc','f-chg','f-mov'].forEach(id=>{$(id).onchange=render;});
+render();
+</script>

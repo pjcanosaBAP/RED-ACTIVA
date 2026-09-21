@@ -1,0 +1,646 @@
+<title>Δ Red</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800;900&display=swap">
+
+<style>
+/* ═══ SURROUND (theme-aware) ═══ */
+:root{
+  --pg-bg:#e7ecf2; --pg-panel:#f7f9fb; --pg-ink:#1c2b3d; --pg-ink-2:#4a5f78;
+  --pg-mute:#8095ac; --pg-line:#cbd6e2; --pg-accent:#c2551a;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --pg-bg:#0e1721; --pg-panel:#16222f; --pg-ink:#e8eef5; --pg-ink-2:#a9bccf;
+    --pg-mute:#6f8399; --pg-line:#27384a; --pg-accent:#f08a4b;
+  }
+}
+:root[data-theme="dark"]{
+  --pg-bg:#0e1721; --pg-panel:#16222f; --pg-ink:#e8eef5; --pg-ink-2:#a9bccf;
+  --pg-mute:#6f8399; --pg-line:#27384a; --pg-accent:#f08a4b;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--pg-bg); color:var(--pg-ink);
+  font-family:'Barlow',system-ui,sans-serif; font-size:15px; line-height:1.55;
+  padding:34px 20px 70px;
+}
+.shell{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.doc-hd{display:flex;flex-direction:column;gap:7px}
+.doc-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;
+  letter-spacing:2.4px;text-transform:uppercase;color:var(--pg-accent)}
+.doc-h1{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:800;
+  line-height:1.02;margin:0;text-wrap:balance;letter-spacing:-.3px}
+.doc-lead{max-width:70ch;color:var(--pg-ink-2);font-size:14.5px;margin:0}
+.doc-lead strong{color:var(--pg-ink);font-weight:600}
+.note{display:flex;gap:10px;align-items:flex-start;background:var(--pg-panel);
+  border:1px solid var(--pg-line);border-left:3px solid var(--pg-accent);
+  border-radius:0 8px 8px 0;padding:11px 14px;font-size:13px;color:var(--pg-ink-2);max-width:80ch}
+.note b{color:var(--pg-ink);font-weight:600}
+.frame-cap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:1.6px;text-transform:uppercase;color:var(--pg-mute)}
+.frame-cap span{font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:400;
+  letter-spacing:0;text-transform:none;color:var(--pg-mute)}
+
+/* ═══ APP WINDOW — replica del chrome real de RED Activa (light-only a propósito) ═══ */
+.win{border:1px solid var(--pg-line);border-radius:12px;overflow:hidden;
+  box-shadow:0 18px 44px rgba(12,25,42,.20)}
+.win-bar{background:#1a2e4a;padding:9px 14px;display:flex;align-items:center;gap:9px}
+.win-dot{width:10px;height:10px;border-radius:50%;background:#3d5573}
+.win-ttl{margin-left:6px;font-family:'Barlow Condensed',sans-serif;font-size:13px;
+  font-weight:700;letter-spacing:1.5px;color:#8fa8c4;text-transform:uppercase}
+
+/* Todo lo de adentro usa la paleta literal de la app: no hereda tokens del surround. */
+.app{background:#f0f4f8;padding:16px 18px 22px;color:#3d5573;
+  font-family:'Barlow',sans-serif;font-size:14px}
+.app *{box-sizing:border-box}
+.subnav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;
+  border-bottom:1px solid #d1dae6;padding-bottom:0}
+.sn{background:none;border:none;border-bottom:2px solid transparent;padding:7px 11px;
+  font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;color:#7a90a8;cursor:default;
+  border-radius:5px 5px 0 0}
+.sn.on{color:#e86820;border-bottom-color:#e86820;background:#fff}
+.sn.new{color:#1a2e4a}
+.sn.new::after{content:'NUEVO';margin-left:6px;font-size:8px;font-weight:800;letter-spacing:.8px;
+  background:#e86820;color:#fff;padding:1px 5px;border-radius:3px;vertical-align:1px}
+
+.bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#fff;
+  border:1px solid #d1dae6;border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.blbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7a90a8;font-weight:700}
+.bsel{background:#f0f4f8;border:1px solid #d1dae6;color:#1a2e4a;border-radius:6px;
+  padding:5px 10px;font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:600}
+.arrow{color:#e86820;font-weight:800;font-size:15px}
+
+.card{background:#fff;border:1px solid #d1dae6;border-radius:10px;padding:13px 15px;margin-bottom:12px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid #eef2f7}
+.card-ttl{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:1.3px;text-transform:uppercase;color:#1a2e4a}
+.badge{font-size:9.5px;padding:2.5px 8px;border-radius:3px;font-weight:700;letter-spacing:.4px}
+.b-ok{background:#e8f7f2;color:#1d9e6f;border:1px solid #9dd9c0}
+.b-dg{background:#fdecea;color:#c0392b;border:1px solid #f5a9a3}
+.b-wn{background:#fff3e0;color:#c97a00;border:1px solid #f5c060}
+.b-in{background:#e8f1fb;color:#1a6db5;border:1px solid #a3c4ee}
+.b-mock{background:#f1f5f9;color:#64748b;border:1px dashed #94a3b8}
+
+/* selector de distribuidores */
+.presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pbtn{border:1px solid #d1dae6;background:#f8fafc;color:#3d5573;border-radius:6px;
+  padding:5px 11px;font-family:'Barlow',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer}
+.pbtn:hover{border-color:#e86820;color:#e86820}
+.pbtn.on{background:#1a2e4a;border-color:#1a2e4a;color:#fff}
+.pbtn:focus-visible{outline:2px solid #e86820;outline-offset:2px}
+.chk-line{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#3d5573;cursor:pointer}
+.dlist{margin-top:10px;max-height:206px;overflow-y:auto;border:1px solid #e8edf3;border-radius:7px}
+.drow{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid #f2f6fa;
+  font-size:12.5px;cursor:pointer}
+.drow:last-child{border-bottom:none}
+.drow:hover{background:#f8fbff}
+.drow.off{opacity:.42}
+.dname{flex:1;color:#1a2e4a;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsc{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:#7a90a8;min-width:44px;text-align:right}
+.dsc.now{color:#1a2e4a}
+.ddel{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;
+  font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
+.dflag{font-size:9.5px;font-weight:700;color:#c97a00;background:#fff3e0;
+  border:1px solid #f5c060;border-radius:3px;padding:1px 6px;white-space:nowrap}
+.dflag.ph{visibility:hidden}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid #d1dae6;border-radius:8px;padding:12px 13px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:var(--k,#e86820)}
+.kpi-l{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:#7a90a8;font-weight:700;margin-bottom:5px}
+.kpi-v{font-family:'Barlow Condensed',sans-serif;font-size:27px;font-weight:800;line-height:1;
+  color:var(--k,#1a2e4a);font-variant-numeric:tabular-nums}
+.kpi-s{font-size:10px;color:#7a90a8;margin-top:3px}
+
+.g2{display:grid;grid-template-columns:1.05fr .95fr;gap:12px;margin-bottom:12px}
+.g2 .card{margin-bottom:0}
+
+/* cascada */
+.wf{display:flex;flex-direction:column;gap:9px}
+.wf-row{display:grid;grid-template-columns:210px 1fr 66px;align-items:center;gap:11px}
+.wf-lbl{font-size:12px;color:#3d5573;line-height:1.25}
+.wf-lbl small{display:block;font-size:10px;color:#9ab0c4}
+.wf-track{position:relative;height:19px;background:#f2f6fa;border-radius:4px;
+  border:1px solid #e8edf3;overflow:hidden}
+.wf-zero{position:absolute;top:0;bottom:0;left:62%;width:1px;background:#cbd6e2}
+.wf-fill{position:absolute;top:0;bottom:0;border-radius:3px}
+.wf-val{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;
+  text-align:right;font-variant-numeric:tabular-nums}
+.wf-tot{border-top:1px dashed #d1dae6;padding-top:9px;margin-top:2px}
+
+/* aporte */
+.ap{display:flex;flex-direction:column;gap:4px}
+.ap-row{display:grid;grid-template-columns:1fr 132px 52px;align-items:center;gap:9px;
+  padding:2.5px 0;font-size:11.5px}
+.ap-n{color:#1a2e4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-tr{position:relative;height:13px;background:#f5f8fb;border-radius:3px}
+.ap-mid{position:absolute;top:-2px;bottom:-2px;left:50%;width:1px;background:#cbd6e2}
+.ap-f{position:absolute;top:0;bottom:0;border-radius:2px}
+.ap-v{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;
+  text-align:right;font-variant-numeric:tabular-nums}
+
+/* tablas */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{padding:7px 9px;font-size:9.5px;color:#7a90a8;font-weight:700;text-transform:uppercase;
+  letter-spacing:.6px;border-bottom:2px solid #d1dae6;white-space:nowrap;text-align:left}
+th.c,td.c{text-align:center}
+th.r,td.r{text-align:right}
+td{padding:6.5px 9px;border-bottom:1px solid #f0f4f8;color:#3d5573}
+tbody tr:nth-child(even){background:#fafcfe}
+.num{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.aname{font-weight:700}
+tfoot td{background:#f0f4f8;border-top:2px solid #d1dae6;border-bottom:none;font-weight:700;color:#1a2e4a}
+
+/* matriz movilidad */
+.mob{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;font-size:11px}
+.mob-h{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:#7a90a8;text-align:center;padding:4px 2px}
+.mob-c{background:#f7fafd;border:1px solid #eef2f7;border-radius:5px;padding:8px 4px;text-align:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:#c3cfdb;
+  font-variant-numeric:tabular-nums}
+.mob-c.has{background:#fff;border-color:#d1dae6;color:#1a2e4a}
+.mob-c.diag{background:#eef7f2;border-color:#b9dfcc;color:#1d9e6f}
+.mob-c.down{background:#fdeeec;border-color:#f2bab3;color:#d93025}
+.mob-c.up{background:#eaf3fc;border-color:#b3d0ee;color:#2f7dc8}
+.mob-rl{font-size:9.5px;font-weight:700;color:#7a90a8;display:flex;align-items:center;
+  justify-content:flex-end;padding-right:6px;text-align:right}
+
+/* copy block */
+.copy-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.btn-cp{background:#e86820;border:none;color:#fff;border-radius:7px;padding:8px 16px;
+  font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer}
+.btn-cp:hover{background:#cf5a17}
+.btn-cp:focus-visible{outline:2px solid #1a2e4a;outline-offset:2px}
+.btn-x{background:#fff;border:1px solid #d1dae6;color:#3d5573;border-radius:7px;padding:8px 14px;
+  font-family:'Barlow',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer}
+.btn-x:hover{border-color:#2f7dc8;color:#2f7dc8}
+#copytext{width:100%;height:430px;background:#fbfcfe;border:1px solid #d1dae6;border-radius:8px;
+  padding:14px 16px;font-family:ui-monospace,'Cascadia Mono',Consolas,monospace;font-size:11.5px;
+  line-height:1.62;color:#243b53;resize:vertical;white-space:pre;overflow:auto}
+.stale{display:none;font-size:11px;color:#c97a00;background:#fff8ec;border:1px solid #f5c060;
+  border-radius:5px;padding:4px 9px;font-weight:600}
+.stale.show{display:inline-block}
+
+@media (max-width:900px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:1fr}
+  .wf-row{grid-template-columns:150px 1fr 56px}
+  .doc-h1{font-size:31px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="shell">
+
+  <header class="doc-hd">
+    <div class="doc-eyebrow">Solapa Red · sub-tab propuesto</div>
+    <h1 class="doc-h1">Δ Red — Comparación entre ediciones</h1>
+    <p class="doc-lead">Mockup navegable del panel. Los datos son <strong>reales</strong>: CHILE, edición 2025 → 2026, tomados de la base. Probá los presets y los checkboxes — el titular, la cascada, el aporte por distribuidor, los críticos y el texto para PPT <strong>recalculan de verdad</strong> con tu selección.</p>
+  </header>
+
+  <div class="note">
+    <div><b>Qué es real y qué no.</b> Scores totales, por área, críticos cumplidos y categorías salen de las 12 auditorías de Chile con ambas ediciones. Las dos tablas marcadas <em>datos ilustrativos</em> — apertura por atributo/BPL y el split respuestas vs criterios — necesitan correr el motor de scoring en el browser, así que acá van con números de ejemplo para que veas la forma.</div>
+  </div>
+
+  <div class="frame-cap">Vista del panel <span>— así se vería dentro de la app</span></div>
+
+  <div class="win">
+    <div class="win-bar">
+      <i class="win-dot"></i><i class="win-dot"></i><i class="win-dot"></i>
+      <span class="win-ttl">RED Activa 2.0 · Red</span>
+    </div>
+
+    <div class="app">
+
+      <div class="subnav">
+        <button class="sn">📊 Resumen Red</button>
+        <button class="sn">📐 Por Área</button>
+        <button class="sn">📋 Por Atributo</button>
+        <button class="sn">🔴 Críticos</button>
+        <button class="sn">🏢 Distribuidores</button>
+        <button class="sn">🔍 Análisis</button>
+        <button class="sn on new">⚖️ Δ Red</button>
+        <button class="sn">⚪ No Vinc.</button>
+        <button class="sn">🧮 Matriz</button>
+      </div>
+
+      <div class="bar">
+        <span class="blbl">País</span>
+        <select class="bsel"><option>CHILE</option></select>
+        <span class="blbl" style="margin-left:6px">Base</span>
+        <select class="bsel"><option>2025</option></select>
+        <span class="arrow">→</span>
+        <span class="blbl">Comparar</span>
+        <select class="bsel"><option>2026</option></select>
+        <span style="margin-left:auto;display:flex;gap:7px">
+          <button class="btn-x">📊 Excel</button>
+        </span>
+      </div>
+
+      <!-- ─── SELECTOR ─── -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-ttl">Distribuidores incluidos</span>
+          <span class="badge b-in" id="selcount">10 de 12</span>
+        </div>
+        <div class="presets">
+          <button class="pbtn on" id="p-panel" onclick="preset('panel')">Panel constante</button>
+          <button class="pbtn" id="p-all" onclick="preset('all')">Todos</button>
+          <button class="pbtn" id="p-none" onclick="preset('none')">Ninguno</button>
+          <label class="chk-line" style="margin-left:8px">
+            <input type="checkbox" id="excl" checked onchange="preset('panel')">
+            Excluir auditorías incompletas (&lt;50% respondido)
+          </label>
+          <span class="badge b-wn" id="exclcount">2 excluidas</span>
+        </div>
+        <div class="dlist" id="dlist"></div>
+      </div>
+
+      <!-- ─── KPIs ─── -->
+      <div class="kpis" id="kpis"></div>
+
+      <!-- ─── CASCADA + APORTE ─── -->
+      <div class="g2">
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ttl">Qué explica la variación</span>
+            <span class="badge b-mock">split respuestas/criterios: ilustrativo</span>
+          </div>
+          <div class="wf" id="wf"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ttl">Aporte al promedio de red</span>
+            <span class="badge b-in">pp sobre el Δ total</span>
+          </div>
+          <div class="ap" id="ap"></div>
+        </div>
+      </div>
+
+      <!-- ─── POR ÁREA ─── -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-ttl">Dónde se pierde — por área</span>
+          <span class="stale" id="stale-area">Recalcula con la selección en la versión real</span>
+          <span class="badge b-ok">datos reales</span>
+        </div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Área</th><th class="c">Peso</th><th class="c">2025</th><th class="c">2026</th>
+              <th class="c">Δ área</th><th class="c">Aporte al Δ red</th><th class="c">Retroceden</th>
+            </tr></thead>
+            <tbody id="areabody"></tbody>
+            <tfoot><tr>
+              <td>TOTAL RED</td><td class="c">100%</td>
+              <td class="c num">79.3%</td><td class="c num">76.0%</td>
+              <td class="c num" style="color:#d93025">−3.2</td>
+              <td class="c num" style="color:#d93025">−3.2 pp</td>
+              <td class="c">8 de 10</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── POR ATRIBUTO ─── -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-ttl">Atributos (BPL) que más pesan en la caída</span>
+          <span class="badge b-mock">datos ilustrativos</span>
+        </div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Atributo</th><th>Área</th><th class="c">2025</th><th class="c">2026</th>
+              <th class="c">Aporte</th><th class="c">Retroceden</th><th class="c">Mejoran</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>4</td><td class="aname">Control de temperatura en cámara</td><td style="color:#2f7dc8">Infraestructura</td><td class="c">81.0%</td><td class="c">60.0%</td><td class="c num" style="color:#d93025">−1.31 pp</td><td class="c" style="color:#d93025;font-weight:700">6</td><td class="c" style="color:#9ab0c4">1</td></tr>
+              <tr><td>2</td><td class="aname">Estado edilicio y layout de depósito</td><td style="color:#2f7dc8">Infraestructura</td><td class="c">74.5%</td><td class="c">59.8%</td><td class="c num" style="color:#d93025">−0.92 pp</td><td class="c" style="color:#d93025;font-weight:700">5</td><td class="c" style="color:#9ab0c4">2</td></tr>
+              <tr><td>7</td><td class="aname">Trazabilidad de lote en picking</td><td style="color:#1d9e6f">Procesos Logísticos</td><td class="c">93.1%</td><td class="c">82.4%</td><td class="c num" style="color:#d93025">−0.67 pp</td><td class="c" style="color:#d93025;font-weight:700">5</td><td class="c" style="color:#9ab0c4">0</td></tr>
+              <tr><td>9</td><td class="aname">Control de plagas documentado</td><td style="color:#2f7dc8">Infraestructura</td><td class="c">78.0%</td><td class="c">70.5%</td><td class="c num" style="color:#d93025">−0.47 pp</td><td class="c" style="color:#d93025;font-weight:700">4</td><td class="c" style="color:#9ab0c4">1</td></tr>
+              <tr><td>6</td><td class="aname">Gestión de devoluciones y mermas</td><td style="color:#1d9e6f">Procesos Logísticos</td><td class="c">90.2%</td><td class="c">85.1%</td><td class="c num" style="color:#d93025">−0.32 pp</td><td class="c" style="color:#d93025;font-weight:700">4</td><td class="c" style="color:#9ab0c4">2</td></tr>
+              <tr><td>12</td><td class="aname">Capacitación de personal operativo</td><td style="color:#e8920a">Gestión</td><td class="c">55.0%</td><td class="c">62.5%</td><td class="c num" style="color:#1d9e6f">+0.30 pp</td><td class="c" style="color:#9ab0c4">2</td><td class="c" style="color:#1d9e6f;font-weight:700">5</td></tr>
+              <tr><td>15</td><td class="aname">Rotación FEFO en góndola</td><td style="color:#7c5cd6">Integridad del Producto</td><td class="c">84.0%</td><td class="c">90.0%</td><td class="c num" style="color:#1d9e6f">+0.36 pp</td><td class="c" style="color:#9ab0c4">1</td><td class="c" style="color:#1d9e6f;font-weight:700">6</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:9px;font-size:11.5px;color:#7a90a8">
+          Los 3 primeros atributos concentran el <strong style="color:#d93025">90%</strong> de la caída. Ordenado por aporte absoluto; en la versión real la tabla es completa y ordenable.
+        </div>
+      </div>
+
+      <!-- ─── CRÍTICOS + MOVILIDAD ─── -->
+      <div class="g2">
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ttl">Críticos</span>
+            <span class="badge b-ok">datos reales</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:11px" id="critkpi"></div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Distribuidor</th><th class="c">2025</th><th class="c">2026</th><th class="c">Δ</th></tr></thead>
+              <tbody id="critbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-ttl">Movilidad de categorías</span>
+            <span class="badge b-ok">datos reales</span>
+          </div>
+          <div style="font-size:10px;color:#7a90a8;margin-bottom:7px">Filas = categoría 2025 · Columnas = categoría 2026</div>
+          <div class="mob" id="mob"></div>
+          <div id="mobsum" style="margin-top:11px;display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px"></div>
+        </div>
+      </div>
+
+      <!-- ─── COPY PPT ─── -->
+      <div class="card">
+        <div class="copy-hd">
+          <span class="card-ttl">Texto para el slide</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="cpok" style="font-size:11.5px;color:#1d9e6f;font-weight:700;visibility:hidden">✓ Copiado</span>
+            <button class="btn-x" onclick="rebuild()">↻ Regenerar</button>
+            <button class="btn-cp" onclick="copyTxt()">📋 Copiar para PPT</button>
+          </div>
+        </div>
+        <textarea id="copytext" readonly spellcheck="false"></textarea>
+        <div style="margin-top:8px;font-size:11px;color:#7a90a8">
+          Texto plano, sin markdown ni tabs raros — pega limpio en un cuadro de texto de PowerPoint y respeta la alineación con espacios.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="note">
+    <div><b>Tres decisiones para confirmar antes de codear.</b> (1) El titular usa <em>panel constante</em> por default —solo distribuidores con auditoría en ambas ediciones—, porque si no "el promedio cayó" mezcla gestión con altas y bajas. (2) Las auditorías con menos del 50% respondido se excluyen por default, siempre con el aviso visible: en Chile son dos cargas a medio hacer que solas mueven el titular de −3.2 pp a −14.6 pp. (3) El selector filtra todo, incluido el texto del slide, y el texto declara siempre cuántos entraron y cuántos quedaron afuera.</div>
+  </div>
+
+</div>
+
+<script>
+// ── Datos reales: CHILE 2025 → 2026 (12 distribuidores con ambas ediciones) ──
+const D = [
+  {n:'SOC.COMERCIALIZADORA Y DIST.OVIEDO SPA',     s:'OVIEDO',           a:97.5, b:89.1, c1:12, c2:11, inc:false},
+  {n:'COM. ALDO PATRICIO BALKENHOL FLORES EIRL',   s:'BALKENHOL FLORES', a:95.7, b:92.9, c1:12, c2:11, inc:false},
+  {n:'SOCIEDAD COMERCIAL MULTIMIX LIMITADA',       s:'MULTIMIX',         a:84.0, b:82.6, c1:10, c2:10, inc:false},
+  {n:'COMERCIALIZADORA COMCELL E.I.R.L.',          s:'COMCELL',          a:83.6, b:78.3, c1:8,  c2:7,  inc:false},
+  {n:'SOCIEDAD COMERCIAL BOREAS D Y S LTDA.',      s:'BOREAS D Y S',     a:82.8, b:83.9, c1:8,  c2:10, inc:false},
+  {n:'DIST DE ALIMENTOS ALCOHOLADO DISALCO SPA',   s:'DISALCO',          a:72.6, b:74.2, c1:7,  c2:8,  inc:false},
+  {n:'DISTRIB. Y COMERC. DISALVO LTDA.',           s:'DISALVO',          a:72.4, b:67.9, c1:6,  c2:5,  inc:false},
+  {n:'COMERCIAL DISGAL LIMITADA',                  s:'DISGAL',           a:70.3, b:69.8, c1:6,  c2:7,  inc:false},
+  {n:'DISTRIB.COM. MAURICIO A.RIFFO FISSORE EIRL', s:'RIFFO FISSORE',    a:67.5, b:65.4, c1:6,  c2:5,  inc:false},
+  {n:'SAAVEDRA PANTOJA RAUL',                      s:'SAAVEDRA PANTOJA', a:66.3, b:56.3, c1:6,  c2:3,  inc:false},
+  {n:'DILEKU SPA',                                 s:'DILEKU',           a:75.0, b:1.4,  c1:9,  c2:0,  inc:true},
+  {n:'DIST.Y COMERCIALIZADORA ACUÑA GONZALEZ L',   s:'ACUÑA GONZALEZ',   a:70.4, b:1.4,  c1:7,  c2:0,  inc:true}
+];
+// Áreas: promedios reales sobre los 10 del panel limpio
+const AREAS = [
+  {k:'IFT', n:'Infraestructura',         w:.25, a:76.5, b:66.4, dn:7, up:2, col:'#2f7dc8'},
+  {k:'PLG', n:'Procesos Logísticos',     w:.25, a:92.3, b:88.3, dn:9, up:1, col:'#1d9e6f'},
+  {k:'IDP', n:'Integridad del Producto', w:.30, a:85.2, b:86.2, dn:4, up:6, col:'#7c5cd6'},
+  {k:'GST', n:'Gestión',                 w:.20, a:57.4, b:57.4, dn:5, up:5, col:'#e8920a'}
+];
+const CATS = ['PROACTIVO','ACTIVO','REACTIVO','INACTIVO'];
+const CATC = {PROACTIVO:'#1d9e6f',ACTIVO:'#2f7dc8',REACTIVO:'#e8920a',INACTIVO:'#d93025'};
+const cat = v => v>=85?'PROACTIVO' : v>=70?'ACTIVO' : v>=50?'REACTIVO' : 'INACTIVO';
+
+let sel = D.map(d => !d.inc);           // panel constante limpio por default
+let defaultSel = sel.slice();
+
+const f1 = v => (v<0?'−':'') + Math.abs(v).toFixed(1);
+const pp = v => (v>0?'+':v<0?'−':'') + Math.abs(v).toFixed(2);
+const col = v => v>0.005?'#1d9e6f' : v<-0.005?'#d93025' : '#7a90a8';
+const pad = (s,n) => (s+'').padEnd(n,' ');
+const lpad = (s,n) => (s+'').padStart(n,' ');
+
+function toggle(i){ sel[i]=!sel[i]; syncPresetBtns(); rebuild(); }
+function preset(k){
+  const ex = document.getElementById('excl').checked;
+  if(k==='panel') sel = D.map(d => ex ? !d.inc : true);
+  if(k==='all')   sel = D.map(d => ex ? !d.inc : true);
+  if(k==='none')  sel = D.map(() => false);
+  if(k==='all' && !ex) sel = D.map(()=>true);
+  if(k==='all' &&  ex) sel = D.map(d=>!d.inc);
+  syncPresetBtns(k); rebuild();
+}
+function syncPresetBtns(k){
+  const n = sel.filter(Boolean).length;
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  const ex = document.getElementById('excl').checked;
+  const isPanel = sel.every((v,i)=> v === (ex ? !D[i].inc : true));
+  if(k==='none' || n===0) document.getElementById('p-none').classList.add('on');
+  else if(isPanel) document.getElementById('p-panel').classList.add('on');
+}
+
+function rebuild(){
+  const on = D.map((d,i)=>({...d,i})).filter(d=>sel[d.i]);
+  const n = on.length;
+
+  // lista
+  document.getElementById('dlist').innerHTML = D.map((d,i)=>`
+    <div class="drow ${sel[i]?'':'off'}" onclick="toggle(${i})">
+      <input type="checkbox" ${sel[i]?'checked':''} onclick="event.stopPropagation();toggle(${i})">
+      <span class="dname">${d.n}</span>
+      <span class="dsc">${d.a.toFixed(1)}</span>
+      <span style="color:#c3cfdb">→</span>
+      <span class="dsc now">${d.b.toFixed(1)}</span>
+      <span class="ddel" style="color:${col(d.b-d.a)}">${pp(d.b-d.a)}</span>
+      <span class="dflag ${d.inc?'':'ph'}">⚠ incompleta</span>
+    </div>`).join('');
+  document.getElementById('selcount').textContent = n+' de '+D.length;
+  document.getElementById('exclcount').textContent = D.filter(d=>d.inc).length+' excluidas';
+  document.getElementById('exclcount').style.display = document.getElementById('excl').checked?'':'none';
+
+  const empty = n===0;
+  const m1 = empty?0: on.reduce((s,d)=>s+d.a,0)/n;
+  const m2 = empty?0: on.reduce((s,d)=>s+d.b,0)/n;
+  const dt = m2-m1;
+  const up = on.filter(d=>d.b-d.a>0.05).length;
+  const dn = on.filter(d=>d.b-d.a<-0.05).length;
+  const eq = n-up-dn;
+
+  // KPIs
+  document.getElementById('kpis').innerHTML = [
+    {l:'Distribuidores', v:n, s:'en la comparación', c:'#2f7dc8'},
+    {l:'Promedio 2025',  v:empty?'—':m1.toFixed(1)+'%', s:'edición base', c:'#7a90a8'},
+    {l:'Promedio 2026',  v:empty?'—':m2.toFixed(1)+'%', s:'edición actual', c:'#1a2e4a'},
+    {l:'Δ Red',          v:empty?'—':pp(dt)+' pp', s:'variación del promedio', c:col(dt)},
+    {l:'Mejoran',        v:up, s:'distribuidores', c:'#1d9e6f'},
+    {l:'Retroceden',     v:dn, s:eq?eq+' sin cambio':'distribuidores', c:'#d93025'}
+  ].map(k=>`<div class="kpi" style="--k:${k.c}"><div class="kpi-l">${k.l}</div>
+      <div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div></div>`).join('');
+
+  // Cascada — respuestas/criterios repartidos con proporción ilustrativa
+  const efResp = dt*0.81, efPond = dt*0.16, efComp = 0, resid = dt-efResp-efPond;
+  const maxAbs = Math.max(0.4, ...[efResp,efPond,resid,dt].map(Math.abs));
+  const bar = v => {
+    const w = Math.abs(v)/maxAbs*38;
+    return v<0 ? `left:${62-w}%;width:${w}%;background:#d93025` : `left:62%;width:${w}%;background:#1d9e6f`;
+  };
+  const wfRows = [
+    ['Desempeño de los distribuidores','lo que efectivamente cambió de respuesta', efResp],
+    ['Criterios y ponderación','cambios del modelo entre ediciones', efPond],
+    ['Composición de la red','altas y bajas — cero en panel constante', efComp],
+    ['Residual','interacción y ajustes de cálculo', resid]
+  ];
+  document.getElementById('wf').innerHTML =
+    wfRows.map(([l,s,v])=>`<div class="wf-row">
+      <div class="wf-lbl">${l}<small>${s}</small></div>
+      <div class="wf-track"><i class="wf-zero"></i><i class="wf-fill" style="${bar(v)}"></i></div>
+      <div class="wf-val" style="color:${col(v)}">${empty?'—':pp(v)}</div></div>`).join('')
+    + `<div class="wf-row wf-tot">
+        <div class="wf-lbl" style="font-weight:700;color:#1a2e4a">Δ TOTAL DEL PROMEDIO</div>
+        <div class="wf-track"><i class="wf-zero"></i><i class="wf-fill" style="${bar(dt)};opacity:.85"></i></div>
+        <div class="wf-val" style="color:${col(dt)};font-size:18px">${empty?'—':pp(dt)}</div></div>`;
+
+  // Aporte por distribuidor
+  const ap = on.map(d=>({s:d.s, v:n?(d.b-d.a)/n:0})).sort((x,y)=>y.v-x.v);
+  const apMax = Math.max(0.2, ...ap.map(x=>Math.abs(x.v)));
+  document.getElementById('ap').innerHTML = ap.length? ap.map(x=>{
+    const w = Math.abs(x.v)/apMax*50;
+    const st = x.v<0 ? `left:${50-w}%;width:${w}%;background:#d93025` : `left:50%;width:${w}%;background:#1d9e6f`;
+    return `<div class="ap-row"><span class="ap-n">${x.s}</span>
+      <span class="ap-tr"><i class="ap-mid"></i><i class="ap-f" style="${st}"></i></span>
+      <span class="ap-v" style="color:${col(x.v)}">${pp(x.v)}</span></div>`;
+  }).join('') : '<div style="padding:22px;text-align:center;color:#9ab0c4;font-size:12px">Seleccioná al menos un distribuidor.</div>';
+
+  // Áreas (estáticas — reales sobre el panel de 10)
+  document.getElementById('areabody').innerHTML = AREAS.map(a=>{
+    const da = a.b-a.a, ap2 = da*a.w;
+    return `<tr>
+      <td class="aname" style="color:${a.col}">${a.n}</td>
+      <td class="c">${(a.w*100).toFixed(0)}%</td>
+      <td class="c">${a.a.toFixed(1)}%</td>
+      <td class="c num">${a.b.toFixed(1)}%</td>
+      <td class="c num" style="color:${col(da)}">${pp(da)}</td>
+      <td class="c num" style="color:${col(ap2)}">${pp(ap2)} pp</td>
+      <td class="c" style="color:${a.dn>a.up?'#d93025':'#7a90a8'};font-weight:${a.dn>a.up?700:400}">${a.dn} de 10</td>
+    </tr>`;}).join('');
+  const isDefault = sel.every((v,i)=>v===defaultSel[i]);
+  document.getElementById('stale-area').classList.toggle('show', !isDefault && n>0);
+
+  // Críticos
+  const c1 = empty?0: on.reduce((s,d)=>s+d.c1,0)/n;
+  const c2 = empty?0: on.reduce((s,d)=>s+d.c2,0)/n;
+  const lose = on.filter(d=>d.c2<d.c1), gain = on.filter(d=>d.c2>d.c1);
+  document.getElementById('critkpi').innerHTML = [
+    {l:'Promedio cumplidos', v: empty?'—':c1.toFixed(1)+' → '+c2.toFixed(1), c:col(c2-c1)},
+    {l:'Pierden críticos',   v: lose.length, c:'#d93025'},
+    {l:'Recuperan críticos', v: gain.length, c:'#1d9e6f'}
+  ].map(k=>`<div style="background:#f8fafc;border:1px solid #e8edf3;border-radius:7px;padding:9px 8px;text-align:center">
+      <div style="font-size:8.5px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${k.l}</div>
+      <div class="num" style="font-size:19px;color:${k.c}">${k.v}</div></div>`).join('');
+  const cr = on.filter(d=>d.c2!==d.c1).sort((x,y)=>(x.c2-x.c1)-(y.c2-y.c1));
+  document.getElementById('critbody').innerHTML = cr.length? cr.map(d=>`<tr>
+      <td class="aname" style="font-weight:500">${d.s}</td>
+      <td class="c">${d.c1}</td><td class="c num">${d.c2}</td>
+      <td class="c num" style="color:${col(d.c2-d.c1)}">${d.c2-d.c1>0?'+':''}${d.c2-d.c1}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:#9ab0c4;padding:16px">Sin cambios en críticos.</td></tr>';
+
+  // Movilidad
+  const mx = {}; CATS.forEach(a=>{mx[a]={}; CATS.forEach(b=>mx[a][b]=0);});
+  on.forEach(d=> mx[cat(d.a)][cat(d.b)]++);
+  let h = '<div></div>' + CATS.map(c=>`<div class="mob-h" style="color:${CATC[c]}">${c.slice(0,4)}</div>`).join('');
+  CATS.forEach((r,ri)=>{
+    h += `<div class="mob-rl" style="color:${CATC[r]}">${r.slice(0,4)}</div>`;
+    CATS.forEach((c,ci)=>{
+      const v = mx[r][c];
+      const cls = v===0 ? '' : ri===ci ? 'diag' : ci>ri ? 'down' : 'up';
+      h += `<div class="mob-c ${v?'has':''} ${cls}">${v||'·'}</div>`;
+    });
+  });
+  document.getElementById('mob').innerHTML = h;
+  let down=0, upc=0;
+  CATS.forEach((r,ri)=>CATS.forEach((c,ci)=>{ if(ci>ri) down+=mx[r][c]; if(ci<ri) upc+=mx[r][c]; }));
+  document.getElementById('mobsum').innerHTML =
+    `<span>▼ Descensos: <strong style="color:#d93025">${down}</strong></span>
+     <span>▲ Ascensos: <strong style="color:#2f7dc8">${upc}</strong></span>
+     <span>■ Se mantienen: <strong style="color:#1d9e6f">${n-down-upc}</strong></span>`;
+
+  buildCopy({on,n,m1,m2,dt,up,dn,eq,efResp,efPond,resid,c1,c2,lose,gain,down,upc,mx});
+}
+
+function buildCopy(x){
+  if(x.n===0){ document.getElementById('copytext').value='Seleccioná al menos un distribuidor.'; return; }
+  const exc = D.length - x.n;
+  const sorted = [...x.on].sort((a,b)=>(b.b-b.a)-(a.a-a.b)*0);
+  const best = [...x.on].sort((a,b)=>(b.b-b.a)-(a.b-a.a))[0];
+  const worst= [...x.on].sort((a,b)=>(a.b-a.a)-(b.b-b.a))[0];
+  const share = v => x.dt!==0 ? Math.round(Math.abs(v/x.dt)*100)+'%' : '—';
+  const isDefault = sel.every((v,i)=>v===defaultSel[i]);
+
+  const areaLines = [...AREAS].sort((a,b)=>(a.b-a.a)*a.w-(b.b-b.a)*b.w).map(a=>
+    '• ' + pad(a.n,26) + lpad(a.a.toFixed(1)+'%',6) + ' → ' + lpad(a.b.toFixed(1)+'%',6) +
+    '   ' + lpad(pp((a.b-a.a)*a.w)+' pp',9) + '   ' + a.dn + ' de 10 retroceden');
+
+  const critLines = x.lose.length
+    ? x.lose.sort((p,q)=>(p.c2-p.c1)-(q.c2-q.c1)).map(d=>'  - '+pad(d.s,20)+' '+d.c1+' → '+d.c2+'  ('+(d.c2-d.c1)+')')
+    : ['  - Ninguno'];
+
+  const t =
+`RED ${'CHILE'} · EDICIÓN 2025 → 2026
+${isDefault ? 'Panel constante de '+x.n+' distribuidores'+(exc?' ('+exc+' excluidos por auditoría incompleta)':'')
+            : 'Selección manual de '+x.n+' de '+D.length+' distribuidores'}
+
+TITULAR
+El promedio de la red ${x.dt<0?'cae':'sube'} ${Math.abs(x.dt).toFixed(1)} pp, de ${x.m1.toFixed(1)}% a ${x.m2.toFixed(1)}%.
+${x.dn>x.up ? 'La variación es generalizada, no puntual: '+x.dn+' de '+x.n+' distribuidores retroceden.'
+            : 'La mejora es mayoritaria: '+x.up+' de '+x.n+' distribuidores avanzan.'}
+
+QUÉ EXPLICA LA VARIACIÓN
+• Desempeño de los distribuidores ....... ${lpad(pp(x.efResp)+' pp',9)}   (${share(x.efResp)})
+• Criterios y ponderación .............. ${lpad(pp(x.efPond)+' pp',9)}   (${share(x.efPond)})
+• Composición de la red ................ ${lpad('0.00 pp',9)}   (panel constante)
+• Residual ............................. ${lpad(pp(x.resid)+' pp',9)}
+
+DÓNDE SE PIERDE
+${areaLines.join('\n')}
+La caída se concentra en Infraestructura: explica el 78% de la variación total.
+
+ATRIBUTOS QUE MÁS PESAN
+1. Control de temperatura en cámara ......  -1.31 pp   6 retroceden
+2. Estado edilicio y layout de depósito ..  -0.92 pp   5 retroceden
+3. Trazabilidad de lote en picking .......  -0.67 pp   5 retroceden
+Estos 3 atributos concentran el 90% de la caída.
+
+CRÍTICOS
+• Críticos cumplidos (promedio de red): ${x.c1.toFixed(1)} → ${x.c2.toFixed(1)}
+• ${x.lose.length} distribuidor${x.lose.length===1?'':'es'} pierde${x.lose.length===1?'':'n'} al menos un crítico:
+${critLines.join('\n')}
+• ${x.gain.length} recupera${x.gain.length===1?'':'n'} críticos respecto de 2025.
+
+MOVILIDAD DE CATEGORÍAS
+• Descensos de categoría: ${x.down}   |   Ascensos: ${x.upc}   |   Se mantienen: ${x.n-x.down-x.upc}
+${x.down? '• Cruzan el umbral hacia abajo por margen mínimo — revisar antes de comunicar.':''}
+
+EXTREMOS
+• Mayor retroceso: ${pad(worst.s,20)} ${worst.a.toFixed(1)}% → ${worst.b.toFixed(1)}%  (${pp(worst.b-worst.a)} pp)
+• Mayor avance:    ${pad(best.s,20)} ${best.a.toFixed(1)}% → ${best.b.toFixed(1)}%  (${pp(best.b-best.a)} pp)`;
+
+  document.getElementById('copytext').value = t;
+}
+
+function copyTxt(){
+  const ta = document.getElementById('copytext');
+  ta.select(); ta.setSelectionRange(0,999999);
+  navigator.clipboard.writeText(ta.value).then(()=>{
+    const ok = document.getElementById('cpok');
+    ok.style.visibility='visible';
+    setTimeout(()=>ok.style.visibility='hidden',1800);
+  }).catch(()=>{});
+}
+
+rebuild();
+</script>

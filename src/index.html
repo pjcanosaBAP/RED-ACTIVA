@@ -3824,9 +3824,12 @@ async function persist(){
 let _aeSourcePref=(function(){try{const s=localStorage.getItem('bpl_ae_src_pref');return s?JSON.parse(s):{};}catch(e){return {};}})();
 function _saveAESrcPref(){try{localStorage.setItem('bpl_ae_src_pref',JSON.stringify(_aeSourcePref));}catch(e){}}
 // Normalizar edición a dígitos (últimos 2) para que "AE25", "EV25", "2025" sean la misma clave
+// Clave canonica de distribuidor: colapsa espacios internos, trim y mayusculas.
+// Evita que "C Y C  Y CIA" (doble espacio) no matchee con "C Y C Y CIA".
+function _distKey(s){return String(s||'').replace(/\s+/g,' ').trim().toUpperCase();}
 function _prefEdKey(e){const n=(e||'').replace(/\D/g,'');return n.length===4?n.slice(-2):n;}
 function aeToggleAESrc(dist,edicion,src){
-  const key=dist.trim().toUpperCase()+'|||'+_prefEdKey(edicion);
+  const key=_distKey(dist)+'|||'+_prefEdKey(edicion);
   _aeSourcePref[key]=src;
   _saveAESrcPref();
   renderAETable(_aeAccessRows,_aeCampaignEdicion);
@@ -4088,7 +4091,7 @@ function renderAETable(rows, edicion){
   const trs = dists.map(d=>{
     const r = distMap[d]||{};
     // Portal AE: prioridad 1 = edicion exacta de campaña (ej: 'AE26'), prioridad 2 = fuzzy year
-    const _matchDist=a=>a.distribuidor.trim().toUpperCase()===d.trim().toUpperCase();
+    const _matchDist=a=>_distKey(a.distribuidor)===_distKey(d);
     const _matchEd=a=>a.edicion===edicionKey||(()=>{const en=(a.edicion||'').replace(/\D/g,'');return edNumLocal&&en&&_nyLocal(edNumLocal)===_nyLocal(en);})();
     // aeRow = solo AE del portal (nunca mostrar AE Excel en el panel del portal)
     const aeRow = edicionKey
@@ -4101,7 +4104,7 @@ function renderAETable(rows, edicion){
       if(!_matchDist(a)) return false;
       return _matchEd(a);
     });
-    const prefKey=d.trim().toUpperCase()+'|||'+_prefEdKey(edicionKey);
+    const prefKey=_distKey(d)+'|||'+_prefEdKey(edicionKey);
     const pref=_aeSourcePref[prefKey]||'portal';
     const answered = aeRow ? Object.values(aeRow.answers||{}).filter(v=>v&&v!=='').length : 0;
     // Score ponderado usando estructura de la campaña (misma lógica que _calcAEScore)
@@ -4350,7 +4353,7 @@ async function exportAECampaignExcel(){
   rH.height=22;
   hdrCols.forEach(i=>sty(rH.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),c('center')));
   dists.forEach((dist,di)=>{
-    const ae=autoevals.find(a=>a.distribuidor===dist&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
+    const ae=autoevals.find(a=>_distKey(a.distribuidor)===_distKey(dist)&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
     const sc=ae?_calcAEScore(ae.answers||{},qArr,_aeCampaignAW,_aeCampaignNV):null;
     const bg=di%2===0?LGRAY:'FFFFFFFF';
     const row=['',(dist.length>50?dist.slice(0,50)+'…':dist),sc?pctStr(sc.total):'—',...sheets.map(sh=>sc?pctStr((sc.areas||{})[sh]||0):'—'),sc?sc.critMet+'/'+sc.totalCrits:'—',sc?sc.category:'PENDIENTE',sc?sc.answered:'—'];
@@ -4377,7 +4380,7 @@ async function exportAECampaignExcel(){
   qArr.forEach((q,qi)=>{
     const bg=qi%2===0?LGRAY:'FFFFFFFF';
     const distAnswers=dists.map(dist=>{
-      const ae=autoevals.find(a=>a.distribuidor===dist&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
+      const ae=autoevals.find(a=>_distKey(a.distribuidor)===_distKey(dist)&&(a.edicion===edicion||(a.edicion||'').replace(/\D/g,'')===(edicion||'').replace(/\D/g,'')));
       return ae?(ae.answers||{})[String(q.comp_num)]||'':'-';
     });
     const rQ=wsD.addRow(['',q.sheet||'',q.bpl_name||'',q.question||'',q.critico||'',...distAnswers.map(v=>ansLabel[v]||v)]);
@@ -4402,7 +4405,7 @@ async function exportAECampaignExcel(){
 async function exportDistAEExcel(distribuidor){
   if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún');return;}
   if(!_aeCampaignId){showToast('⚠️ Seleccioná una campaña primero');return;}
-  const ae=_getAEFor(distribuidor,_aeCampaignEdicion)||autoevals.find(a=>a.distribuidor===distribuidor&&(a.edicion||'').replace(/\D/g,'')===((_aeCampaignEdicion||'').replace(/\D/g,'')));
+  const ae=_getAEFor(distribuidor,_aeCampaignEdicion)||autoevals.find(a=>_distKey(a.distribuidor)===_distKey(distribuidor)&&(a.edicion||'').replace(/\D/g,'')===((_aeCampaignEdicion||'').replace(/\D/g,'')));
   if(!ae||!Object.keys(ae.answers||{}).length){showToast('⚠️ Sin respuestas para '+distribuidor);return;}
   showToast('⏳ Generando Excel AE...');
   // Cargar estructura correcta
@@ -4804,11 +4807,11 @@ function _getAEFor(distribuidor, edicion){
   const altEdicion=edicion
     ? (/^EV/i.test(edicion)?edicion.replace(/^EV/i,'AE'):edicion.replace(/^AE/i,'EV'))
     : '';
-  const distNorm=(distribuidor||'').trim().toUpperCase();
+  const distNorm=_distKey(distribuidor);
   const _ny=n=>n&&n.length===4?n.slice(-2):n;
   const candidates=autoevals.filter(a=>{
     if(!a.distribuidor) return false;
-    if(a.distribuidor.trim().toUpperCase()!==distNorm) return false;
+    if(_distKey(a.distribuidor)!==distNorm) return false;
     if(a.edicion===edicion) return true;
     if(altEdicion&&a.edicion===altEdicion) return true;
     const aeEdNum=(a.edicion||'').replace(/\D/g,'');
@@ -5953,7 +5956,7 @@ function renderGlobalAE(){
   }
   const pairs=[];
   evAudits.forEach(function(ev){
-    const ae=aeAudits.find(function(a){return a.distribuidor===ev.distribuidor&&a.edicion===ev.edicion;});
+    const ae=aeAudits.find(function(a){return _distKey(a.distribuidor)===_distKey(ev.distribuidor)&&a.edicion===ev.edicion;});
     if(ae) pairs.push({dist:ev.distribuidor,evSc:ev.scores.total,aeSc:ae.scores.total,ev:ev,ae:ae});
   });
   if(!pairs.length){
@@ -6130,6 +6133,11 @@ function importEVFile(input){
     }
 
     // ── Auto-crear distribuidor en el país activo si no existe ──
+    // Reusar el nombre canonico ya registrado si solo difiere en espacios/mayusculas
+    if(distName && !DISTRIBUTORS.includes(distName)){
+      const _canon=DISTRIBUTORS.find(function(x){return _distKey(x)===_distKey(distName);});
+      if(_canon) distName=_canon;
+    }
     if(distName && !DISTRIBUTORS.includes(distName)){
       DISTRIBUTORS.push(distName);
       _saveDistsForPais(DISTRIBUTORS);
@@ -6223,7 +6231,7 @@ function importEVFile(input){
         const sc=computeScores(answers);
 
         if(fileType==='EV'){
-          const _norm=function(s){return (s||'').trim().toUpperCase();};
+          const _norm=_distKey;
           const _evIdx=saved.findIndex(function(a){return _norm(a.distribuidor)===_norm(distName)&&a.edicion===edYear;});
           const _prevA=_evIdx>=0?saved[_evIdx]:null;
           // Auditoría congelada = resultado oficial cerrado: no se pisa ni la estructura ni las respuestas
@@ -6245,7 +6253,7 @@ function importEVFile(input){
           }
           totalEV++;
         } else {
-          const _aeIdx=autoevals.findIndex(function(a){return a.distribuidor===distName&&a.edicion===edYear&&a.source!=='portal';});
+          const _aeIdx=autoevals.findIndex(function(a){return _distKey(a.distribuidor)===_distKey(distName)&&a.edicion===edYear&&a.source!=='portal';});
           const _aeId=_aeIdx>=0?autoevals[_aeIdx].id:String(Date.now()+Math.random());
           const ae={id:_aeId,distribuidor:distName,fecha,edicion:edYear,pais:cfg.pais||'',answers,scores:sc,source:'excel'};
           if(_aeIdx>=0) autoevals[_aeIdx]=ae; else autoevals.push(ae);
@@ -6924,7 +6932,7 @@ function exportExcel(){
   if(autoevals.length){
     const r6=[['Edición','Distribuidor','Área','BPL','Sub-Atributo','#Pregunta','Pregunta','Resp. EV','Resp. AE','Coincide','Crítico']];
     sorted.forEach(function(a){
-      const ae=autoevals.find(function(x){return x.distribuidor===a.distribuidor&&x.edicion===a.edicion;});
+      const ae=autoevals.find(function(x){return _distKey(x.distribuidor)===_distKey(a.distribuidor)&&x.edicion===a.edicion;});
       if(!ae) return;
       Q.forEach(function(q){
         const evAns=({si:'SI',no:'NO',na:'N/A'})[(a.answers||{})[q.comp_num]]||'—';
@@ -10002,7 +10010,11 @@ function initAnalisis(){
   _populatePaisSelect('an-pais');
   const _as = _anSaved();
   // Populate all selectors — distributors filtered by country, editions from filtered set
-  const dists=[...new Set([..._as.map(a=>a.distribuidor),...autoevals.map(a=>a.distribuidor)])].sort();
+  // Dedupe por clave canonica: si una AE trae el nombre con espaciado distinto, gana el de la auditoria
+  const _dmap=new Map();
+  [..._as.map(a=>a.distribuidor),...autoevals.map(a=>a.distribuidor)].filter(Boolean)
+    .forEach(n=>{if(!_dmap.has(_distKey(n))) _dmap.set(_distKey(n),n);});
+  const dists=[..._dmap.values()].sort();
   const eds=[...new Set([..._as.map(a=>a.edicion),...autoevals.map(a=>a.edicion)].filter(Boolean))].sort();
   ['an-sel-dist','an-nv-dist'].forEach(id=>{
     const s=document.getElementById(id); if(!s) return;
@@ -10557,7 +10569,7 @@ function renderM2(){
       const s=a.scores||{}; const at=s.areas||{};
       const prev2=m2ShowPrev?prevData.find(p=>p.distribuidor===a.distribuidor):null;
       const delta=prev2?((s.total||0)-((prev2.scores||{}).total||0)):null;
-      const ae2=m2ShowAE?autoevals.find(ae=>ae.distribuidor===a.distribuidor&&ae.edicion===a.edicion):null;
+      const ae2=m2ShowAE?autoevals.find(ae=>_distKey(ae.distribuidor)===_distKey(a.distribuidor)&&ae.edicion===a.edicion):null;
       const aeTotal2=ae2?(ae2.scores||{}).total||0:null;
       const deltaAE=aeTotal2!==null?((s.total||0)-aeTotal2):null;
       return `<tr>
