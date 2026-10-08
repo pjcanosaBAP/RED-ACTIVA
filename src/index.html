@@ -2699,7 +2699,22 @@ function _isBaja(dist,edicion,pais){
   const k=_distKey(dist);
   return _bajasFor(p,edicion).some(function(x){return _distKey(x)===k;});
 }
-function _isBajaAudit(a){ return !!a && _isBaja(a.distribuidor,a.edicion,a.pais); }
+// ¿Hay auditoría cargada para ese distribuidor en esa edición?
+function _hasAuditFor(dist,edicion,pais){
+  const k=_distKey(dist);
+  const p=(pais||'').toUpperCase();
+  return saved.some(function(a){
+    return _distKey(a.distribuidor)===k && a.edicion===edicion &&
+           (!p || (a.pais||'').toUpperCase()===p);
+  });
+}
+// Una baja SOLO se aplica si el distribuidor no tiene auditoría en esa edición.
+// Si la tiene, la marca queda obsoleta y se ignora: los números de una edición
+// ya cerrada nunca se mueven por una baja. Congelar protege el resultado de una
+// auditoría individual, no el promedio de la edición — de ahí esta regla.
+function _bajaAplica(dist,edicion,pais){
+  return _isBaja(dist,edicion,pais) && !_hasAuditFor(dist,edicion,pais);
+}
 function _setBaja(dist,edicion,pais,on){
   const p=(pais||cfg.pais||'').toUpperCase();
   const e=String(edicion||'');
@@ -2713,14 +2728,12 @@ function _setBaja(dist,edicion,pais,on){
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   _sbPushConfig();
 }
-// Base de TODOS los análisis de red: saved sin los registros dados de baja
-function _actSaved(){ return saved.filter(function(a){return !_isBajaAudit(a);}); }
-// Distribuidores de la lista maestra que siguen activos en una edición
+// Distribuidores de Config → Distribuidores que cuentan en una edición
 function _activeDistsFor(pais,edicion){
   const p=(pais||cfg.pais||'').toUpperCase();
   const base=p?_distsForPais(p):[...DISTRIBUTORS];
   if(!edicion) return base;
-  return base.filter(function(d){return !_isBaja(d,edicion,p);});
+  return base.filter(function(d){return !_bajaAplica(d,edicion,p);});
 }
 
 // Load cfg
@@ -5623,7 +5636,7 @@ function _mxFilters(){
 // mode: 'core' = áreas vinculantes (default) · 'nv' = solo No Vinculantes
 function _mxData(mode){
   const {ed,pais}=_mxFilters();
-  const audits=_actSaved().filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
+  const audits=saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
                     .sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
   // Score recalculado por distribuidor, con sus propios pesos, para tener subattrs
   const cols=audits.map(a=>{
@@ -5883,7 +5896,7 @@ async function exportMatrizRedExcel(mode){
 function renderGlobalRed(){
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const pais=(document.getElementById('gl-pais')||{}).value||'';
-  const audits=_actSaved().filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
+  const audits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
   if(!audits.length) return;
   const failWrap=document.getElementById('global-top-fail');
   const naWrap=document.getElementById('global-top-na');
@@ -5949,7 +5962,7 @@ function renderGlobalEdiciones(){
   const wrap=document.getElementById('global-ediciones-content');
   if(!wrap) return;
   const _glPais=(document.getElementById('gl-pais')||{}).value||'';
-  const _savedForEd=_actSaved().filter(function(a){return !_glPais||a.pais===_glPais;});
+  const _savedForEd=saved.filter(function(a){return !_glPais||a.pais===_glPais;});
   const eds=[].concat(Array.from(new Set(_savedForEd.map(function(a){return a.edicion;}).filter(Boolean)))).sort();
   if(eds.length<2){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">📅 Necesitás auditorías de al menos 2 ediciones para ver la comparación.</div>';
@@ -6031,7 +6044,7 @@ function renderGlobalEdiciones(){
 // ══════════════════════════════════════════════════════════
 // Compara la edición vigente contra la anterior, distribuidor por distribuidor,
 // y permite dar de baja a los que ya no operan: solo en la edición vigente
-// (reversible, vive en cfg.bajas) o de la base completa (lista maestra, con o
+// (reversible, vive en cfg.bajas) o de la red entera (Config → Distribuidores,
 // sin su historial).
 
 let _cobRows=[];
@@ -6084,7 +6097,7 @@ function renderGlobalCobertura(){
   const master=_distsForPais(pais);
   const masterKeys=new Set(master.map(_distKey));
 
-  // Universo: lista maestra + quien tenga auditoría en la vigente o en la anterior
+  // Universo: Config → Distribuidores + quien tenga auditoría en la vigente o en la anterior
   const uni=new Map();
   const _add=function(n){ if(n&&!uni.has(_distKey(n))) uni.set(_distKey(n),n); };
   master.forEach(_add);
@@ -6095,9 +6108,12 @@ function renderGlobalCobertura(){
     const k=_distKey(d);
     const cAud=pool.find(function(a){return _distKey(a.distribuidor)===k&&a.edicion===cur;})||null;
     const pAud=prev?(pool.find(function(a){return _distKey(a.distribuidor)===k&&a.edicion===prev;})||null):null;
-    const baja=_isBaja(d,cur,pais);
+    // Marcado de baja pero con auditoría = marca obsoleta: manda la auditoría
+    const marcado=_isBaja(d,cur,pais);
+    const baja=marcado&&!cAud;
     return {
-      dist:d, pais:pais, cur:cur, prev:prev, cAud:cAud, pAud:pAud, baja:baja,
+      dist:d, pais:pais, cur:cur, prev:prev, cAud:cAud, pAud:pAud,
+      baja:baja, marcadoObsoleto:marcado&&!!cAud,
       estado: baja?'baja':cAud?'auditado':pAud?'pendiente':'sin-datos',
       enMaster: masterKeys.has(k)
     };
@@ -6126,7 +6142,7 @@ function renderGlobalCobertura(){
   };
   h+=_kpi(nAud+'/'+act.length,'Auditados '+cur,'#2e7d32');
   h+=_kpi(nPend,'Pendientes','#e65100');
-  h+=_kpi(nBaja,'Fuera de red '+cur,'#c62828');
+  h+=_kpi(nBaja,'De baja en '+cur,'#c62828');
   h+=_kpi(avgCur===null?'—':(avgCur*100).toFixed(1)+'%','Promedio '+cur,'#1565c0');
   h+='</div>';
   if(avgPrevPar!==null&&avgCurPar!==null){
@@ -6161,7 +6177,7 @@ function renderGlobalCobertura(){
   _cobRows.forEach(function(r,i){
     const dim=r.baja?'opacity:.5;':'';
     h+='<tr style="'+dim+'">'
-      +'<td style="font-weight:700">'+r.dist+(r.enMaster?'':' <span style="font-size:9px;color:var(--g400);font-weight:400">(fuera de la lista maestra)</span>')+'</td>';
+      +'<td style="font-weight:700">'+r.dist+(r.enMaster?'':' <span style="font-size:9px;color:#b45309;font-weight:600" title="Tiene auditorías guardadas, pero su nombre no figura en Config → Distribuidores: no se puede elegir al cargar una auditoría nueva ni suma al total de la red">⚠ no está en Config → Distribuidores</span>')+'</td>';
     if(prev) h+='<td style="text-align:right">'+_pc(r.pAud)+'</td>';
     h+='<td style="text-align:right">'+_pc(r.cAud)+'</td>';
     if(prev){
@@ -6173,23 +6189,26 @@ function renderGlobalCobertura(){
     if(prev) h+='<td>'+(r.pAud?catBadge(recomputeCategory(r.pAud)):'<span style="color:var(--g300)">—</span>')+'</td>';
     h+='<td>'+(r.cAud?catBadge(recomputeCategory(r.cAud)):'<span style="color:var(--g300)">—</span>')+'</td>';
     const es=_COB_EST[r.estado];
-    h+='<td><span class="badge '+es.cls+'">'+es.lbl+'</span></td>';
+    h+='<td><span class="badge '+es.cls+'">'+es.lbl+'</span>'
+      +(r.marcadoObsoleto?'<div style="font-size:9px;color:#b45309;font-weight:600;margin-top:2px" title="Quedó marcado de baja, pero tiene auditoría cargada en '+cur+'. La baja no se aplica: sus números cuentan igual.">⚠ baja marcada, no aplica</div>':'')
+      +'</td>';
     h+='<td style="text-align:right;white-space:nowrap">';
     if(!r.enMaster){
-      h+='<button class="cob-btn cob-ok" onclick="cobVolverABase('+i+')" title="Volver a agregarlo a la lista maestra de distribuidores">↩ A la base</button> ';
+      h+='<button class="cob-btn cob-ok" onclick="cobVolverABase('+i+')" title="Volver a agregarlo a Config → Distribuidores para poder auditarlo y que vuelva a contar en el total">↩ Volver a la lista</button> ';
     }
-    if(r.baja){
-      h+='<button class="cob-btn cob-ok" onclick="cobReactivar('+i+')" title="Volver a incluirlo en los análisis de '+cur+'">↩ Reactivar</button> ';
+    if(r.baja||r.marcadoObsoleto){
+      h+='<button class="cob-btn cob-ok" onclick="cobReactivar('+i+')" title="'+(r.marcadoObsoleto?'Limpiar la marca de baja que quedó obsoleta':'Volver a incluirlo en el padrón de '+cur)+'">↩ Reactivar</button> ';
     } else if(!r.cAud){
       h+='<button class="cob-btn cob-warn" onclick="cobDarBaja('+i+')" title="Excluirlo de todos los análisis de '+cur+'. Reversible; el historial se conserva">⛔ Baja '+cur+'</button> ';
     }
-    h+='<button class="cob-btn cob-danger" onclick="cobBajaBase('+i+')" title="Sacarlo de la lista maestra de distribuidores">🗑 Base</button>';
+    h+='<button class="cob-btn cob-danger" onclick="cobBajaBase('+i+')" title="Sacarlo de Config → Distribuidores: deja de figurar en la red y no aparece al cargar auditorías">🗑 Sacar de la red</button>';
     h+='</td></tr>';
   });
   h+='</tbody></table></div>';
   h+='<div style="margin-top:10px;font-size:10px;color:var(--g500);line-height:1.7">'
-    +'<strong>⛔ Baja '+cur+'</strong> — lo saca de todos los análisis de la red de esa edición y del denominador «auditados / total». Su historial queda intacto y se revierte con ↩ Reactivar.<br>'
-    +'<strong>🗑 Base</strong> — lo saca de la lista maestra de distribuidores. Al confirmar elegís si se conserva o se borra su historial de auditorías.'
+    +'<strong>⛔ Baja '+cur+'</strong> — deja de contar como pendiente y sale del denominador «auditados / total» de esa edición. Sigue en la lista de distribuidores y su historial queda intacto. Se revierte con ↩ Reactivar.<br>'
+    +'<strong>🗑 Sacar de la red</strong> — lo borra de <strong>Config → Distribuidores</strong>: deja de aparecer al cargar una auditoría nueva y no cuenta para el total de ninguna edición. Al confirmar elegís si se conserva o se borra su historial. Si conservás el historial, se revierte con ↩ Volver a la lista.<br>'
+    +'<strong>Ninguna de las dos toca los promedios.</strong> Una auditoría cargada cuenta siempre en el promedio, el ranking y las categorías de su edición, aunque el distribuidor esté de baja. Para sacar a uno que <em>sí</em> fue auditado hay que borrar esa auditoría desde <strong>Guardadas</strong> — y si está congelada 🔒, descongelarla primero.'
     +'</div>';
   h+='</div>';
   _set(h);
@@ -6200,7 +6219,8 @@ function renderGlobalCobertura(){
 function cobDarBaja(i){
   const r=_cobRows[i]; if(!r) return;
   if(!confirm('¿Dar de baja a '+r.dist+' en la edición '+r.cur+'?\n\n'
-    +'Queda fuera de todos los análisis de la red de '+r.cur+' y del denominador.\n'
+    +'Deja de figurar como pendiente y sale del denominador de '+r.cur+'.\n'
+    +'No cambia ningún promedio: no tiene auditoría en esta edición.\n'
     +'Su historial se conserva y podés reactivarlo cuando quieras.')) return;
   _setBaja(r.dist,r.cur,r.pais,true);
   _cobRefresh();
@@ -6227,7 +6247,7 @@ function cobBajaBase(i){
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">'
     +'<div style="padding:16px 20px;border-bottom:1px solid var(--g200)">'
-      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:900;color:var(--g700)">Dar de baja de la base</div>'
+      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:900;color:var(--g700)">Sacar de la red</div>'
       +'<div style="font-size:12px;color:var(--g500);margin-top:2px">'+r.dist+' · '+r.pais+'</div>'
     +'</div>'
     +'<div style="padding:16px 20px;font-size:12px;color:var(--g600);line-height:1.7">'
@@ -6239,7 +6259,7 @@ function cobBajaBase(i){
       +'<div style="font-weight:700;color:var(--g700);margin-bottom:8px">¿Qué hacemos con su historial?</div>'
       +'<button class="cob-choice" onclick="_cobBajaBaseDo('+i+',\'keep\')">'
         +'<div style="font-weight:800;font-size:13px;color:var(--g700)">Conservar el historial</div>'
-        +'<div style="font-size:11px;color:var(--g500);margin-top:3px;line-height:1.5">Sale de la lista maestra y del denominador. Sus auditorías siguen consultables en los análisis históricos.</div>'
+        +'<div style="font-size:11px;color:var(--g500);margin-top:3px;line-height:1.5">Sale de Config → Distribuidores y del denominador. Sus auditorías siguen consultables en los análisis históricos, y podés volver a sumarlo cuando quieras.</div>'
       +'</button>'
       +'<button class="cob-choice cob-choice-danger" onclick="_cobBajaBaseDo('+i+',\'purge\')">'
         +'<div style="font-weight:800;font-size:13px;color:#c62828">Borrado total</div>'
@@ -6284,10 +6304,10 @@ function _cobBajaBaseDo(i,mode){
   _cobModalClose();
   _cobRefresh();
   try{ renderSaved(); updateAudCnt(); }catch(e){}
-  showToast(mode==='purge'?'🗑 '+r.dist+' borrado de la base y del historial':'🗑 '+r.dist+' fuera de la base (historial conservado)');
+  showToast(mode==='purge'?'🗑 '+r.dist+' borrado junto con su historial':'🗑 '+r.dist+' fuera de la red (historial conservado)');
 }
 
-// Reversa de la baja de base: lo devuelve a la lista maestra conservando el
+// Reversa: lo devuelve a Config → Distribuidores conservando el
 // nombre con el que quedaron escritas sus auditorías
 function cobVolverABase(i){
   const r=_cobRows[i]; if(!r) return;
@@ -6295,7 +6315,7 @@ function cobVolverABase(i){
   const k=_distKey(r.dist);
   const list=_distsForPais(p);
   if(list.some(function(x){return _distKey(x)===k;})){
-    showToast('ℹ️ '+r.dist+' ya está en la base');
+    showToast('ℹ️ '+r.dist+' ya está en la lista');
     _cobRefresh();
     return;
   }
@@ -6309,10 +6329,10 @@ function cobVolverABase(i){
   localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
   _sbPushConfig();
   _cobRefresh();
-  showToast('↩ '+r.dist+' volvió a la base');
+  showToast('↩ '+r.dist+' volvió a la lista de distribuidores');
 }
 
-// Saca al distribuidor de la lista maestra del país indicado, sea o no el activo
+// Saca al distribuidor de Config → Distribuidores del país indicado, sea o no el activo
 function _cobRemoveFromMaster(dist,pais){
   const p=(pais||cfg.pais||'').toUpperCase();
   const k=_distKey(dist);
@@ -6356,7 +6376,7 @@ function renderGlobalAE(){
   if(!wrap) return;
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const _glPaisAE=(document.getElementById('gl-pais')||{}).value||'';
-  const evAudits=_actSaved().filter(function(a){return (!ed||a.edicion===ed)&&(!_glPaisAE||a.pais===_glPaisAE)&&a.scores;});
+  const evAudits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!_glPaisAE||a.pais===_glPaisAE)&&a.scores;});
   const aeAudits=autoevals.filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
   if(!aeAudits.length){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🟣 No hay autoevaluaciones importadas para la edición seleccionada.</div>';
@@ -6768,7 +6788,7 @@ function getFilteredSaved(){
   _populateGlPais();
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const pais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
-  return _actSaved().filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
+  return saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
 }
 function renderGlobal(){
   const data=getFilteredSaved();
@@ -8393,7 +8413,7 @@ async function generatePPTX(){
   const W=13.3,H=7.5;
 
   // ── Data preparation
-  const data = _actSaved().filter(a=>a.scores&&a.scores.total!==undefined);
+  const data = saved.filter(a=>a.scores&&a.scores.total!==undefined);
   if(data.length===0){ showToast('⚠️ No hay auditorías guardadas'); return; }
 
   const sortedA=[...data].sort((a,b)=>b.scores.total-a.scores.total);
@@ -10298,7 +10318,7 @@ function exportExcelFull(){
   const wb=XLSX.utils.book_new();
   const _fPais=_userPais||(document.getElementById('saved-fil-pais')||{}).value||'';
   const _fEd=(document.getElementById('saved-fil-ed')||{}).value||'';
-  const _exData=_actSaved().filter(a=>(!_fPais||a.pais===_fPais)&&(!_fEd||a.edicion===_fEd));
+  const _exData=saved.filter(a=>(!_fPais||a.pais===_fPais)&&(!_fEd||a.edicion===_fEd));
 
   // Sheet 1: Resumen General
   const sheets=SHEETS();
@@ -11774,7 +11794,7 @@ function buildNetworkData(){
   }
   const edFil=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const data=_actSaved().filter(a=>(!edFil||a.edicion===edFil)&&(!paisFil||a.pais===paisFil));
+  const data=saved.filter(a=>(!edFil||a.edicion===edFil)&&(!paisFil||a.pais===paisFil));
 
   // resumen
   const resumen=data.map(a=>{
@@ -12307,7 +12327,7 @@ function dcToggle(k,v){_dcOpts[k]=v;dbRenderDeltaCriticos();}
 
 function _dcData(){
   const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const pool=_actSaved().filter(a=>(!paisFil||a.pais===paisFil)&&a.edicion);
+  const pool=saved.filter(a=>(!paisFil||a.pais===paisFil)&&a.edicion);
   const eds=[...new Set(pool.map(a=>a.edicion))].sort();
   if(eds.length<2) return {eds:eds,err:true};
   const selEd=(document.getElementById('nw-ed-filter')||{}).value||'';
@@ -12899,7 +12919,7 @@ function dbRenderDistribuidores(){
   // Latest audit respecting active filters
   const edFilt=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFilt=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const distAudits=_actSaved().filter(a=>a.distribuidor===selDist&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
+  const distAudits=saved.filter(a=>a.distribuidor===selDist&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
   distAudits.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const audit=distAudits[0];
   const answers=audit?audit.answers||{}:{};
@@ -13084,7 +13104,7 @@ function dbRenderNV(){
   const edFilt=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFilt=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
   const loadedDistNames=new Set(r.map(x=>x['Distribuidor']));
-  const loadedAudits=_actSaved().filter(a=>loadedDistNames.has(a.distribuidor)&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
+  const loadedAudits=saved.filter(a=>loadedDistNames.has(a.distribuidor)&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
   loadedAudits.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const auditByDist={};loadedAudits.forEach(a=>{if(!auditByDist[a.distribuidor])auditByDist[a.distribuidor]=a;});
 
@@ -13521,13 +13541,11 @@ function _populatePaisSelect(selId, triggerFn){
 }
 function _cmpSaved(){
   const p=_userPais||(document.getElementById('cmp-pais')||{}).value||'';
-  const s=_actSaved();
-  return p ? s.filter(a=>a.pais===p) : s;
+  return p ? saved.filter(a=>a.pais===p) : saved;
 }
 function _anSaved(){
   const p=_userPais||(document.getElementById('an-pais')||{}).value||'';
-  const s=_actSaved();
-  return p ? s.filter(a=>a.pais===p) : s;
+  return p ? saved.filter(a=>a.pais===p) : saved;
 }
 function onAnPaisChange(){
   initAnalisis();
