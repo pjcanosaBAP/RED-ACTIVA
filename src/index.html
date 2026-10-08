@@ -146,6 +146,26 @@ body.sb-mini .sb-toggle-ico{transform:scaleX(-1);}
 .cp-host{position:relative;}
 @media print{.cp-btn{display:none!important;}}
 
+/* Botones de acción dentro de tarjetas claras (Cobertura) */
+.cob-btn{background:#fff;border:1px solid #d1dae6;color:#51607a;border-radius:5px;
+  padding:3px 9px;font-size:10px;font-weight:700;font-family:'Barlow',sans-serif;
+  letter-spacing:.3px;cursor:pointer;line-height:1.7;white-space:nowrap;
+  transition:background .15s,border-color .15s,color .15s;}
+.cob-btn:hover{background:#eef4fb;border-color:#1a6db5;color:#1a6db5;}
+.cob-btn.cob-warn{color:#b45309;border-color:#fcd34d;}
+.cob-btn.cob-warn:hover{background:#fffbeb;border-color:#d97706;color:#92400e;}
+.cob-btn.cob-danger{color:#c62828;border-color:#f3c4c4;}
+.cob-btn.cob-danger:hover{background:#fef2f2;border-color:#c62828;color:#991b1b;}
+.cob-btn.cob-ok{color:#1b7a3d;border-color:#b7e0c4;}
+.cob-btn.cob-ok:hover{background:#eefaf1;border-color:#1b7a3d;color:#14532d;}
+.cob-choice{display:block;width:100%;text-align:left;padding:11px 13px;margin-bottom:9px;
+  border-radius:9px;border:1px solid #d1dae6;background:#fff;cursor:pointer;
+  font-family:'Barlow',sans-serif;transition:background .15s,border-color .15s;}
+.cob-choice:hover{background:#f6f9fd;border-color:#1a6db5;}
+.cob-choice.cob-choice-danger{border-color:#f3c4c4;}
+.cob-choice.cob-choice-danger:hover{background:#fef2f2;border-color:#c62828;}
+@media print{.cob-btn{display:none!important;}}
+
 /* PANELS */
 .panel{display:none;} .panel.on{display:block;}
 .content{padding:18px 22px;}
@@ -790,7 +810,7 @@ body.sb-mini #sb-pending-panel{display:none!important;}
   .sub-nav { display: none !important; }
   /* Page break before each sub-tab section (except first) */
   #dash-sub-areas, #dash-sub-criticos, #dash-sub-brecha, #dash-sub-evolucion,
-  #global-sub-red, #global-sub-ediciones, #global-sub-ae {
+  #global-sub-red, #global-sub-ediciones, #global-sub-ae, #global-sub-cobertura {
     page-break-before: always;
   }
   /* Sub-tab section label for print orientation */
@@ -814,6 +834,7 @@ body.sb-mini #sb-pending-panel{display:none!important;}
   #global-sub-red::before   { content: "GLOBAL — Análisis de Red"; }
   #global-sub-ediciones::before { content: "GLOBAL — Comparación de Ediciones"; }
   #global-sub-ae::before    { content: "GLOBAL — EV vs Autoevaluación"; }
+  #global-sub-cobertura::before { content: "GLOBAL — Cobertura de la Edición"; }
   /* Gauge and SVG sizing for print */
   .gauge-wrap svg { max-width: 160px !important; }
   /* Heatmap table fits page */
@@ -1410,6 +1431,7 @@ body.readonly .admin-only{display:none!important;}
           <button class="sn-tab" onclick="goGlobalTab('red')">🔬 Análisis de Red</button>
           <button class="sn-tab" onclick="goGlobalTab('ediciones')">📅 Entre Ediciones</button>
           <button class="sn-tab sn-disabled" id="global-tab-ae" onclick="goGlobalTab('ae')">🟣 EV vs AE</button>
+          <button class="sn-tab" id="global-tab-cobertura" onclick="goGlobalTab('cobertura')">🧭 Cobertura</button>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           <button class="btn btn-sm btn-out" onclick="exportExcel()" title="Exportar Excel completo de todas las auditorías">📊 Excel</button>
@@ -1509,6 +1531,15 @@ body.readonly .admin-only{display:none!important;}
         <div id="global-ediciones-content">
           <div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">
             📅 Necesitás auditorías de al menos 2 ediciones para ver la comparación entre ediciones.
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-TAB: Cobertura de la edición -->
+      <div id="global-sub-cobertura" style="display:none">
+        <div id="global-cobertura-content">
+          <div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">
+            🧭 Cobertura de la edición vigente contra la anterior, y alta/baja de distribuidores.
           </div>
         </div>
       </div>
@@ -1903,6 +1934,7 @@ body.readonly .admin-only{display:none!important;}
       <button class="sn-tab" data-tab="analisis" onclick="dbRenderTab('analisis')">🔍 Análisis</button>
       <button class="sn-tab" data-tab="nv" onclick="dbRenderTab('nv')">⚪ No Vinc.</button>
       <button class="sn-tab" data-tab="matriz" onclick="dbRenderTab('matriz')">🧮 Matriz</button>
+      <button class="sn-tab" data-tab="cobertura" onclick="dbRenderTab('cobertura')">🧭 Cobertura</button>
     </div>
     <!-- Panels (populated by JS) -->
     <div id="nw-panels">
@@ -1914,6 +1946,9 @@ body.readonly .admin-only{display:none!important;}
       <div id="nw-panel-distribuidores" class="nw-panel" style="display:none"></div>
       <div id="nw-panel-analisis" class="nw-panel" style="display:none"></div>
       <div id="nw-panel-nv" class="nw-panel" style="display:none"></div>
+      <div id="nw-panel-cobertura" class="nw-panel" style="display:none">
+        <div id="nw-cobertura-content"></div>
+      </div>
       <div id="nw-panel-matriz" class="nw-panel" style="display:none">
         <div class="sc-card">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -2640,6 +2675,52 @@ function _syncDistributors(pais){
   const configured=cfg.dists[p]||[];
   DISTRIBUTORS.length=0;
   [...configured].sort().forEach(d=>DISTRIBUTORS.push(d));
+}
+
+// ── BAJAS POR EDICIÓN ────────────────────────────────────────────────────────
+// cfg.bajas = { PAIS: { EDICION: ["DIST", ...] } }
+// Un distribuidor dado de baja en una edición queda fuera de TODOS los análisis
+// de la red de esa edición y del denominador «auditados / total», pero su
+// historial se conserva y la baja se revierte con un clic.
+function _bajasObj(){
+  if(!cfg.bajas || typeof cfg.bajas!=='object' || Array.isArray(cfg.bajas)) cfg.bajas={};
+  return cfg.bajas;
+}
+function _bajasFor(pais,edicion){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  const e=String(edicion||'');
+  if(!p||!e) return [];
+  return [...((_bajasObj()[p]||{})[e]||[])];
+}
+function _isBaja(dist,edicion,pais){
+  if(!dist||!edicion) return false;
+  const p=(pais||cfg.pais||'').toUpperCase();
+  if(!p) return false;
+  const k=_distKey(dist);
+  return _bajasFor(p,edicion).some(function(x){return _distKey(x)===k;});
+}
+function _isBajaAudit(a){ return !!a && _isBaja(a.distribuidor,a.edicion,a.pais); }
+function _setBaja(dist,edicion,pais,on){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  const e=String(edicion||'');
+  if(!p||!e||!dist) return;
+  const o=_bajasObj();
+  if(!o[p]) o[p]={};
+  const k=_distKey(dist);
+  const cur=(o[p][e]||[]).filter(function(x){return _distKey(x)!==k;});
+  if(on) cur.push(dist);
+  o[p][e]=cur;
+  localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  _sbPushConfig();
+}
+// Base de TODOS los análisis de red: saved sin los registros dados de baja
+function _actSaved(){ return saved.filter(function(a){return !_isBajaAudit(a);}); }
+// Distribuidores de la lista maestra que siguen activos en una edición
+function _activeDistsFor(pais,edicion){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  const base=p?_distsForPais(p):[...DISTRIBUTORS];
+  if(!edicion) return base;
+  return base.filter(function(d){return !_isBaja(d,edicion,p);});
 }
 
 // Load cfg
@@ -4573,6 +4654,10 @@ async function _sbApplyRemoteConfig(){
       _syncDistributors();
       try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
     }
+    // Bajas por edición
+    if(remote.bajas && typeof remote.bajas==='object' && !Array.isArray(remote.bajas)){
+      cfg.bajas=remote.bajas;
+    }
     // Umbrales y pesos
     if(remote.thr) Object.assign(THR, remote.thr);
     // Cargar estructura activa del país/año actual
@@ -4629,6 +4714,7 @@ async function _sbPushConfig(){
       pais: cfg.pais||'URUGUAY',
       anio: cfg.anio||2025,
       dists: _distsObj(),
+      bajas: _bajasObj(),
       thr: {...THR},
       aw: {...AW},
       structures,
@@ -4968,7 +5054,7 @@ function goDashTab(tab){
 }
 
 function goGlobalTab(tab){
-  const tabs=['exec','red','ediciones','ae'];
+  const tabs=['exec','red','ediciones','ae','cobertura'];
   tabs.forEach(t=>{
     const el=document.getElementById('global-sub-'+t);
     if(el) el.style.display=t===tab?'block':'none';
@@ -4979,6 +5065,7 @@ function goGlobalTab(tab){
   if(tab==='red') renderGlobalRed();
   if(tab==='ediciones') renderGlobalEdiciones();
   if(tab==='ae') renderGlobalAE();
+  if(tab==='cobertura') renderGlobalCobertura();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5536,7 +5623,7 @@ function _mxFilters(){
 // mode: 'core' = áreas vinculantes (default) · 'nv' = solo No Vinculantes
 function _mxData(mode){
   const {ed,pais}=_mxFilters();
-  const audits=saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
+  const audits=_actSaved().filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais))
                     .sort((a,b)=>((b.scores||{}).total||0)-((a.scores||{}).total||0));
   // Score recalculado por distribuidor, con sus propios pesos, para tener subattrs
   const cols=audits.map(a=>{
@@ -5796,7 +5883,7 @@ async function exportMatrizRedExcel(mode){
 function renderGlobalRed(){
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const pais=(document.getElementById('gl-pais')||{}).value||'';
-  const audits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
+  const audits=_actSaved().filter(function(a){return (!ed||a.edicion===ed)&&(!pais||a.pais===pais);});
   if(!audits.length) return;
   const failWrap=document.getElementById('global-top-fail');
   const naWrap=document.getElementById('global-top-na');
@@ -5862,7 +5949,7 @@ function renderGlobalEdiciones(){
   const wrap=document.getElementById('global-ediciones-content');
   if(!wrap) return;
   const _glPais=(document.getElementById('gl-pais')||{}).value||'';
-  const _savedForEd=saved.filter(function(a){return !_glPais||a.pais===_glPais;});
+  const _savedForEd=_actSaved().filter(function(a){return !_glPais||a.pais===_glPais;});
   const eds=[].concat(Array.from(new Set(_savedForEd.map(function(a){return a.edicion;}).filter(Boolean)))).sort();
   if(eds.length<2){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">📅 Necesitás auditorías de al menos 2 ediciones para ver la comparación.</div>';
@@ -5909,13 +5996,13 @@ function renderGlobalEdiciones(){
       +'<div style="font-size:11px;color:var(--g600)">'+Math.abs(delta).toFixed(1)+' puntos porcentuales</div>'
       +'</div>';
     const dists=Array.from(new Set(
-      saved.filter(function(a){return a.edicion===prev;}).map(function(a){return a.distribuidor;})
-      .concat(saved.filter(function(a){return a.edicion===cur;}).map(function(a){return a.distribuidor;}))
+      _savedForEd.filter(function(a){return a.edicion===prev;}).map(function(a){return a.distribuidor;})
+      .concat(_savedForEd.filter(function(a){return a.edicion===cur;}).map(function(a){return a.distribuidor;}))
     ));
     const changes=[];
     dists.forEach(function(d){
-      const pAud=saved.find(function(a){return a.distribuidor===d&&a.edicion===prev;});
-      const cAud=saved.find(function(a){return a.distribuidor===d&&a.edicion===cur;});
+      const pAud=_savedForEd.find(function(a){return a.distribuidor===d&&a.edicion===prev;});
+      const cAud=_savedForEd.find(function(a){return a.distribuidor===d&&a.edicion===cur;});
       if(pAud&&cAud){
         const pCat=recomputeCategory(pAud)||'PENDIENTE';
         const cCat=recomputeCategory(cAud)||'PENDIENTE';
@@ -5940,6 +6027,299 @@ function renderGlobalEdiciones(){
 }
 
 // ══════════════════════════════════════════════════════════
+// GLOBAL — COBERTURA DE LA EDICIÓN (altas y bajas)
+// ══════════════════════════════════════════════════════════
+// Compara la edición vigente contra la anterior, distribuidor por distribuidor,
+// y permite dar de baja a los que ya no operan: solo en la edición vigente
+// (reversible, vive en cfg.bajas) o de la base completa (lista maestra, con o
+// sin su historial).
+
+let _cobRows=[];
+
+// Prioriza los filtros de la solapa Red; cae a los del panel global
+function _cobFilters(){
+  const edEl=document.getElementById('nw-ed-filter')||document.getElementById('gl-edicion');
+  const paEl=document.getElementById('nw-pais-filter')||document.getElementById('gl-pais');
+  return {
+    ed:(edEl||{}).value||'',
+    pais:(_userPais||(paEl||{}).value||cfg.pais||'').toUpperCase()
+  };
+}
+// Contenedores donde vive el panel (solapa Red y, si existe, el global)
+function _cobWraps(){
+  return ['nw-cobertura-content','global-cobertura-content']
+    .map(function(id){return document.getElementById(id);}).filter(Boolean);
+}
+function _cobEdsFor(pais){
+  return [...new Set(saved.filter(function(a){return (a.pais||'').toUpperCase()===pais;})
+    .map(function(a){return a.edicion;}).filter(Boolean))].sort();
+}
+const _COB_EST={
+  auditado:{lbl:'✔ Auditado',  cls:'b-green'},
+  pendiente:{lbl:'⏳ Sin evaluar',cls:'b-amber'},
+  'sin-datos':{lbl:'⭕ Sin auditorías',cls:'b-gray'},
+  baja:{lbl:'⛔ Fuera de red',  cls:'b-red'}
+};
+
+function renderGlobalCobertura(){
+  const wraps=_cobWraps();
+  if(!wraps.length) return;
+  const _set=function(html){ wraps.forEach(function(w){ w.innerHTML=html; }); };
+  const f=_cobFilters();
+  const pais=f.pais;
+  if(!pais){
+    _cobRows=[];
+    _set('<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🧭 Elegí un país en el filtro de arriba para ver la cobertura de la edición.</div>');
+    return;
+  }
+  const pool=saved.filter(function(a){return (a.pais||'').toUpperCase()===pais;});
+  const eds=_cobEdsFor(pais);
+  const cur=f.ed||eds[eds.length-1]||String(cfg.anio||'');
+  if(!cur){
+    _cobRows=[];
+    _set('<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🧭 No hay ediciones cargadas para '+pais+'.</div>');
+    return;
+  }
+  const prev=eds.filter(function(e){return e<cur;}).pop()||'';
+  const master=_distsForPais(pais);
+  const masterKeys=new Set(master.map(_distKey));
+
+  // Universo: lista maestra + quien tenga auditoría en la vigente o en la anterior
+  const uni=new Map();
+  const _add=function(n){ if(n&&!uni.has(_distKey(n))) uni.set(_distKey(n),n); };
+  master.forEach(_add);
+  pool.filter(function(a){return a.edicion===cur;}).forEach(function(a){_add(a.distribuidor);});
+  if(prev) pool.filter(function(a){return a.edicion===prev;}).forEach(function(a){_add(a.distribuidor);});
+
+  _cobRows=[...uni.values()].sort(function(a,b){return a.localeCompare(b);}).map(function(d){
+    const k=_distKey(d);
+    const cAud=pool.find(function(a){return _distKey(a.distribuidor)===k&&a.edicion===cur;})||null;
+    const pAud=prev?(pool.find(function(a){return _distKey(a.distribuidor)===k&&a.edicion===prev;})||null):null;
+    const baja=_isBaja(d,cur,pais);
+    return {
+      dist:d, pais:pais, cur:cur, prev:prev, cAud:cAud, pAud:pAud, baja:baja,
+      estado: baja?'baja':cAud?'auditado':pAud?'pendiente':'sin-datos',
+      enMaster: masterKeys.has(k)
+    };
+  });
+
+  // ── KPIs (los dados de baja no cuentan en los promedios) ──
+  const act=_cobRows.filter(function(r){return !r.baja;});
+  const nAud=act.filter(function(r){return r.cAud;}).length;
+  const nPend=act.filter(function(r){return !r.cAud;}).length;
+  const nBaja=_cobRows.length-act.length;
+  const _avg=function(arr){ return arr.length?arr.reduce(function(s,v){return s+v;},0)/arr.length:null; };
+  const avgPrev=_avg(act.filter(function(r){return r.pAud&&r.pAud.scores;}).map(function(r){return r.pAud.scores.total||0;}));
+  const avgCur=_avg(act.filter(function(r){return r.cAud&&r.cAud.scores;}).map(function(r){return r.cAud.scores.total||0;}));
+  // Promedio de la anterior restringido a los que también tienen la vigente —
+  // comparar sobre bases distintas haría que el delta mida altas y bajas, no gestión
+  const pares=act.filter(function(r){return r.pAud&&r.pAud.scores&&r.cAud&&r.cAud.scores;});
+  const avgPrevPar=_avg(pares.map(function(r){return r.pAud.scores.total||0;}));
+  const avgCurPar=_avg(pares.map(function(r){return r.cAud.scores.total||0;}));
+
+  let h='<div class="sc-card" style="margin-bottom:14px"><div class="sc-h3">Cobertura Edición '+cur+(prev?' · comparada contra '+prev:'')+' — '+pais+'</div>';
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">';
+  const _kpi=function(val,lbl,col){
+    return '<div style="flex:1;min-width:120px;background:var(--g50);border-radius:8px;padding:10px 14px">'
+      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:26px;font-weight:900;line-height:1;color:'+col+'">'+val+'</div>'
+      +'<div style="font-size:10px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-top:2px">'+lbl+'</div></div>';
+  };
+  h+=_kpi(nAud+'/'+act.length,'Auditados '+cur,'#2e7d32');
+  h+=_kpi(nPend,'Pendientes','#e65100');
+  h+=_kpi(nBaja,'Fuera de red '+cur,'#c62828');
+  h+=_kpi(avgCur===null?'—':(avgCur*100).toFixed(1)+'%','Promedio '+cur,'#1565c0');
+  h+='</div>';
+  if(avgPrevPar!==null&&avgCurPar!==null){
+    h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--g600);padding-top:8px;border-top:1px solid var(--g100);margin-top:8px">'
+      +'<strong>Base comparable</strong> ('+pares.length+' distribuidor'+(pares.length!==1?'es':'')+' con ambas ediciones):'
+      +'<span>'+prev+' '+(avgPrevPar*100).toFixed(1)+'%</span><span style="color:var(--g400)">→</span>'
+      +'<span>'+cur+' '+(avgCurPar*100).toFixed(1)+'%</span>'
+      +_deltaHTML(avgCurPar-avgPrevPar)+'</div>';
+  } else if(avgPrev!==null&&avgCur!==null){
+    h+='<div style="font-size:11px;color:var(--g500);padding-top:8px;border-top:1px solid var(--g100);margin-top:8px">'
+      +'Promedio '+prev+': '+(avgPrev*100).toFixed(1)+'% · '+cur+': '+(avgCur*100).toFixed(1)+'% — sin distribuidores con ambas ediciones para comparar base contra base.</div>';
+  }
+  h+='</div>';
+
+  if(!prev){
+    h+='<div class="sc-card" style="margin-bottom:14px"><div style="font-size:11px;color:var(--g500)">'
+      +'📅 No hay una edición anterior a '+cur+' para '+pais+'. La tabla muestra solo el estado de la edición vigente.</div></div>';
+  }
+
+  // ── Tabla comparativa ──
+  h+='<div class="sc-card"><div class="sc-h3">Edición Anterior vs. Vigente · Distribuidor por Distribuidor</div>';
+  h+='<div style="overflow-x:auto"><table class="aq-table"><thead><tr>'
+    +'<th>Distribuidor</th>'
+    +(prev?'<th style="text-align:right">'+prev+'</th>':'')
+    +'<th style="text-align:right">'+cur+'</th>'
+    +(prev?'<th style="text-align:center">Δ</th>':'')
+    +(prev?'<th>Cat. '+prev+'</th>':'')
+    +'<th>Cat. '+cur+'</th>'
+    +'<th>Estado</th><th style="text-align:right">Acciones</th>'
+    +'</tr></thead><tbody>';
+  const _pc=function(a){ return a&&a.scores?pctBadge(((a.scores.total||0)*100).toFixed(1)):'<span style="color:var(--g300)">—</span>'; };
+  _cobRows.forEach(function(r,i){
+    const dim=r.baja?'opacity:.5;':'';
+    h+='<tr style="'+dim+'">'
+      +'<td style="font-weight:700">'+r.dist+(r.enMaster?'':' <span style="font-size:9px;color:var(--g400);font-weight:400">(fuera de la lista maestra)</span>')+'</td>';
+    if(prev) h+='<td style="text-align:right">'+_pc(r.pAud)+'</td>';
+    h+='<td style="text-align:right">'+_pc(r.cAud)+'</td>';
+    if(prev){
+      const dd=(r.pAud&&r.pAud.scores&&r.cAud&&r.cAud.scores)
+        ? _deltaHTML((r.cAud.scores.total||0)-(r.pAud.scores.total||0))
+        : '<span style="color:var(--g300)">—</span>';
+      h+='<td style="text-align:center">'+dd+'</td>';
+    }
+    if(prev) h+='<td>'+(r.pAud?catBadge(recomputeCategory(r.pAud)):'<span style="color:var(--g300)">—</span>')+'</td>';
+    h+='<td>'+(r.cAud?catBadge(recomputeCategory(r.cAud)):'<span style="color:var(--g300)">—</span>')+'</td>';
+    const es=_COB_EST[r.estado];
+    h+='<td><span class="badge '+es.cls+'">'+es.lbl+'</span></td>';
+    h+='<td style="text-align:right;white-space:nowrap">';
+    if(r.baja){
+      h+='<button class="cob-btn cob-ok" onclick="cobReactivar('+i+')" title="Volver a incluirlo en los análisis de '+cur+'">↩ Reactivar</button> ';
+    } else if(!r.cAud){
+      h+='<button class="cob-btn cob-warn" onclick="cobDarBaja('+i+')" title="Excluirlo de todos los análisis de '+cur+'. Reversible; el historial se conserva">⛔ Baja '+cur+'</button> ';
+    }
+    h+='<button class="cob-btn cob-danger" onclick="cobBajaBase('+i+')" title="Sacarlo de la lista maestra de distribuidores">🗑 Base</button>';
+    h+='</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div style="margin-top:10px;font-size:10px;color:var(--g500);line-height:1.7">'
+    +'<strong>⛔ Baja '+cur+'</strong> — lo saca de todos los análisis de la red de esa edición y del denominador «auditados / total». Su historial queda intacto y se revierte con ↩ Reactivar.<br>'
+    +'<strong>🗑 Base</strong> — lo saca de la lista maestra de distribuidores. Al confirmar elegís si se conserva o se borra su historial de auditorías.'
+    +'</div>';
+  h+='</div>';
+  _set(h);
+  try{ cpInjectButtons(); }catch(e){}
+}
+
+// ── Acciones: baja por edición (reversible) ─────────────────────────────────
+function cobDarBaja(i){
+  const r=_cobRows[i]; if(!r) return;
+  if(!confirm('¿Dar de baja a '+r.dist+' en la edición '+r.cur+'?\n\n'
+    +'Queda fuera de todos los análisis de la red de '+r.cur+' y del denominador.\n'
+    +'Su historial se conserva y podés reactivarlo cuando quieras.')) return;
+  _setBaja(r.dist,r.cur,r.pais,true);
+  _cobRefresh();
+  showToast('⛔ '+r.dist+' fuera de la red en '+r.cur);
+}
+function cobReactivar(i){
+  const r=_cobRows[i]; if(!r) return;
+  _setBaja(r.dist,r.cur,r.pais,false);
+  _cobRefresh();
+  showToast('↩ '+r.dist+' reactivado en '+r.cur);
+}
+
+// ── Acciones: baja de la base (elige conservar o borrar historial) ──────────
+function cobBajaBase(i){
+  const r=_cobRows[i]; if(!r) return;
+  const k=_distKey(r.dist);
+  const aud=saved.filter(function(a){return _distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais;});
+  const aes=autoevals.filter(function(a){return _distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais;});
+  const eds=[...new Set(aud.map(function(a){return a.edicion;}).filter(Boolean))].sort().join(', ')||'ninguna';
+  const frozen=aud.filter(function(a){return a.frozen;}).length;
+
+  const ov=document.createElement('div');
+  ov.id='cob-modal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">'
+    +'<div style="padding:16px 20px;border-bottom:1px solid var(--g200)">'
+      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:900;color:var(--g700)">Dar de baja de la base</div>'
+      +'<div style="font-size:12px;color:var(--g500);margin-top:2px">'+r.dist+' · '+r.pais+'</div>'
+    +'</div>'
+    +'<div style="padding:16px 20px;font-size:12px;color:var(--g600);line-height:1.7">'
+      +'<div style="background:var(--g50);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px">'
+        +'Auditorías en la base: <strong>'+aud.length+'</strong> ('+eds+')'
+        +(frozen?' · <strong>'+frozen+' congelada'+(frozen!==1?'s':'')+'</strong>':'')
+        +'<br>Autoevaluaciones: <strong>'+aes.length+'</strong>'
+      +'</div>'
+      +'<div style="font-weight:700;color:var(--g700);margin-bottom:8px">¿Qué hacemos con su historial?</div>'
+      +'<button class="cob-choice" onclick="_cobBajaBaseDo('+i+',\'keep\')">'
+        +'<div style="font-weight:800;font-size:13px;color:var(--g700)">Conservar el historial</div>'
+        +'<div style="font-size:11px;color:var(--g500);margin-top:3px;line-height:1.5">Sale de la lista maestra y del denominador. Sus auditorías siguen consultables en los análisis históricos.</div>'
+      +'</button>'
+      +'<button class="cob-choice cob-choice-danger" onclick="_cobBajaBaseDo('+i+',\'purge\')">'
+        +'<div style="font-weight:800;font-size:13px;color:#c62828">Borrado total</div>'
+        +'<div style="font-size:11px;color:var(--g500);margin-top:3px;line-height:1.5">Borra el distribuidor y sus '+aud.length+' auditoría(s) y '+aes.length+' autoevaluación(es) de todas las ediciones, también en Supabase. Irreversible.</div>'
+      +'</button>'
+    +'</div>'
+    +'<div style="padding:12px 20px;border-top:1px solid var(--g200);text-align:right">'
+      +'<button class="cob-btn" onclick="_cobModalClose()">Cancelar</button>'
+    +'</div>'
+  +'</div>';
+  ov.addEventListener('click',function(ev){ if(ev.target===ov) _cobModalClose(); });
+  document.body.appendChild(ov);
+}
+function _cobModalClose(){
+  const el=document.getElementById('cob-modal');
+  if(el&&el.parentNode) el.parentNode.removeChild(el);
+}
+function _cobBajaBaseDo(i,mode){
+  const r=_cobRows[i]; if(!r){ _cobModalClose(); return; }
+  const k=_distKey(r.dist);
+  if(mode==='purge'){
+    const aud=saved.filter(function(a){return _distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais;});
+    const frozen=aud.filter(function(a){return a.frozen;}).length;
+    if(!confirm('BORRADO TOTAL de '+r.dist+'\n\n'
+      +'Se eliminan '+aud.length+' auditoría(s)'+(frozen?' ('+frozen+' congelada/s)':'')+' y sus autoevaluaciones, de todas las ediciones.\n'
+      +'Esta acción no se puede deshacer. ¿Confirmás?')) return;
+    const audIds=aud.map(function(a){return String(a.id);});
+    const aeIds=autoevals.filter(function(a){return _distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais;})
+      .map(function(a){return String(a.id);});
+    saved=saved.filter(function(a){return !(_distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais);});
+    autoevals=autoevals.filter(function(a){return !(_distKey(a.distribuidor)===k&&(a.pais||'').toUpperCase()===r.pais);});
+    if(_sbc&&_sbOnline){
+      if(audIds.length) _sbc.from('audits').delete().in('id',audIds)
+        .then(function(res){ if(res.error) console.warn('[SB] cobBajaBase audits:',res.error.message); });
+      if(aeIds.length) _sbc.from('autoevals').delete().in('id',aeIds)
+        .then(function(res){ if(res.error) console.warn('[SB] cobBajaBase autoevals:',res.error.message); });
+    }
+    persist();
+  }
+  _cobRemoveFromMaster(r.dist,r.pais);
+  _cobClearBajas(r.dist,r.pais);
+  _cobModalClose();
+  _cobRefresh();
+  try{ renderSaved(); updateAudCnt(); }catch(e){}
+  showToast(mode==='purge'?'🗑 '+r.dist+' borrado de la base y del historial':'🗑 '+r.dist+' fuera de la base (historial conservado)');
+}
+
+// Saca al distribuidor de la lista maestra del país indicado, sea o no el activo
+function _cobRemoveFromMaster(dist,pais){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  const k=_distKey(dist);
+  const list=_distsForPais(p).filter(function(x){return _distKey(x)!==k;});
+  _saveDistsForPais(list,p);
+  if(p===(cfg.pais||'').toUpperCase()){
+    _syncDistributors();
+    try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+  }
+  localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  _sbPushConfig();
+}
+// Limpia sus bajas por edición: ya no está en la base, la marca pierde sentido
+function _cobClearBajas(dist,pais){
+  const p=(pais||cfg.pais||'').toUpperCase();
+  const k=_distKey(dist);
+  const o=_bajasObj();
+  if(!o[p]) return;
+  Object.keys(o[p]).forEach(function(e){
+    o[p][e]=(o[p][e]||[]).filter(function(x){return _distKey(x)!==k;});
+  });
+  localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  _sbPushConfig();
+}
+// Rerender de la cobertura + de todo lo que depende del padrón
+function _cobRefresh(){
+  renderGlobalCobertura();
+  try{ buildNetworkData(); }catch(e){}
+  try{ renderGlobal(); }catch(e){}
+  try{ renderGlobalRed(); }catch(e){}
+  try{ renderGlobalEdiciones(); }catch(e){}
+  try{ initAnalisis(); }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════════
 // GLOBAL — EV vs AE SCATTER
 // ══════════════════════════════════════════════════════════
 
@@ -5948,7 +6328,7 @@ function renderGlobalAE(){
   if(!wrap) return;
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const _glPaisAE=(document.getElementById('gl-pais')||{}).value||'';
-  const evAudits=saved.filter(function(a){return (!ed||a.edicion===ed)&&(!_glPaisAE||a.pais===_glPaisAE)&&a.scores;});
+  const evAudits=_actSaved().filter(function(a){return (!ed||a.edicion===ed)&&(!_glPaisAE||a.pais===_glPaisAE)&&a.scores;});
   const aeAudits=autoevals.filter(function(a){return (!ed||a.edicion===ed)&&a.scores;});
   if(!aeAudits.length){
     wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400);font-size:12px">🟣 No hay autoevaluaciones importadas para la edición seleccionada.</div>';
@@ -6360,14 +6740,15 @@ function getFilteredSaved(){
   _populateGlPais();
   const ed=(document.getElementById('gl-edicion')||{}).value||'';
   const pais=_userPais||(document.getElementById('gl-pais')||{}).value||'';
-  return saved.filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
+  return _actSaved().filter(a=>(!ed||a.edicion===ed)&&(!pais||a.pais===pais));
 }
 function renderGlobal(){
   const data=getFilteredSaved();
-  const _glPaisCur=(document.getElementById('gl-pais')||{}).value||'';
-  // Show count/total for current active config; if filtering by pais just show count
-  document.getElementById('gl-auditados').textContent=
-    _glPaisCur ? (data.length||0) : (data.length||0)+'/'+DISTRIBUTORS.length;
+  // Denominador: padrón activo del país/edición — los dados de baja no cuentan
+  const _glEdCur=(document.getElementById('gl-edicion')||{}).value||'';
+  const _glPaisEff=(_userPais||(document.getElementById('gl-pais')||{}).value||cfg.pais||'').toUpperCase();
+  const _glTot=_glPaisEff?_activeDistsFor(_glPaisEff,_glEdCur).length:DISTRIBUTORS.length;
+  document.getElementById('gl-auditados').textContent=(data.length||0)+'/'+_glTot;
   if(!data.length){
     ['ranking-bars','global-table-wrap','cross-table-wrap','global-areas','cat-dist-wrap'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.innerHTML='<p style="padding:20px 0;font-size:12px;color:var(--g400)">Sin datos para la edición seleccionada. Importá tu JSON desde Configuración.</p>';
@@ -7984,7 +8365,7 @@ async function generatePPTX(){
   const W=13.3,H=7.5;
 
   // ── Data preparation
-  const data = saved.filter(a=>a.scores&&a.scores.total!==undefined);
+  const data = _actSaved().filter(a=>a.scores&&a.scores.total!==undefined);
   if(data.length===0){ showToast('⚠️ No hay auditorías guardadas'); return; }
 
   const sortedA=[...data].sort((a,b)=>b.scores.total-a.scores.total);
@@ -9889,7 +10270,7 @@ function exportExcelFull(){
   const wb=XLSX.utils.book_new();
   const _fPais=_userPais||(document.getElementById('saved-fil-pais')||{}).value||'';
   const _fEd=(document.getElementById('saved-fil-ed')||{}).value||'';
-  const _exData=saved.filter(a=>(!_fPais||a.pais===_fPais)&&(!_fEd||a.edicion===_fEd));
+  const _exData=_actSaved().filter(a=>(!_fPais||a.pais===_fPais)&&(!_fEd||a.edicion===_fEd));
 
   // Sheet 1: Resumen General
   const sheets=SHEETS();
@@ -11365,7 +11746,7 @@ function buildNetworkData(){
   }
   const edFil=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const data=saved.filter(a=>(!edFil||a.edicion===edFil)&&(!paisFil||a.pais===paisFil));
+  const data=_actSaved().filter(a=>(!edFil||a.edicion===edFil)&&(!paisFil||a.pais===paisFil));
 
   // resumen
   const resumen=data.map(a=>{
@@ -11414,6 +11795,7 @@ function dbRenderTab(t){
     case 'analisis':      dbRenderAnalisisEspecial();break;
     case 'nv':            dbRenderNV();renderMatrizRed('nv');break;
     case 'matriz':        renderMatrizRed('core');break;
+    case 'cobertura':     renderGlobalCobertura();break;
   }
 }
 
@@ -11897,7 +12279,7 @@ function dcToggle(k,v){_dcOpts[k]=v;dbRenderDeltaCriticos();}
 
 function _dcData(){
   const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const pool=saved.filter(a=>(!paisFil||a.pais===paisFil)&&a.edicion);
+  const pool=_actSaved().filter(a=>(!paisFil||a.pais===paisFil)&&a.edicion);
   const eds=[...new Set(pool.map(a=>a.edicion))].sort();
   if(eds.length<2) return {eds:eds,err:true};
   const selEd=(document.getElementById('nw-ed-filter')||{}).value||'';
@@ -12489,7 +12871,7 @@ function dbRenderDistribuidores(){
   // Latest audit respecting active filters
   const edFilt=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFilt=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
-  const distAudits=saved.filter(a=>a.distribuidor===selDist&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
+  const distAudits=_actSaved().filter(a=>a.distribuidor===selDist&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
   distAudits.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const audit=distAudits[0];
   const answers=audit?audit.answers||{}:{};
@@ -12674,7 +13056,7 @@ function dbRenderNV(){
   const edFilt=(document.getElementById('nw-ed-filter')||{}).value||'';
   const paisFilt=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
   const loadedDistNames=new Set(r.map(x=>x['Distribuidor']));
-  const loadedAudits=saved.filter(a=>loadedDistNames.has(a.distribuidor)&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
+  const loadedAudits=_actSaved().filter(a=>loadedDistNames.has(a.distribuidor)&&(!edFilt||a.edicion===edFilt)&&(!paisFilt||a.pais===paisFilt));
   loadedAudits.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const auditByDist={};loadedAudits.forEach(a=>{if(!auditByDist[a.distribuidor])auditByDist[a.distribuidor]=a;});
 
@@ -13111,11 +13493,13 @@ function _populatePaisSelect(selId, triggerFn){
 }
 function _cmpSaved(){
   const p=_userPais||(document.getElementById('cmp-pais')||{}).value||'';
-  return p ? saved.filter(a=>a.pais===p) : saved;
+  const s=_actSaved();
+  return p ? s.filter(a=>a.pais===p) : s;
 }
 function _anSaved(){
   const p=_userPais||(document.getElementById('an-pais')||{}).value||'';
-  return p ? saved.filter(a=>a.pais===p) : saved;
+  const s=_actSaved();
+  return p ? s.filter(a=>a.pais===p) : s;
 }
 function onAnPaisChange(){
   initAnalisis();
@@ -13248,7 +13632,7 @@ function renderCompareEditions() {
 
   // ── Card 4: Evolución por distribuidor (table with category per edition) ──
   if (editions.length > 0) {
-    const allDists = [...new Set(saved.map(a=>a.distribuidor))].sort();
+    const allDists = [...new Set(_cs.map(a=>a.distribuidor))].sort();
     html += `<div class="cmp-edition-block">
       <div class="cmp-edition-title">👥 Evolución por Distribuidor</div>
       <div style="overflow-x:auto"><table class="tbl" style="font-size:11px"><thead><tr>
@@ -13410,7 +13794,8 @@ function printCurrentTab(){
     renderGlobalRed();
     renderGlobalEdiciones();
     renderGlobalAE();
-    ['exec','red','ediciones','ae'].forEach(function(t){
+    renderGlobalCobertura();
+    ['exec','red','ediciones','ae','cobertura'].forEach(function(t){
       const el=document.getElementById('global-sub-'+t);
       if(el && el.style.display==='none'){ el.style.display='block'; hiddenSubTabs.push(el); }
     });
