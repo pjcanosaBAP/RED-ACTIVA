@@ -6175,6 +6175,9 @@ function renderGlobalCobertura(){
     const es=_COB_EST[r.estado];
     h+='<td><span class="badge '+es.cls+'">'+es.lbl+'</span></td>';
     h+='<td style="text-align:right;white-space:nowrap">';
+    if(!r.enMaster){
+      h+='<button class="cob-btn cob-ok" onclick="cobVolverABase('+i+')" title="Volver a agregarlo a la lista maestra de distribuidores">↩ A la base</button> ';
+    }
     if(r.baja){
       h+='<button class="cob-btn cob-ok" onclick="cobReactivar('+i+')" title="Volver a incluirlo en los análisis de '+cur+'">↩ Reactivar</button> ';
     } else if(!r.cAud){
@@ -6282,6 +6285,31 @@ function _cobBajaBaseDo(i,mode){
   _cobRefresh();
   try{ renderSaved(); updateAudCnt(); }catch(e){}
   showToast(mode==='purge'?'🗑 '+r.dist+' borrado de la base y del historial':'🗑 '+r.dist+' fuera de la base (historial conservado)');
+}
+
+// Reversa de la baja de base: lo devuelve a la lista maestra conservando el
+// nombre con el que quedaron escritas sus auditorías
+function cobVolverABase(i){
+  const r=_cobRows[i]; if(!r) return;
+  const p=(r.pais||cfg.pais||'').toUpperCase();
+  const k=_distKey(r.dist);
+  const list=_distsForPais(p);
+  if(list.some(function(x){return _distKey(x)===k;})){
+    showToast('ℹ️ '+r.dist+' ya está en la base');
+    _cobRefresh();
+    return;
+  }
+  list.push(r.dist);
+  list.sort();
+  _saveDistsForPais(list,p);
+  if(p===(cfg.pais||'').toUpperCase()){
+    _syncDistributors();
+    try{ renderCfgDists(); rebuildDistSelect(); }catch(e){}
+  }
+  localStorage.setItem('bpl_cfg_v5',JSON.stringify(cfg));
+  _sbPushConfig();
+  _cobRefresh();
+  showToast('↩ '+r.dist+' volvió a la base');
 }
 
 // Saca al distribuidor de la lista maestra del país indicado, sea o no el activo
