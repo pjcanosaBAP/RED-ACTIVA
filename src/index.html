@@ -11433,9 +11433,50 @@ function renderNetworkDashboard(){
 // Compara la edición seleccionada contra la inmediatamente anterior: cuántos
 // distribuidores hay en cada categoría, cómo se movieron entre categorías y
 // quién subió o bajó. Solo lee datos: no modifica ninguna auditoría.
+//
+// SIMULACIÓN: mientras la edición vigente no esté cerrada hay críticos que
+// figuran como no cumplidos sólo porque todavía no se auditaron. El panel
+// permite simular una columna extra asumiendo que un crítico lo cumplen en la
+// edición vigente los mismos que lo cumplían en la anterior. Es una proyección
+// de pantalla: no toca las auditorías ni se guarda en ningún lado.
 
 const CAT_ORDEN=['PROACTIVO','ACTIVO','REACTIVO','INACTIVO']; // 0 = mejor
 const _catAb={PROACTIVO:'PRO',ACTIVO:'ACT',REACTIVO:'REA',INACTIVO:'INA'};
+let _catSimOn=true;            // la columna simulada arranca visible
+let _catSimTag='CRITICO 2';    // crítico a simular
+
+function catToggleSim(on){ _catSimOn=!!on; dbRenderCategorias(); }
+function catSetSimCrit(tag){ _catSimTag=tag||''; dbRenderCategorias(); }
+function _catCrit(){ return CRIT_LIST.find(function(c){return c.tag===_catSimTag;})||null; }
+
+// Proyecta el score y la categoría de la edición vigente asumiendo que el
+// crítico elegido se cumple igual que en la edición anterior.
+function _catSimCalc(a1,a2,crit){
+  const real={aplica:false,total:a2?((a2.scores||{}).total||0)*100:null,cat:a2?recomputeCategory(a2):'',cambia:false};
+  if(!a2||!crit||!(crit.qs||[]).length) return real;
+  const qs=crit.qs, ans2=a2.answers||{};
+  const yaCumple=qs.every(function(q){return ans2[q]==='si';});
+  const cumplioAntes=!!a1&&qs.every(function(q){return (a1.answers||{})[q]==='si';});
+  if(yaCumple||!cumplioAntes) return real;
+  let base,sim;
+  try{
+    const w=_mxSanW(a2.weights);
+    base=computeScores(ans2,w);
+    const mod=Object.assign({},ans2);
+    qs.forEach(function(q){ mod[q]='si'; });
+    sim=computeScores(mod,w);
+  }catch(e){ return real; }
+  // Anclado al score guardado: se suma sólo lo que aporta el crítico, así la
+  // proyección no se mueve por diferencias de estructura activa.
+  const stored=(a2.scores||{}).total||0;
+  const storedCrit=(a2.scores||{}).critMet||0;
+  const total=Math.max(0,Math.min(1,stored+(sim.total-base.total)));
+  const critMet=storedCrit+(sim.critMet-base.critMet);
+  const catSim=recomputeCategory({scores:{total:total,critMet:critMet},weights:a2.weights});
+  // Base recalculada con el mismo criterio, para aislar el efecto del crítico
+  const catBase=recomputeCategory({scores:{total:stored,critMet:storedCrit},weights:a2.weights});
+  return {aplica:true,total:total*100,cat:catSim,critMet:critMet,cambia:catSim!==catBase};
+}
 
 function _catData(){
   const paisFil=_userPais||(document.getElementById('nw-pais-filter')||{}).value||'';
@@ -11447,6 +11488,7 @@ function _catData(){
   const ci=eds.indexOf(cur);
   if(ci<1) return {eds:eds,cur:cur,err:true,pool:pool};
   const prev=eds[ci-1];
+  const crit=_catCrit();
 
   // Si hay más de una auditoría por distribuidor y edición, manda la más reciente
   const pick=function(d,e){
@@ -11454,7 +11496,6 @@ function _catData(){
     return pool.filter(function(a){return _distKey(a.distribuidor)===k&&a.edicion===e;})
                .sort(function(x,y){return String(y.fecha||'').localeCompare(String(x.fecha||''));})[0];
   };
-  // Universo: quien tenga auditoría en cualquiera de las dos ediciones
   const uni=new Map();
   pool.filter(function(a){return a.edicion===prev||a.edicion===cur;})
       .forEach(function(a){ if(!uni.has(_distKey(a.distribuidor))) uni.set(_distKey(a.distribuidor),a.distribuidor); });
@@ -11472,10 +11513,11 @@ function _catData(){
       n:d, c1:c1, c2:c2, mov:mov,
       t1:a1?((a1.scores||{}).total||0)*100:null,
       t2:a2?((a2.scores||{}).total||0)*100:null,
+      sim:_catSimCalc(a1,a2,crit),
       saltos:(r1>=0&&r2>=0)?(r1-r2):0  // + sube, - baja
     };
   });
-  return {eds:eds,cur:cur,prev:prev,rows:rows,pool:pool};
+  return {eds:eds,cur:cur,prev:prev,rows:rows,pool:pool,crit:crit};
 }
 
 // Reparto por categoría de una edición: cantidad y promedio
@@ -11486,6 +11528,20 @@ function _catReparto(pool,ed){
   pool.filter(function(a){return a.edicion===ed&&a.scores;}).forEach(function(a){
     const c=recomputeCategory(a);
     const t=((a.scores||{}).total||0)*100;
+    if(out[c]){ out[c].n++; out[c].suma+=t; }
+    n++; suma+=t;
+  });
+  CAT_ORDEN.forEach(function(c){ out[c].prom=out[c].n?out[c].suma/out[c].n:null; });
+  out.__total={n:n,prom:n?suma/n:null};
+  return out;
+}
+// Reparto simulado: mismas auditorías de la edición vigente, con el crítico proyectado
+function _catRepartoSim(rows){
+  const out={};
+  CAT_ORDEN.forEach(function(c){ out[c]={n:0,suma:0}; });
+  let n=0,suma=0;
+  rows.filter(function(r){return r.t2!==null;}).forEach(function(r){
+    const c=r.sim.cat, t=r.sim.total;
     if(out[c]){ out[c].n++; out[c].suma+=t; }
     n++; suma+=t;
   });
@@ -11506,6 +11562,15 @@ function _catDeltaN(v){
   if(v<0) return '<span style="color:#d93025;font-weight:700">'+v+'</span>';
   return '<span style="color:#7a90a8">=</span>';
 }
+// Cantidad + porcentaje con anchos fijos: mantiene alineada la columna
+function _catNPct(n,tot,sinPct){
+  const pct=tot?Math.round(n/tot*100):0;
+  return '<span style="display:inline-block;width:26px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">'+n+'</span>'
+    +'<span style="display:inline-block;width:34px;text-align:right;color:#a9b6c6;font-size:10px;font-variant-numeric:tabular-nums">'+(sinPct?'':pct+'%')+'</span>';
+}
+function _catProm(v){
+  return '<span style="font-variant-numeric:tabular-nums">'+(v===null||v===undefined?'—':v.toFixed(1)+'%')+'</span>';
+}
 
 function dbRenderCategorias(){
   const el=document.getElementById('nw-panel-categorias'); if(!el) return;
@@ -11516,8 +11581,10 @@ function dbRenderCategorias(){
       +(D.eds&&D.eds.length?' (disponibles: '+D.eds.join(', ')+').':'.')+'</p></div>';
     return;
   }
-  const prev=D.prev, cur=D.cur, rows=D.rows;
+  const prev=D.prev, cur=D.cur, rows=D.rows, crit=D.crit;
   const rp=_catReparto(D.pool,prev), rc=_catReparto(D.pool,cur);
+  const sim=_catSimOn&&crit;
+  const rs=sim?_catRepartoSim(rows):null;
 
   const nSube=rows.filter(function(r){return r.mov==='sube';}).length;
   const nBaja=rows.filter(function(r){return r.mov==='baja';}).length;
@@ -11525,7 +11592,10 @@ function dbRenderCategorias(){
   const nNuevo=rows.filter(function(r){return r.mov==='nuevo';}).length;
   const nFalta=rows.filter(function(r){return r.mov==='falta';}).length;
   const comparables=nSube+nBaja+nIgual;
+  const simAplica=rows.filter(function(r){return r.sim&&r.sim.aplica;}).length;
+  const simCambia=rows.filter(function(r){return r.sim&&r.sim.aplica&&r.sim.cambia;}).length;
 
+  const SIMC='#7c3aed';
   let h='';
 
   // ── 1. KPIs del movimiento ────────────────────────────────────────────────
@@ -11536,12 +11606,12 @@ function dbRenderCategorias(){
       +(sub?'<div style="font-size:10px;color:#a9b6c6;margin-top:1px">'+sub+'</div>':'')+'</div>';
   };
   h+='<div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Movimiento de Categorías · '+prev+' → '+cur+'</span>'
-    +'<span class="cit" data-tip="Compara la categoría de cada distribuidor entre las dos ediciones. Solo entran los que tienen auditoría en ambas; los que falta una se listan aparte.">ℹ</span></div>';
+    +'<span class="cit" data-tip="Compara la categoría de cada distribuidor entre las dos ediciones. Solo entran los que tienen auditoría en ambas; los que les falta una se listan aparte.">ℹ</span></div>';
   h+='<div style="display:flex;gap:9px;flex-wrap:wrap">';
   h+=kpi('▲ '+nSube,'Subieron','#1d9e6f');
   h+=kpi('= '+nIgual,'Se mantuvieron','#7a90a8');
   h+=kpi('▼ '+nBaja,'Bajaron','#d93025');
-  h+=kpi(comparables,'Comparables',' #2f7dc8'.trim(),'con ambas ediciones');
+  h+=kpi(comparables,'Comparables','#2f7dc8','con ambas ediciones');
   const dProm=(rc.__total.prom!==null&&rp.__total.prom!==null)?(rc.__total.prom-rp.__total.prom):null;
   h+=kpi((rc.__total.prom===null?'—':rc.__total.prom.toFixed(1)+'%'),'Promedio '+cur,'#1a6db5',
     (dProm===null?'':'vs '+rp.__total.prom.toFixed(1)+'% en '+prev));
@@ -11554,53 +11624,95 @@ function dbRenderCategorias(){
   }
   h+='</div>';
 
-  // ── 2. Totales por categoría ──────────────────────────────────────────────
+  // ── 2. Control de la simulación ───────────────────────────────────────────
+  h+='<div class="db-card" style="border-left:3px solid '+SIMC+'">'
+    +'<div class="db-card-hd"><span class="db-card-ttl" style="color:'+SIMC+'">Columna Simulada · edición en curso</span></div>'
+    +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#51607a">'
+    +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700">'
+      +'<input type="checkbox" '+(_catSimOn?'checked':'')+' onchange="catToggleSim(this.checked)" style="cursor:pointer"> Mostrar simulación'
+    +'</label>'
+    +'<label style="display:flex;align-items:center;gap:6px">Crítico: '
+      +'<select class="db-sel" onchange="catSetSimCrit(this.value)">'
+      +CRIT_LIST.map(function(c){
+         return '<option value="'+c.tag+'"'+(c.tag===_catSimTag?' selected':'')+'>'+c.tag+' · '+(c.subattr||c.bpl_name||'')+'</option>';
+       }).join('')
+      +'</select></label>'
+    +'</div>';
+  if(sim){
+    h+='<div style="margin-top:9px;font-size:11px;color:#51607a;line-height:1.7;background:#faf7ff;border-radius:7px;padding:9px 11px">'
+      +'Proyecta el score y la categoría de <strong>'+cur+'</strong> asumiendo que <strong>'+crit.tag+'</strong> ('+(crit.subattr||crit.bpl_name||'')+') '
+      +'lo cumplen los mismos que lo cumplían en '+prev+'. '
+      +'Aplica a <strong>'+simAplica+'</strong> distribuidor'+(simAplica!==1?'es':'')+' que lo cumplían en '+prev+' y hoy figuran sin cumplirlo'
+      +(simCambia?', de los cuales <strong>'+simCambia+'</strong> cambiaría'+(simCambia!==1?'n':'')+' de categoría':'')+'.<br>'
+      +'<strong>Es una proyección de pantalla:</strong> no modifica ninguna auditoría ni se guarda. Las columnas simuladas van en violeta.'
+      +'</div>';
+  } else if(_catSimOn&&!crit){
+    h+='<div style="margin-top:9px;font-size:11px;color:#c0392b">No se encontró el crítico seleccionado en la estructura activa.</div>';
+  }
+  h+='</div>';
+
+  // ── 3. Totales por categoría ──────────────────────────────────────────────
+  const nCols=sim?9:7;
   h+='<div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Totales por Categoría</span>'
     +'<span class="cit" data-tip="Cuántos distribuidores hay en cada categoría en cada edición y qué promedio de score tienen. Cuenta todas las auditorías de la edición, tengan o no comparación.">ℹ</span></div>';
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-    +'<thead><tr style="border-bottom:2px solid #d1dae6;color:#7a90a8;font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
-    +'<th style="text-align:left;padding:7px 6px">Categoría</th>'
-    +'<th style="text-align:right;padding:7px 6px">'+prev+'</th>'
-    +'<th style="text-align:right;padding:7px 6px">'+cur+'</th>'
-    +'<th style="text-align:center;padding:7px 6px">Δ cant.</th>'
-    +'<th style="text-align:right;padding:7px 6px">Prom. '+prev+'</th>'
-    +'<th style="text-align:right;padding:7px 6px">Prom. '+cur+'</th>'
-    +'<th style="text-align:center;padding:7px 6px">Δ prom.</th>'
+  h+='<div style="overflow-x:auto"><table style="width:100%;min-width:'+(sim?720:600)+'px;border-collapse:collapse;'
+    +'table-layout:fixed;font-size:12px;font-variant-numeric:tabular-nums">';
+  h+='<colgroup><col style="width:150px">'
+    +'<col style="width:92px"><col style="width:92px">'+(sim?'<col style="width:98px">':'')
+    +'<col style="width:70px">'
+    +'<col style="width:88px"><col style="width:88px">'+(sim?'<col style="width:94px">':'')
+    +'<col style="width:74px"></colgroup>';
+  const th=function(txt,al,extra){
+    return '<th style="text-align:'+al+';padding:7px 8px;border-bottom:2px solid #d1dae6;'+(extra||'')+'">'+txt+'</th>';
+  };
+  h+='<thead><tr style="color:#7a90a8;font-size:10px;text-transform:uppercase;letter-spacing:.4px">'
+    +th('Categoría','left')
+    +th(prev,'right')+th(cur,'right')+(sim?th(cur+' sim','right','color:'+SIMC):'')
+    +th('Δ cant.','center')
+    +th('Prom. '+prev,'right')+th('Prom. '+cur,'right')+(sim?th('Prom. sim','right','color:'+SIMC):'')
+    +th('Δ prom.','center')
     +'</tr></thead><tbody>';
   CAT_ORDEN.forEach(function(c){
-    const a=rp[c], b=rc[c];
-    const pctA=rp.__total.n?(a.n/rp.__total.n*100):0;
-    const pctB=rc.__total.n?(b.n/rc.__total.n*100):0;
-    h+='<tr style="border-bottom:1px solid #eef2f7">'
-      +'<td style="padding:7px 6px">'+dbCatBadge(c)+'</td>'
-      +'<td style="text-align:right;padding:7px 6px"><strong>'+a.n+'</strong> <span style="color:#a9b6c6;font-size:10px">'+pctA.toFixed(0)+'%</span></td>'
-      +'<td style="text-align:right;padding:7px 6px"><strong>'+b.n+'</strong> <span style="color:#a9b6c6;font-size:10px">'+pctB.toFixed(0)+'%</span></td>'
-      +'<td style="text-align:center;padding:7px 6px">'+_catDeltaN(b.n-a.n)+'</td>'
-      +'<td style="text-align:right;padding:7px 6px;color:#51607a">'+(a.prom===null?'—':a.prom.toFixed(1)+'%')+'</td>'
-      +'<td style="text-align:right;padding:7px 6px;color:#51607a">'+(b.prom===null?'—':b.prom.toFixed(1)+'%')+'</td>'
-      +'<td style="text-align:center;padding:7px 6px">'+((a.prom===null||b.prom===null)?'<span style="color:#b0bcc8">—</span>':_catDelta(b.prom-a.prom))+'</td>'
+    const a=rp[c], b=rc[c], sc=sim?rs[c]:null;
+    const td='padding:7px 8px;border-bottom:1px solid #eef2f7;';
+    h+='<tr>'
+      +'<td style="'+td+'">'+dbCatBadge(c)+'</td>'
+      +'<td style="'+td+'text-align:right">'+_catNPct(a.n,rp.__total.n)+'</td>'
+      +'<td style="'+td+'text-align:right">'+_catNPct(b.n,rc.__total.n)+'</td>'
+      +(sim?'<td style="'+td+'text-align:right;background:#faf7ff;color:'+SIMC+'">'+_catNPct(sc.n,rs.__total.n)+'</td>':'')
+      +'<td style="'+td+'text-align:center">'+_catDeltaN(b.n-a.n)+'</td>'
+      +'<td style="'+td+'text-align:right;color:#51607a">'+_catProm(a.prom)+'</td>'
+      +'<td style="'+td+'text-align:right;color:#51607a">'+_catProm(b.prom)+'</td>'
+      +(sim?'<td style="'+td+'text-align:right;background:#faf7ff;color:'+SIMC+'">'+_catProm(sc.prom)+'</td>':'')
+      +'<td style="'+td+'text-align:center">'+((a.prom===null||b.prom===null)?'<span style="color:#b0bcc8">—</span>':_catDelta(b.prom-a.prom))+'</td>'
       +'</tr>';
   });
-  h+='<tr style="border-top:2px solid #d1dae6;background:#f7fafd;font-weight:700">'
-    +'<td style="padding:8px 6px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px">TOTAL AUDITADOS</td>'
-    +'<td style="text-align:right;padding:8px 6px">'+rp.__total.n+'</td>'
-    +'<td style="text-align:right;padding:8px 6px">'+rc.__total.n+'</td>'
-    +'<td style="text-align:center;padding:8px 6px">'+_catDeltaN(rc.__total.n-rp.__total.n)+'</td>'
-    +'<td style="text-align:right;padding:8px 6px">'+(rp.__total.prom===null?'—':rp.__total.prom.toFixed(1)+'%')+'</td>'
-    +'<td style="text-align:right;padding:8px 6px">'+(rc.__total.prom===null?'—':rc.__total.prom.toFixed(1)+'%')+'</td>'
-    +'<td style="text-align:center;padding:8px 6px">'+(dProm===null?'<span style="color:#b0bcc8">—</span>':_catDelta(dProm))+'</td>'
+  const tdT='padding:8px;border-top:2px solid #d1dae6;background:#f7fafd;font-weight:700;';
+  h+='<tr>'
+    +'<td style="'+tdT+'font-family:\'Barlow Condensed\',sans-serif;font-size:13px">TOTAL AUDITADOS</td>'
+    +'<td style="'+tdT+'text-align:right">'+_catNPct(rp.__total.n,rp.__total.n,true)+'</td>'
+    +'<td style="'+tdT+'text-align:right">'+_catNPct(rc.__total.n,rc.__total.n,true)+'</td>'
+    +(sim?'<td style="'+tdT+'text-align:right;color:'+SIMC+'">'+_catNPct(rs.__total.n,rs.__total.n,true)+'</td>':'')
+    +'<td style="'+tdT+'text-align:center">'+_catDeltaN(rc.__total.n-rp.__total.n)+'</td>'
+    +'<td style="'+tdT+'text-align:right">'+_catProm(rp.__total.prom)+'</td>'
+    +'<td style="'+tdT+'text-align:right">'+_catProm(rc.__total.prom)+'</td>'
+    +(sim?'<td style="'+tdT+'text-align:right;color:'+SIMC+'">'+_catProm(rs.__total.prom)+'</td>':'')
+    +'<td style="'+tdT+'text-align:center">'+(dProm===null?'<span style="color:#b0bcc8">—</span>':_catDelta(dProm))+'</td>'
     +'</tr>';
-  h+='</tbody></table></div></div>';
+  h+='</tbody></table></div>';
+  h+='<div style="margin-top:8px;font-size:10px;color:#a9b6c6">Δ cant. y Δ prom. comparan '+prev+' contra '+cur+' real'
+    +(sim?'. Las columnas violeta son la proyección con '+crit.tag+' cumplido.':'.')+'</div>';
+  h+='</div>';
 
-  // ── 3. Evolución de la distribución (todas las ediciones) ─────────────────
+  // ── 4. Evolución de la distribución ───────────────────────────────────────
   h+='<div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Evolución de la Distribución</span>'
     +'<span class="cit" data-tip="Cómo se reparte la red entre las cuatro categorías en cada edición. Cada barra es una edición y suma el total de auditados de ese año.">ℹ</span></div>'
-    +'<div style="height:'+Math.max(180,D.eds.length*62)+'px;position:relative"><canvas id="nw-chart-cat-evol"></canvas></div></div>';
+    +'<div style="height:'+Math.max(190,(D.eds.length+(sim?1:0))*62)+'px;position:relative"><canvas id="nw-chart-cat-evol"></canvas></div></div>';
 
-  // ── 4. Matriz de movimiento ───────────────────────────────────────────────
+  // ── 5. Matriz de movimiento ───────────────────────────────────────────────
   h+='<div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Matriz de Movimiento · de '+prev+' a '+cur+'</span>'
-    +'<span class="cit" data-tip="Cada celda cuenta los distribuidores que pasaron de la categoría de la fila a la de la columna. La diagonal son los que se mantuvieron; arriba de la diagonal subieron, abajo bajaron.">ℹ</span></div>';
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<span class="cit" data-tip="Cada celda cuenta los distribuidores que pasaron de la categoría de la fila a la de la columna. La diagonal son los que se mantuvieron; arriba de la diagonal subieron, abajo bajaron. Usa siempre los datos reales, no la simulación.">ℹ</span></div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums">'
     +'<thead><tr style="color:#7a90a8;font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
     +'<th style="text-align:left;padding:6px;border-bottom:2px solid #d1dae6">'+prev+' \\ '+cur+'</th>';
   CAT_ORDEN.forEach(function(c){
@@ -11614,9 +11726,9 @@ function dbRenderCategorias(){
       const n=fila.filter(function(r){return r.c2===c2;}).length;
       let st='color:#dde4ec';
       if(n>0){
-        if(j<i)      st='background:#e6f3ec;color:#1d9e6f;font-weight:800';           // subió
-        else if(j>i) st='background:#fbeceb;color:#d93025;font-weight:800';           // bajó
-        else         st='background:#f1f4f8;color:#51607a;font-weight:700';           // igual
+        if(j<i)      st='background:#e6f3ec;color:#1d9e6f;font-weight:800';
+        else if(j>i) st='background:#fbeceb;color:#d93025;font-weight:800';
+        else         st='background:#f1f4f8;color:#51607a;font-weight:700';
       }
       h+='<td style="text-align:center;padding:6px;border-bottom:1px solid #eef2f7;'+st+'">'+(n||'·')+'</td>';
     });
@@ -11629,7 +11741,7 @@ function dbRenderCategorias(){
     +'<span><span style="display:inline-block;width:10px;height:10px;background:#fbeceb;border:1px solid #f5a9a3;border-radius:2px;vertical-align:-1px"></span> bajó de categoría</span>'
     +'</div></div>';
 
-  // ── 5. Detalle por distribuidor ───────────────────────────────────────────
+  // ── 6. Detalle por distribuidor ───────────────────────────────────────────
   const ordMov={baja:0,sube:1,igual:2,falta:3,nuevo:4};
   const movLbl={
     baja:{t:'▼ Bajó',c:'#d93025'}, sube:{t:'▲ Subió',c:'#1d9e6f'},
@@ -11643,53 +11755,74 @@ function dbRenderCategorias(){
     if(da!==db) return da-db;
     return a.n.localeCompare(b.n);
   });
+  const nColsDet=sim?9:7;
   h+='<div class="db-card"><div class="db-card-hd"><span class="db-card-ttl">Detalle por Distribuidor</span>'
     +'<span class="cit" data-tip="Ordenado por movimiento: primero los que bajaron (y dentro, los que bajaron más casilleros), después los que subieron, los que se mantuvieron y los que no tienen las dos ediciones.">ℹ</span></div>';
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'
-    +'<thead><tr style="border-bottom:2px solid #d1dae6;color:#7a90a8;font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
-    +'<th style="text-align:left;padding:7px 6px">Distribuidor</th>'
-    +'<th style="text-align:center;padding:7px 6px">Cat. '+prev+'</th>'
-    +'<th style="text-align:right;padding:7px 6px">'+prev+'</th>'
-    +'<th style="text-align:center;padding:7px 6px">Cat. '+cur+'</th>'
-    +'<th style="text-align:right;padding:7px 6px">'+cur+'</th>'
-    +'<th style="text-align:center;padding:7px 6px">Δ score</th>'
-    +'<th style="text-align:left;padding:7px 6px">Movimiento</th>'
+  h+='<div style="overflow-x:auto"><table style="width:100%;min-width:'+(sim?860:700)+'px;border-collapse:collapse;'
+    +'table-layout:fixed;font-size:11.5px;font-variant-numeric:tabular-nums">';
+  h+='<colgroup><col><col style="width:96px"><col style="width:66px">'
+    +'<col style="width:96px"><col style="width:66px"><col style="width:72px">'
+    +(sim?'<col style="width:96px"><col style="width:66px">':'')
+    +'<col style="width:122px"></colgroup>';
+  h+='<thead><tr style="color:#7a90a8;font-size:10px;text-transform:uppercase;letter-spacing:.4px">'
+    +th('Distribuidor','left')
+    +th('Cat. '+prev,'center')+th(prev,'right')
+    +th('Cat. '+cur,'center')+th(cur,'right')
+    +th('Δ score','center')
+    +(sim?th('Cat. sim','center','color:'+SIMC)+th(cur+' sim','right','color:'+SIMC):'')
+    +th('Movimiento','left')
     +'</tr></thead><tbody>';
   let lastMov=null;
   det.forEach(function(r){
     if(r.mov!==lastMov){
       const m=movLbl[r.mov];
       const cant=det.filter(function(x){return x.mov===r.mov;}).length;
-      h+='<tr style="background:#f7fafd"><td colspan="7" style="padding:5px 6px;font-size:10px;font-weight:800;'
+      h+='<tr style="background:#f7fafd"><td colspan="'+nColsDet+'" style="padding:5px 8px;font-size:10px;font-weight:800;'
         +'text-transform:uppercase;letter-spacing:.5px;color:'+m.c+'">'+m.t+' · '+cant+'</td></tr>';
       lastMov=r.mov;
     }
     const ds=(r.t1!==null&&r.t2!==null)?(r.t2-r.t1):null;
     const salto=(r.mov==='baja'||r.mov==='sube')&&Math.abs(r.saltos)>1
       ? ' <span style="font-size:9px;color:#a9b6c6">('+Math.abs(r.saltos)+' casilleros)</span>' : '';
-    h+='<tr style="border-bottom:1px solid #eef2f7">'
-      +'<td style="padding:6px;color:#3d5573;font-weight:600">'+r.n+'</td>'
-      +'<td style="text-align:center;padding:6px">'+(r.c1?dbCatBadge(r.c1):'<span style="color:#dde4ec">—</span>')+'</td>'
-      +'<td style="text-align:right;padding:6px;color:#51607a">'+(r.t1===null?'—':r.t1.toFixed(1)+'%')+'</td>'
-      +'<td style="text-align:center;padding:6px">'+(r.c2?dbCatBadge(r.c2):'<span style="color:#dde4ec">—</span>')+'</td>'
-      +'<td style="text-align:right;padding:6px;color:#51607a">'+(r.t2===null?'—':r.t2.toFixed(1)+'%')+'</td>'
-      +'<td style="text-align:center;padding:6px">'+(ds===null?'<span style="color:#b0bcc8">—</span>':_catDelta(ds))+'</td>'
-      +'<td style="padding:6px;color:'+movLbl[r.mov].c+';font-weight:700">'+movLbl[r.mov].t+salto+'</td>'
+    const td='padding:6px 8px;border-bottom:1px solid #eef2f7;';
+    let simCat='<span style="color:#dde4ec">—</span>', simTot=simCat;
+    if(sim&&r.t2!==null){
+      const cambia=r.sim.aplica&&r.sim.cambia;
+      simCat=(cambia?'<span title="Cambia de categoría con la proyección">':'<span>')
+        +dbCatBadge(r.sim.cat)+(cambia?' <span style="color:'+SIMC+';font-weight:800">*</span>':'')+'</span>';
+      simTot='<span style="color:'+(r.sim.aplica?SIMC:'#b0bcc8')+';font-weight:'+(r.sim.aplica?'700':'400')+'">'
+        +r.sim.total.toFixed(1)+'%</span>';
+    }
+    h+='<tr>'
+      +'<td style="'+td+'color:#3d5573;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.n+'">'+r.n+'</td>'
+      +'<td style="'+td+'text-align:center">'+(r.c1?dbCatBadge(r.c1):'<span style="color:#dde4ec">—</span>')+'</td>'
+      +'<td style="'+td+'text-align:right;color:#51607a">'+(r.t1===null?'—':r.t1.toFixed(1)+'%')+'</td>'
+      +'<td style="'+td+'text-align:center">'+(r.c2?dbCatBadge(r.c2):'<span style="color:#dde4ec">—</span>')+'</td>'
+      +'<td style="'+td+'text-align:right;color:#51607a">'+(r.t2===null?'—':r.t2.toFixed(1)+'%')+'</td>'
+      +'<td style="'+td+'text-align:center">'+(ds===null?'<span style="color:#b0bcc8">—</span>':_catDelta(ds))+'</td>'
+      +(sim?'<td style="'+td+'text-align:center;background:#faf7ff">'+simCat+'</td>'
+           +'<td style="'+td+'text-align:right;background:#faf7ff">'+simTot+'</td>':'')
+      +'<td style="'+td+'color:'+movLbl[r.mov].c+';font-weight:700">'+movLbl[r.mov].t+salto+'</td>'
       +'</tr>';
   });
-  h+='</tbody></table></div></div>';
+  h+='</tbody></table></div>';
+  if(sim) h+='<div style="margin-top:8px;font-size:10px;color:#a9b6c6">'
+    +'<span style="color:'+SIMC+';font-weight:800">*</span> cambia de categoría respecto del dato real de '+cur+'.</div>';
+  h+='</div>';
 
   el.innerHTML=h;
 
-  // ── Gráfico apilado: una barra por edición ────────────────────────────────
+  // ── Gráfico apilado: una barra por edición (+ la simulada) ────────────────
   dbDestroyChart('nw-chart-cat-evol');
   const cv=document.getElementById('nw-chart-cat-evol');
   if(cv&&typeof Chart!=='undefined'){
+    const labels=D.eds.slice();
     const repartos=D.eds.map(function(e){return _catReparto(D.pool,e);});
+    if(sim){ labels.push(cur+' sim'); repartos.push(rs); }
     dbCharts['nw-chart-cat-evol']=new Chart(cv,{
       type:'bar',
       data:{
-        labels:D.eds,
+        labels:labels,
         datasets:CAT_ORDEN.map(function(c){
           return {label:c, data:repartos.map(function(r){return r[c].n;}),
                   backgroundColor:dbCatColor(c)+'cc', borderColor:dbCatColor(c), borderWidth:1};
