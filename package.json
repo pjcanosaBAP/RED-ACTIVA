@@ -1,6 +1,6 @@
 {
   "name": "redactiva-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "RED Activa 2.0 · Auditoría BPL · BAP Partners",
   "main": "main.js",
   "scripts": {
@@ -22,8 +22,7 @@
       "src/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "src/icon.ico"
+      "target": "nsis"
     },
     "mac": {
       "target": "dmg",
@@ -36,9 +35,6 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "src/icon.ico",
-      "uninstallerIcon": "src/icon.ico",
-      "installerHeaderIcon": "src/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "RED Activa 2.0"
