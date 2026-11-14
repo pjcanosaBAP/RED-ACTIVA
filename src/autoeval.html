@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="logos.js"></script>
+<script src="ae_guia_ui.js" defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Barlow',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
@@ -445,11 +446,16 @@ async function step2Next(){
     if(S.submitted && !S.unlock_granted){ showStep(4); updateDoneScreen(); return; }
     buildQuestionsUI();
     showStep(3);
+    // Guía por punto + buscador en el manual (se activa sólo si la base la entrega; ver ae_guia_ui.js)
+    try{ if(window.AEGuia) AEGuia.init({ questions:S.questions, load:function(){
+      return sbc.rpc('ae_get_guia',{p_codigo:S.codigo,p_distribuidor:S.distribuidor,p_pin:S.pin}).then(function(r){ return (r&&r.data&&r.data.data)||null; });
+    }}); }catch(e){}
   }catch(e){ setErr('err2','Error de conexión. Intentá de nuevo.'); }
   finally{ setBtn('btn2', false); }
 }
 
 function goStep1(){
+  try{ if(window.AEGuia) AEGuia.reset(); }catch(e){}
   S.codigo = ''; S.distribuidor = ''; S.pin = '';
   document.getElementById('inp-code').value = '';
   document.getElementById('inp-pin').value = '';
@@ -524,7 +530,7 @@ function buildQuestionsUI(){
           const critBadge=q.critico?`<span class="q-crit">🔴 CRÍTICO</span>`:'';
           html+='<div class="q-row" id="qr-'+q.comp_num+'">'
             +'<div class="q-num">'+q.comp_num+'</div>'
-            +'<div class="q-main"><div class="q-text">'+critBadge+(critBadge?' ':'')+q.question+'</div></div>'
+            +'<div class="q-main"><div class="q-text">'+critBadge+(critBadge?' ':'')+q.question+'</div><button type="button" class="gd-btn" data-gd="'+q.comp_num+'">ℹ️ Guía</button></div>'
             +'<div class="ans-btns" data-comp="'+q.comp_num+'">'
             +'<button class="ans-btn'+(ans==='si'?' si':'')+'" data-val="si">Sí</button>'
             +'<button class="ans-btn'+(ans==='no'?' no':'')+'" data-val="no">No</button>'

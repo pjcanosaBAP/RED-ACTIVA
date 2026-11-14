@@ -5,3 +5,8 @@ dist/
 
 # Local Netlify folder
 .netlify
+
+# Insumos confidenciales de la guia AE (manuales y guia de evidencias) y su salida con texto de los manuales
+Varios/IA - RED ACTIVA/*.pdf
+Varios/IA - RED ACTIVA/*.xlsx
+Varios/IA - RED ACTIVA/salida/ae_guia.js
