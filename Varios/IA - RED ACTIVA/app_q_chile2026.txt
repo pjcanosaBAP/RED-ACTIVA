@@ -1,0 +1,187 @@
+1.1.1|IFT|1|EMPLAZAMIENTO|ENTORNO Y SEGURIDAD EXTERNA||Predios cerrados, o Zonas industriales o logísticas
+1.1.2|IFT|1|EMPLAZAMIENTO|ENTORNO Y SEGURIDAD EXTERNA||Zona segura, con vigilancia de fuerzas públicas o privadas
+1.1.3|IFT|1|EMPLAZAMIENTO|ENTORNO Y SEGURIDAD EXTERNA||Zona provista de iluminación pública o propia.
+1.1.4|IFT|1|EMPLAZAMIENTO|ENTORNO Y SEGURIDAD EXTERNA||Existen cámaras de video externas pública o propia que cubran el ingreso principal o aledaños
+1.2.1|IFT|1|EMPLAZAMIENTO|ENTORNO - ACCESO|CRITICO 1|Capacidad de recibir unidades de alto / Medio tonelaje, según requerimientos de ARCOR
+1.3.2|IFT|1|EMPLAZAMIENTO|PREDIO Y CIRCULACION||Entorno sin problemas de congestionamiento de tráfico
+1.3.3|IFT|1|EMPLAZAMIENTO|PREDIO Y CIRCULACION||Poseen alero o permiten el ingreso de la culata de los vehiculos para la carga/descarga en condiciones climáticas desfavorables
+1.3.4|IFT|1|EMPLAZAMIENTO|PREDIO Y CIRCULACION||Fácil maniobrabilidad
+1.3.5|IFT|1|EMPLAZAMIENTO|PREDIO Y CIRCULACION||Calles y accesos en buen estado, sin pendientes, consolidados o asfaltados
+2.1.1|IFT|2|EDIFICACION|SEGURIDAD INTERNA||Sistema de Alarmas en depósito y oficinas
+2.1.2|IFT|2|EDIFICACION|SEGURIDAD INTERNA||Cámaras de Video en distintos sectores, con grabación y registro
+2.2.1|IFT|2|EDIFICACION|LAY OUT - CAPACIDAD Y MODULACION|CRITICO 2|Días hábiles promedio  6 meses de venta almacenados en la bodega (MinImo 18 dias)
+2.3.1|IFT|2|EDIFICACION|TECHOS  y PAREDES: ESTADO||Techo aislado y/o revestido,  bien conservado
+2.3.2|IFT|2|EDIFICACION|TECHOS  y PAREDES: ESTADO||Paredes aisladas y/o revestidas, bien conservadas, que no permitan la acumulación de tierra o plagas
+2.3.3|IFT|2|EDIFICACION|TECHOS  y PAREDES: ESTADO||Cuenta con extractores eólicos y/o ventilación forzada
+2.3.4|IFT|2|EDIFICACION|TECHOS  y PAREDES: ESTADO||Posee termómetro en sector Secos, (no se permiten termometros de mercurio)
+2.4.1|IFT|2|EDIFICACION|PISOS y JUNTAS: ESTADO||Posee terminación alisada  (a llana)
+2.4.2|IFT|2|EDIFICACION|PISOS y JUNTAS: ESTADO||Las juntas poseen relleno (compuesto elástico ) y/o protección metálica que no genere golpes al transito de apiladoras o transpaletas
+2.4.3|IFT|2|EDIFICACION|PISOS y JUNTAS: ESTADO||No posee desniveles entre los paños
+2.4.4|IFT|2|EDIFICACION|PISOS y JUNTAS: ESTADO||El piso no desprende polvillo y/o no se visualizan grietas
+2.5.1|IFT|2|EDIFICACION|ABERTURAS||Cuenta con 2 o más portones
+2.5.2|IFT|2|EDIFICACION|ABERTURAS||Posee ingreso de personal independiente de la carga
+2.6.1|IFT|2|EDIFICACION|ILUMNACIÓN||Se encuentran por encima del nivel más alto de almacenamiento
+2.6.2|IFT|2|EDIFICACION|ILUMNACIÓN||Se encuentran centradas a lo largo de los pasillos
+2.6.3|IFT|2|EDIFICACION|ILUMNACIÓN||No se perciben sectores oscuros que afecten la operación
+2.6.4|IFT|2|EDIFICACION|ILUMNACIÓN||Se aprovecha la luz natural para la operación diurna sin aumento considerable de la temperatura en el interior
+2.7.1|IFT|2|EDIFICACION|DESAGUES||Se ubican en el exterior del edificio
+2.7.2|IFT|2|EDIFICACION|DESAGUES||Se  encuentran en buen estado (no se visualizan manchas de humedad), con rejillas de protección
+3.1.1|IFT|3|ALMACENAMIENTO Y MANIPULEO|EPPS Y EXTINGUIDORES|CRITICO 3|Uso correcto de EPPS (zapatos o casco según reglamentación local vigente)
+3.1.2|IFT|3|ALMACENAMIENTO Y MANIPULEO|EPPS Y EXTINGUIDORES|CRITICO 3|Extintores bien ubicados y en período de vencimiento
+3.2.1|IFT|3|ALMACENAMIENTO Y MANIPULEO|POP Y MOBILIARIO||Material POP y/o mobiliarios usados se encuentran en condiciones de higiene adecuadas
+3.2.2|IFT|3|ALMACENAMIENTO Y MANIPULEO|POP Y MOBILIARIO||El material se encuentra inventariado el mueble pesado
+3.2.3|IFT|3|ALMACENAMIENTO Y MANIPULEO|POP Y MOBILIARIO||El material se encuentra en un sector aislado de la mercadería
+3.2.4|IFT|3|ALMACENAMIENTO Y MANIPULEO|POP Y MOBILIARIO||El material se encuentra identificado
+3.3.1|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE REFRIGERADOS||Indice nivel de capacidad para productos refrigerados es menor que 1 respecto a su capacidad teorica real
+3.3.2|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE REFRIGERADOS||Posee aislación térmica en paredes laterales, techo y acceso. Paredes aisladas y/o revestidas, bien conservadas, que no permitan la acumulación de tierra o plagas
+3.3.3|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE REFRIGERADOS||Posee termómetro en Cámara de Refrigerados, (no se permiten termometros de mercurio)
+3.4.1|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE CONGELADOS||Indice nivel de capacidad para productos congelados es menor que 1 respecto a su capacidad teorica real
+3.4.2|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE CONGELADOS||Su ubicación permite carga / descarga directa desde el transporte
+3.4.3|IFT|3|ALMACENAMIENTO Y MANIPULEO|CAMARA DE CONGELADOS||Posee termómetro
+3.5.1|IFT|3|ALMACENAMIENTO Y MANIPULEO|EQUIPAMIENTO DE MANIPULEO|CRITICO 4|Cuenta con un equipo propio que le permite operar dentro del depósito y a su vez realizar la descarga de camiones
+3.5.2|IFT|3|ALMACENAMIENTO Y MANIPULEO|EQUIPAMIENTO DE MANIPULEO|CRITICO 4|Cuenta con traspallets o "zorritas"
+3.5.3|IFT|3|ALMACENAMIENTO Y MANIPULEO|EQUIPAMIENTO DE MANIPULEO||Cuenta con carros para Consolidados/Pedidos
+3.5.4|IFT|3|ALMACENAMIENTO Y MANIPULEO|EQUIPAMIENTO DE MANIPULEO|CRITICO 4|El equipo para operar (dentro del depósito) es electrico
+4.1.1|IFT|4|TRANSPORTE Y REPARTO|VEHICULOS||Se guardan en sectores seguros y aislados de la mercadería
+5.1.1|IFT|5|INFORMACIÓN Y COMUNICACIONES|INFORMÁTICA||El personal de logística cuenta con acceso al sistema y/o con usuario propio
+5.1.2|IFT|5|INFORMACIÓN Y COMUNICACIONES|INFORMÁTICA||El personal de logística cuenta con acceso a correo electrónico y/o con cuenta propia
+5.1.3|IFT|5|INFORMACIÓN Y COMUNICACIONES|INFORMÁTICA||El personal de logística cuenta con equipamiento informático en su oficina
+5.2.1|IFT|5|INFORMACIÓN Y COMUNICACIONES|COMUNICACIONES||El personal de logística cuenta con algún dispositivo de comunicación que permita contactarse al interior y exterior de la distribuidora
+5.3.1|IFT|5|INFORMACIÓN Y COMUNICACIONES|ADQUISICIÓN DE DATOS||El personal de logística cuenta cámaras digitales o escáneres, o "smartphones"
+6.1.1|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|PLANIFICACIÓN DE LAS COMPRAS||Se informa/comunica las compras ( de volumen mayor a los normal o excepcionales)a Logística para que pueda planificar la operación de descarga y espacio necesario.(Registro, email, etc)
+6.1.2|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|PLANIFICACIÓN DE LAS COMPRAS||Realizan compras proporcionales y distribuidas dentro del mes
+6.2.1|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|ACTIVACION DEL ABASTECIMIENTO||Logística recibe el IAD
+6.3.1|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|COORDINACIÓN DEL ABASTECIMIENTO|CRITICO 5|Previsión de espacio para el guardado/almacenamiento y/o reordenamiento de la mercadería
+6.3.2|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|COORDINACIÓN DEL ABASTECIMIENTO|CRITICO 5|Previsión de personas y equipo (Apilador/Autoelevador) necesarias para la descarga
+6.3.3|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|COORDINACIÓN DEL ABASTECIMIENTO|CRITICO 5|Cuenta con una ventana horaria de 8hs para recepción de mercadería
+6.3.4|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|COORDINACIÓN DEL ABASTECIMIENTO|CRITICO 5|Descarga  en lugares definidos
+6.4.1|PLG|6|ABASTECIMIENTO Y RECEPCIÓN|RECEPCION||Las novedades se transmiten a Logística de Arcor por correo
+7.1.1|PLG|7|ALMACENAMIENTO Y MANIPULEO|ORGANIZACIÓN DEL LAY OUT||Frecuencia definida documentada de revisión y/o modificación del lay-out (minimo cada 3 meses, maximo cada 6 meses)
+7.1.2|PLG|7|ALMACENAMIENTO Y MANIPULEO|ORGANIZACIÓN DEL LAY OUT||Pasillos organizados por algun criterio logico (Negocio, ABC, familia, etc)
+7.2.1|PLG|7|ALMACENAMIENTO Y MANIPULEO|IDENTIFICACION DEL LAY OUT||Cada área del lay out se encuentra demarcada (Zonas pintadas en el piso)
+7.2.2|PLG|7|ALMACENAMIENTO Y MANIPULEO|IDENTIFICACION DEL LAY OUT||Áreas principales identificadas (Recepción-Despacho-Devoluciones-Mercadería no comercializable-picking/almacenamiento)
+7.2.3|PLG|7|ALMACENAMIENTO Y MANIPULEO|IDENTIFICACION DEL LAY OUT||No hay superposición entre áreas críticas (Despacho y Recepción por ej)
+7.3.1|PLG|7|ALMACENAMIENTO Y MANIPULEO|ROTACION||Control de rotación y vencimientos junto al inventario rotativo y/o auditorias de 5S
+7.3.2|PLG|7|ALMACENAMIENTO Y MANIPULEO|ROTACION||Se lleva registro de las unidades vencidas
+7.3.3|PLG|7|ALMACENAMIENTO Y MANIPULEO|ROTACION||Se informa sobre productos proximos a vencer a fin de tomar acciones
+8.1.1|PLG|8|REPOSICION INVENTARIOS|REPOSICIÓN DE MERCADERIA||Logística o personal designado supervisa por turno o por día con algún criterio (Por ej: Productos A)
+8.1.2|PLG|8|REPOSICION INVENTARIOS|REPOSICIÓN DE MERCADERIA||Posiciones fijas de pickeo con capacidades definidas y/o frecuencias de reposición.
+8.1.3|PLG|8|REPOSICION INVENTARIOS|REPOSICIÓN DE MERCADERIA||Se verifica el volumen de la posición de picking con una frecuencia determinada (minimo cada 3 meses, maximo cada 6 meses)
+8.2.1|PLG|8|REPOSICION INVENTARIOS|INVENTARIOS ROTATIVOS|CRITICO 6|Se analizan causas al finalizar. Se registran acciones
+8.2.2|PLG|8|REPOSICION INVENTARIOS|INVENTARIOS ROTATIVOS|CRITICO 6|Criterio definido de  selección de items (ABC, rotativo,negocio, pasillo, etc.). Se toman y/o verifican  fechas de vencimientos.
+8.2.3|PLG|8|REPOSICION INVENTARIOS|INVENTARIOS ROTATIVOS|CRITICO 6|Se realizan con una frecuencia definida,  mínima mensual
+9.1.1|PLG|9|CONSOLIDADOS Y PEDIDOS|TRANSMISION DE PEDIDOS||Ventana horaria establecida para el corte de pedidos
+9.1.2|PLG|9|CONSOLIDADOS Y PEDIDOS|TRANSMISION DE PEDIDOS||Realiza analisis frecuentes relacionado a desvios en el corte de pedidos
+9.2.1|PLG|9|CONSOLIDADOS Y PEDIDOS|ARMADO Y ASIGNACIÓN DE CONSOLIDADOS Y/O PEDIDOS||El ordenamiento físico de los productos coincide con el consolidado
+9.2.2|PLG|9|CONSOLIDADOS Y PEDIDOS|ARMADO Y ASIGNACIÓN DE CONSOLIDADOS Y/O PEDIDOS||Se generan los consolidados aplicando criterios (Logísticos)de corte a partir de los pedidos ingresados-Solo para los que trabajan pedido por pedido
+9.3.1|PLG|9|CONSOLIDADOS Y PEDIDOS|CONTROL DE CONSOLIDADO||Se registran los errores y usuarios para mejorar el proceso
+9.3.2|PLG|9|CONSOLIDADOS Y PEDIDOS|CONTROL DE CONSOLIDADO||Se conserva en forma transitoria registro de control del consolidado
+9.3.3|PLG|9|CONSOLIDADOS Y PEDIDOS|CONTROL DE CONSOLIDADO||Existe un metodo de control de consolidado
+9.4.1|PLG|9|CONSOLIDADOS Y PEDIDOS|ARMADO DE PEDIDOS||El pedido contiene identificación  de bultos, cliente, zona de reparto, factura, o alguna identificación que facilite la carga
+9.4.2|PLG|9|CONSOLIDADOS Y PEDIDOS|ARMADO DE PEDIDOS||Se registran los errores y usuarios para mejorar el proceso en el armado de pedido
+9.4.3|PLG|9|CONSOLIDADOS Y PEDIDOS|ARMADO DE PEDIDOS||El ordenamiento coincide con las facturas/pedido
+10.1.1|PLG|10|TRANSPORTE Y REPARTO|PEDIDOS LISTOS PARA CARGA||La carga en la zona de despacho contiene identificación zona/reparto/fletero.
+10.2.1|PLG|10|TRANSPORTE Y REPARTO|CARGA DE PEDIDOS||Pedido:La carga se realiza por LIFO de acuerdo al ruteo. Consolidado:La mercadería se carga organizada (manteniendo identificado cada negocio para su pickeo en el punto de venta
+10.2.2|PLG|10|TRANSPORTE Y REPARTO|CARGA DE PEDIDOS||Cuenta con metodologia o registro de la hoja de ruta y el responsable del armado
+10.2.3|PLG|10|TRANSPORTE Y REPARTO|CARGA DE PEDIDOS||Fletero controla y realiza la carga, si existe diferencia verifica con logística y realiza un registro de conformidad
+10.3.1|PLG|10|TRANSPORTE Y REPARTO|ENTREGA AL CLIENTE||Posee registro de reclamos del cliente (Planilla  con registro de incidentes)
+10.3.2|PLG|10|TRANSPORTE Y REPARTO|ENTREGA AL CLIENTE||Cuenta con registro de pedidos reasignados
+11.1.1|PLG|11|RETORNO Y/O DEVOLUCIONES|RECHAZOS / DEVOLUCIONES||Registro de motivos para posterior analisis y mejora del proceso
+11.1.2|PLG|11|RETORNO Y/O DEVOLUCIONES|RECHAZOS / DEVOLUCIONES||Mercadería ordenada con algún criterio y documentación de respaldo para validacion
+11.1.3|PLG|11|RETORNO Y/O DEVOLUCIONES|RECHAZOS / DEVOLUCIONES||Mercadería en el sector identificada y controlada
+11.1.4|PLG|11|RETORNO Y/O DEVOLUCIONES|RECHAZOS / DEVOLUCIONES||Lugar físico identificado y separado para almacenar rechazos/devoluciones
+12.1.1|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Dispone de alguna herramienta informatica y la utiliza en el depósito
+12.1.2|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Cuenta con la aplicación de Arcortrukc para gestionar las entregas , rechazos y/o devoluciones de los clientes
+12.1.3|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Utiliza el Modulo Recepción
+12.1.4|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Utiliza el Modulo Inventario
+12.1.5|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Utiliza el Modulo Picking
+12.1.6|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Utiliza el Modulo Control de Consolidados
+12.1.7|GST|12|ORGANIZACIÓN|HERRAMIENTAS DE GESTION||Utiliza el Modulo Armado de Pedidos
+12.2.1|GST|12|ORGANIZACIÓN|ORGANIGRAMAS Y PERFILES||Se encuentran comunicados
+12.2.2|GST|12|ORGANIZACIÓN|ORGANIGRAMAS Y PERFILES||Se encuentra definido y documentado el perfil del puesto de MML logística
+12.2.3|GST|12|ORGANIZACIÓN|ORGANIGRAMAS Y PERFILES||Se encuentran definidos los perfiles de puestos principales (comercial y administrativo)
+12.2.4|GST|12|ORGANIZACIÓN|ORGANIGRAMAS Y PERFILES||El organigrama se encuentra definido y documentado por la distribuidora
+12.3.1|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Recepción y Control de Mercadería
+12.3.2|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Reposición de Productos en Picking
+12.3.3|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Almacenamiento de Productos
+12.3.4|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Armado y Control de Consolidados
+12.3.5|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Armado de Pedidos
+12.3.6|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Control de hojas de ruta y carga de pedidos
+12.3.7|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de Control de Inventario
+12.3.8|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Cuenta con el Procedimiento Proceso de  Control de Hoja de Ruta y Logistica de Reversa
+12.3.9|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|Los responsables del proceso conocen el procedimiento, el mismo coincide con el proceso
+12.3.10|GST|12|ORGANIZACIÓN|PROCESOS DOCUMENTADOS|CRITICO 7|El formato del procedimiento se ajusta al modelo estandar propuesto por Arcor
+13.1.1|GST|13|PLANIFICACION|PLANIFICACIÓN TÁCTICA||Logistica participa de reuniones con Ventas y Administracion, en las cuales se definen objetivos anuales y/o mensuales
+13.1.2|GST|13|PLANIFICACION|PLANIFICACIÓN TÁCTICA||Se realiza el seguimiento de la  planificación en forma períodica (semanal, quincenal o mensual) evaluando el alcance de los resultados.
+13.1.3|GST|13|PLANIFICACION|PLANIFICACIÓN TÁCTICA||Las acciones surgidas de la planificación quedan plasmadas en un plan de acción
+13.2.1|GST|13|PLANIFICACION|PLANIFICACIÓN OPERATIVA||Se registran e informan las acciones o novedades en un pizarrón o avisadores.
+13.2.2|GST|13|PLANIFICACION|PLANIFICACIÓN OPERATIVA||Se realizan reuniones periódicas en el sector registrándose las decisiones en  planes de acción
+13.3.1|GST|13|PLANIFICACION|MANTENIMIENTO||Se planifica el mantenimiento preventivo de la infraestructura (desagües, portones, racks, techos)
+13.3.2|GST|13|PLANIFICACION|MANTENIMIENTO||Se planifica el mantenimiento preventivo del grupo electrógeno
+13.3.3|GST|13|PLANIFICACION|MANTENIMIENTO||Se planifica el mantenimiento preventivos del equipamiento logístico de manipuleo
+13.3.4|GST|13|PLANIFICACION|MANTENIMIENTO||Se planifica el mantenimiento preventivo de flota propia o chequeo de tercerizada
+14.1.1|GST|14|INFORMACION Y COMUNICACIONES|INFORMACIÓN AL PERSONAL||La información en ella se encuentra actualizada
+14.1.2|GST|14|INFORMACION Y COMUNICACIONES|INFORMACIÓN AL PERSONAL||Existe cartelería informativa en el sector (novedades, indicadores, vacaciones, lanzamientos, informacion relacionada a la operación del depósito, seguridad)
+14.2.1|GST|14|INFORMACION Y COMUNICACIONES|SUGERENCIAS DE MEJORA||Existe un registro de sugerencias realizadas por parte del personal
+14.2.2|GST|14|INFORMACION Y COMUNICACIONES|SUGERENCIAS DE MEJORA||Queda plasmado un plan de acción/respuesta en base a las sugerencias realizadas
+15.1.1|GST|15|FORMACION Y DESARROLLO|CAPACITACION||Realizan capacitaciones relacionadas a cambios o mejoras en los procesos o cuentan con un plan de capacitaciones especificas para el personal de logistica / deposito / Distribución
+15.2.1|GST|15|FORMACION Y DESARROLLO|ROTACIÓN Y POLICOMPETENCIAS||Están definidas matrices de polivalencia o policompetencia
+16.1.1|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Diferencia de inventario
+16.1.2|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Costo de transporte
+16.1.3|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Costo Operativo  Depósito
+16.1.4|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Productividad global
+16.1.5|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Rechazos
+16.1.6|GST|16|MEDICION Y MEJORA|INDICADORES|CRITICO 8|Devoluciones
+16.1.7|GST|16|MEDICION Y MEJORA|INDICADORES||Informan mensualmente el tablero Logistico.
+16.2.1|GST|16|MEDICION Y MEJORA|5S||Posee implementadas las 3 primeras "S"   (CLASIFICAR - ORDENAR - LIMPIAR)
+16.2.2|GST|16|MEDICION Y MEJORA|5S||Se auditan con frecuencia determinada (4ta S - AUDITORIA) los niveles de orden y limpieza alcanzados
+16.2.3|GST|16|MEDICION Y MEJORA|5S||Se toman acciones sobre  los resultados de las auditorias
+16.2.4|GST|16|MEDICION Y MEJORA|5S||Está implementada cada una de las 5Ss, se mantiene en el tiempo y es base para mejoras edilicias, de procesos y de clima laboral
+17.1.1|IDP|17|ABASTECIMIENTO Y RECEPCIÓN|RECEPCION||Control general de la carga incluye vencimientos
+17.1.2|IDP|17|ABASTECIMIENTO Y RECEPCIÓN|RECEPCION||Control general de cantidad y estado de  bultos recibidos
+17.1.3|IDP|17|ABASTECIMIENTO Y RECEPCIÓN|RECEPCION||Controlan y poseen un registro de la temperatura con la que arriba la carga de Helados
+17.1.4|IDP|17|ABASTECIMIENTO Y RECEPCIÓN|RECEPCION||Controlan y poseen un registro de la temperatura con la que arriba la carga de Refrigerados
+18.1.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|ALMACENAMIENTO||Se identifican claramente los vencimientos.
+18.1.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|ALMACENAMIENTO||Los bultos almacenados se encuentran en buen estado de conservación, apilabilidad y separacion de la estiba contra la pared
+18.1.3|IDP|18|ALMACENAMIENTO Y MANIPULEO|ALMACENAMIENTO||Los productos que requieren acondicionamiento de temperatura (según Maestro de Articulos) se encuentran almacenados dentro de la cámara
+18.1.4|IDP|18|ALMACENAMIENTO Y MANIPULEO|ALMACENAMIENTO||No se encuentran pallets rotos, deteriorados, dañados almacenando mercadería
+18.2.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTAMINACIÓN CRUZADA||En el depósito no se perciben olores extraños provenientes de estos químicos.
+18.2.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTAMINACIÓN CRUZADA||Los productos químicos se almacenan en lugares cerrados (armarios o gabinetes)
+18.2.3|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTAMINACIÓN CRUZADA||El lugar se encuentra identificado con cartelería
+18.2.4|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTAMINACIÓN CRUZADA||Se accede al lugar mediante uso de llave u otro elemento que garantice la inviolabilidad y no se evidencia concentración de aromas.
+18.3.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTROL DE TEMPERATURAS|CRITICO 9|La temperatura de los productos secos no supera los 30°C (promedio máximo diario) y 35°C  máximo y se garantiza mediante elemento de medición y registros
+18.3.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTROL DE TEMPERATURAS|CRITICO 9|Controlan y poseen un registro de la temperatura con la que arriba desde arcor
+18.3.3|IDP|18|ALMACENAMIENTO Y MANIPULEO|CONTROL DE TEMPERATURAS||La temperatura de los productos congelados se encuentra en -22°C y se garantiza mediante registros
+18.4.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|INSTRUMENTOS MEDICIÓN TEMPERATURA||Existe un registro de contrastación y/o calibración de termometros que garantice el correcto funcionamiento
+18.4.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|INSTRUMENTOS MEDICIÓN TEMPERATURA||Los instrumentos de medición alertan ante variaciones inaceptables de temperatura
+18.5.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|ROTACIÓN Y REPOSICIÓN||Se garantiza la inocuidad del producto evitando el contacto del envase primario o secundario con la madera u otro material contaminante
+18.5.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|ROTACIÓN Y REPOSICIÓN||Se garantiza la correcta rotación FEFO por gestión visual o informática.
+18.6.1|IDP|18|ALMACENAMIENTO Y MANIPULEO|ILUMINACION||Las luminarias y aberturas de vidrio estan protegidas ante estallidos
+18.6.2|IDP|18|ALMACENAMIENTO Y MANIPULEO|ILUMINACION||Existen métodos de prevención de  estallido y astillado en aberturas, etc
+19.1.1|IDP|19|TRANSPORTE Y REPARTO|DESPACHO||Cuenta con una check-list para controlar las adecuadas condiciones de higiene, limpieza y acondicionamiento de la unidad contenedora del vehículo
+19.1.2|IDP|19|TRANSPORTE Y REPARTO|DESPACHO||Se tienen en cuenta las condiciones de carga de los distintos productos (apilabilidad, peso, volumen, fragilidad, condiciones de temperatura, etc.)
+19.1.3|IDP|19|TRANSPORTE Y REPARTO|DESPACHO||El distribuidor controla la temperatura al momento del despacho y durante la distribución en productos refrigerados.
+19.2.1|IDP|19|TRANSPORTE Y REPARTO|DESPACHO LEGALES HIGIENE||Cuentan con un metodo/planilla de seguimiento de la documentación de los repartidores (Carnet de conducir y sanitario, tarjeta verde o azul, seguros, VTV o ITV, habilitaciones, etc)
+19.2.2|IDP|19|TRANSPORTE Y REPARTO|DESPACHO LEGALES HIGIENE||Los transportes son de uso exclusivo para alimentos y se encuentran habilitados por la autoridad compentente.
+19.2.3|IDP|19|TRANSPORTE Y REPARTO|DESPACHO LEGALES HIGIENE||Los contenedores utilizados para el reparto conservan la integridad del producto.
+19.2.4|IDP|19|TRANSPORTE Y REPARTO|DESPACHO LEGALES HIGIENE||El vehiculo que transporta helados cuenta con instrumento de medición de temperatura permitiendo su verificación en cabina.
+20.1.1|IDP|20|RETORNO Y/O DEVOLUCIONES|RECHAZOS|CRITICO 10|Está determinada la frecuencia de procesamiento de productos rechazados
+20.1.2|IDP|20|RETORNO Y/O DEVOLUCIONES|RECHAZOS|CRITICO 10|Los productos rechazados no aptos son rápidamente segregados de los productos aptos
+20.2.1|IDP|20|RETORNO Y/O DEVOLUCIONES|DEVOLUCIONES DE PRODUCTOS NO APTOS|CRITICO 11|El lugar se encuentra delimitado/identificado con cartelería de manera visual e inequívoca
+20.2.2|IDP|20|RETORNO Y/O DEVOLUCIONES|DEVOLUCIONES DE PRODUCTOS NO APTOS|CRITICO 11|El lugar para almacenamiento de estos productos se encuentra separado del producto apto
+20.3.1|IDP|20|RETORNO Y/O DEVOLUCIONES|RECALL Y TRAZABILIDAD||Cuenta con el Procedimiento Proceso de Recall
+21.1.1|IDP|21|LIMPIEZA|RESIDUOS||Dispone de un sector para almacenar los residuos que se mantiene despejado y ordenado compacto y fácilmente lavable.
+21.1.2|IDP|21|LIMPIEZA|RESIDUOS||Cuenta con contenedores cerrados para depositar residuos.
+21.2.1|IDP|21|LIMPIEZA|LIMPIEZA||Las oficinas están construidas afuera o separados de las zonas donde se encuentran los productos.
+21.2.2|IDP|21|LIMPIEZA|LIMPIEZA||Los baños, vestuarios y/o comedor están en buenas condiciones edilicias, no generan olores y/o contaminación cruzada.
+21.2.3|IDP|21|LIMPIEZA|LIMPIEZA||Sector de carga y descarga en buenas condiciones de limpieza, cumple con el plan de limpieza
+21.3.1|IDP|21|LIMPIEZA|PLANES DE LIMPIEZA||Los productos químicos utilizados cuentan con los certificados de habilitación de la autoridad sanitaria correspondientes.
+21.3.2|IDP|21|LIMPIEZA|PLANES DE LIMPIEZA||Existe plan/seguimiento de limpieza documentado.
+22.1.1|IDP|22|MANEJO INTEGRADO DE PLAGAS|CONTROL DE PLAGAS|CRITICO 12|Llevan a cabo y existen registros del plan documentado de control de plaga para insectos terrestre, voladores, aves y roedores
+22.1.2|IDP|22|MANEJO INTEGRADO DE PLAGAS|CONTROL DE PLAGAS|CRITICO 12|La empresa cuenta con las habilitaciones vigentes requeridas para realizar todas las tareas del manejo integrado de plagas (incluye la aplicación de plaguicidas). Se deja registro de las aplicaciones (productos, sectores, objetivo,etc)
+22.1.3|IDP|22|MANEJO INTEGRADO DE PLAGAS|CONTROL DE PLAGAS|CRITICO 12|Los dispositivos de control de plagas están identificados, protegidos, fijos, razonablemente limpios, no obstruidos y en buenas condiciones para cumplir su función
+22.1.4|IDP|22|MANEJO INTEGRADO DE PLAGAS|CONTROL DE PLAGAS|CRITICO 12|Se realiza monitoreo y control de insectos voladores con trampas UV.
+22.1.5|IDP|22|MANEJO INTEGRADO DE PLAGAS|CONTROL DE PLAGAS|CRITICO 12|Se realiza monitoreo y control de gorgojos / carcoma con feromonas
+22.2.1|IDP|22|MANEJO INTEGRADO DE PLAGAS|INFRAESTRUCTURA||El depósito cuenta con aberturas (puertas, portones y ventanas) que garantizan hermeticidad y se mantienen cerradas
+22.2.2|IDP|22|MANEJO INTEGRADO DE PLAGAS|INFRAESTRUCTURA||El exterior del depósito se encuentra despejado, con el pasto corto, sin acumulación de desechos. No hay equipos/estructuras/POP etc en desuso que favorezcan el anidamiento de plagas. (exterior e interior)
+22.2.3|IDP|22|MANEJO INTEGRADO DE PLAGAS|INFRAESTRUCTURA||No hay evidencia de presencia de mascotas dentro del predio (perros, gatos, etc.)
