@@ -891,6 +891,7 @@ function showStep(n){
 
 // ── ADMIN ────────────────────────────────────────────────────────────────────
 let _adminData = null;
+let _adminPinUsed = '';
 
 function showAdminPin(){
   const wrap = document.getElementById('admin-pin-wrap');
@@ -930,6 +931,7 @@ async function loadAdminView(){
   }));
 
   _adminData = {camp, accRows, answersMap};
+  _adminPinUsed = adminPin;
   renderAdminView();
   showStep(5);
 }
@@ -1109,9 +1111,9 @@ function showAdminDetail(dist){
       const vBg=v==='si'?'rgba(16,185,129,.12)':v==='no'?'rgba(239,68,68,.12)':v==='na'?'rgba(100,116,139,.1)':'rgba(255,255,255,.03)';
       const vTxt=v==='si'?'SÍ':v==='no'?'NO':v==='na'?'N/A':'—';
       const critBadge=q.critico?'<span style="font-size:9px;color:#ef4444;font-weight:700;margin-right:3px">🔴</span>':'';
-      html+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.04)">
+      html+=`<div id="qr-${q.comp_num}" style="display:flex;align-items:flex-start;gap:8px;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.04)">
         <span style="font-size:9px;color:#475569;min-width:38px;flex-shrink:0;padding-top:2px">${q.comp_num}</span>
-        <span style="flex:1;font-size:11px;color:#cbd5e1;line-height:1.4">${critBadge}${q.question}</span>
+        <span style="flex:1;font-size:11px;color:#cbd5e1;line-height:1.4">${critBadge}${q.question}<br><button type="button" class="gd-btn" data-gd="${q.comp_num}">ℹ️ Guía</button></span>
         <span style="min-width:34px;text-align:center;font-size:11px;font-weight:700;color:${vColor};background:${vBg};border-radius:4px;padding:2px 5px;flex-shrink:0">${vTxt}</span>
       </div>`;
     });
@@ -1120,6 +1122,10 @@ function showAdminDetail(dist){
 
   html+=`</div>`;
   detail.innerHTML=html;
+  // Guía por punto + buscador también para el admin (RPC propia, validada con el PIN de administrador)
+  try{ if(window.AEGuia) AEGuia.init({ questions:qs, load:function(){
+    return sbc.rpc('ae_admin_get_guia',{p_codigo:S.codigo,p_admin_pin:_adminPinUsed}).then(function(r){ return (r&&r.data&&r.data.data)||null; });
+  }}); }catch(e){}
   detail.scrollIntoView({behavior:'smooth',block:'start'});
 }
 

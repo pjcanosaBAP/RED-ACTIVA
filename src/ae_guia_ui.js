@@ -98,7 +98,7 @@
 
   // ───────── interfaz
   var CSS = '.gd-btn{display:none;margin-top:6px;padding:3px 9px;border-radius:6px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}' +
-    '.gd-btn:hover{background:#dbeafe}body.gd-on .q-row.gd-has .gd-btn{display:inline-block}' +
+    '.gd-btn:hover{background:#dbeafe}body.gd-on .gd-has .gd-btn{display:inline-block}' +
     '.gd-fab{display:none;position:fixed;right:16px;bottom:84px;z-index:8000;padding:10px 14px;border-radius:999px;border:none;background:#1d4ed8;color:#fff;font-weight:700;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;font-family:inherit}body.gd-on .gd-fab{display:block}' +
     '.gd-ov{display:none;position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:8990}.gd-open .gd-ov{display:block}' +
     '.gd-panel{position:fixed;top:0;right:0;height:100%;width:min(520px,100vw);background:#fff;z-index:9000;box-shadow:-6px 0 24px rgba(0,0,0,.2);transform:translateX(100%);transition:transform .22s;display:flex;flex-direction:column;font-family:inherit;color:#1e293b}.gd-open .gd-panel{transform:none}' +
