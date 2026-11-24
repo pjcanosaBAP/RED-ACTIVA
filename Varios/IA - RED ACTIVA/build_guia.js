@@ -101,7 +101,33 @@ function tidy(t, is5) {
   const bplApp = {}; app.forEach(a => { const k = norm(a.sub); if (!bplApp[k]) { let best = null, s = 0; Object.values(bpl).forEach(B => { const v = sim(a.sub, B.name); if (v > s) { s = v; best = B.key; } }); bplApp[k] = s >= 0.6 ? best : null; } });
 
   // ───────── 5) salida: páginas limpias + ae_guia.js
-  const pg2 = p2.map(t => tidy(t, false)), pg5 = p5.map(t => tidy(t, true));
+  // Limpieza de lo que NO es contenido: portada, índice, páginas separadoras de capítulo/módulo, pies y números de pliego.
+  // Las páginas se vacían (no se quitan) para no correr la numeración; el buscador y las tarjetas ignoran las páginas vacías.
+  const FOOT2 = /CONFECCION[ÓO]:[^|]*\|\s*REVIS[ÓO]:[^|]*\|\s*VALID[ÓO]:\s*\S+/g, INTRO = /A partir de este momento usted comienza/;
+  const dropped = { 2: [], 5: [] };
+  function clean2(P) {
+    const first = P.findIndex(t => INTRO.test(t));                       // antes de la introducción: portada + índice + separador
+    return P.map((t, i) => {
+      if (i < first) { dropped[2].push([i + 1, 'portada/índice', t]); return ''; }
+      const hadFoot = FOOT2.test(t); FOOT2.lastIndex = 0;
+      const x = t.replace(FOOT2, ' ').replace(/^\s*\d{1,3}\s+\d{1,3}\s+/, '').replace(/[ \t]+/g, ' ').trim();   // pie + "n° de pliego" al inicio ("12 13 …")
+      if (/^MANUAL DE OPERACIONES LOG[ÍI]STICAS PARA DISTRIBUIDORES ARCOR$/i.test(x)) { dropped[2].push([i + 1, 'contratapa', t]); return ''; }
+      if (hadFoot && x.length < 110) { dropped[2].push([i + 1, 'separador de capítulo', t]); return ''; }
+      return x;
+    });
+  }
+  function clean5(P) {
+    const first = P.findIndex(t => INTRO.test(t));
+    return P.map((t, i) => {
+      if (i < first) { dropped[5].push([i + 1, 'portada/índice', t]); return ''; }
+      const L = t.split('\n').map(l => l.trim()).filter(Boolean);
+      if (t.length < 40) { dropped[5].push([i + 1, 'separador de nivel', t]); return ''; }
+      const body = L.filter((l, j) => !(j === 0 && /^M[OÓ]DULO\b/i.test(l))), bl = body.filter(l => /^•/.test(l)).length;
+      if (L.length > 1 && body.length && bl / body.length >= 0.8 && body.every(l => l.length < 150)) { dropped[5].push([i + 1, 'índice del módulo', t]); return ''; }
+      return t;
+    });
+  }
+  const pg2 = clean2(p2.map(t => tidy(t, false))), pg5 = clean5(p5.map(t => tidy(t, true)));
   // offset donde empieza realmente cada sección dentro de su página de inicio (la página puede traer el final de la anterior)
   function headingOffset(text, title) {
     let ns = '', im = []; for (let i = 0; i < text.length; i++) { for (const ch of strip(text[i]).toUpperCase()) { if (/[A-Z0-9]/.test(ch)) { ns += ch; im.push(i); } else if (ns && !ns.endsWith(' ')) { ns += ' '; im.push(i); } } }
@@ -127,4 +153,8 @@ function tidy(t, is5) {
   console.log('vínculo: idénticas', rep.exact, '| num+texto dif', rep.numTxt, '| por texto otro nro', rep.soloTxt, '| sin par app', rep.sinGuia.length, '| sin par guía', sinApp.length);
   console.log('BPL sin m2:', map.filter(m => !m.m2.length).map(m => m.name).join(' · '));
   console.log('BPL sin m5:', map.filter(m => !m.m5.length).map(m => m.name).join(' · '));
+  [2, 5].forEach(k => console.log(`Manual ${k}.0 · páginas vaciadas (${dropped[k].length}):`, dropped[k].map(d => d[0] + ' ' + d[1]).join(' | ')));
+  const emptySec = [...sec2.map(s => ['2.0', s.t, secEmpty(pg2, s)]), ...sec5.map(s => ['5.0', 'BPL ' + s.code + ' ' + s.t, secEmpty(pg5, s)])].filter(x => x[2]);
+  function secEmpty(PG, s) { for (let p = s.p0; p <= s.p1 && p <= PG.length; p++) if ((PG[p - 1] || '').trim().length > 40) return false; return true; }
+  console.log('Secciones que quedaron sin texto:', emptySec.length ? emptySec.map(x => x[0] + ' ' + x[1]).join(' | ') : 'ninguna');
 })();
