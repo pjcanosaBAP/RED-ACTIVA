@@ -105,6 +105,14 @@ select.inp{cursor:pointer}
   display:flex;align-items:flex-start;gap:10px;transition:background .1s;background:#fff}
 .q-row:last-child{border-bottom:none}
 .q-row:hover{background:#f8fafc}
+/* Modo solo lectura: AE ya enviada y sin desbloqueo del administrador */
+#step3.ro .ans-btns{pointer-events:none}
+#step3.ro .ans-btn:not(.si):not(.no):not(.na){opacity:.35}
+#step3.ro .sticky-footer{display:none}
+.lock-banner{display:none;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px;margin:0 0 12px;color:#78350f;font-size:13px;line-height:1.5}
+#step3.ro .lock-banner{display:block}
+.lock-banner button{margin-top:8px;padding:7px 14px;border-radius:8px;border:none;background:#d97706;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit}
+.lock-banner button:disabled{background:#94a3b8;cursor:default}
 .q-num{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:#94a3b8;
   min-width:38px;padding-top:3px;font-weight:700;flex-shrink:0;text-align:right}
 .q-main{flex:1}
@@ -275,6 +283,9 @@ select.inp{cursor:pointer}
     </aside>
     <!-- Questions (right) -->
     <div class="q-column">
+      <div class="lock-banner" id="lock-banner">🔒 <strong>Tu autoevaluación ya fue enviada.</strong> Podés revisar tus respuestas y consultar la guía, pero no modificarlas salvo que el administrador lo autorice.<br>
+        <button type="button" id="btn-unlock-ro" onclick="requestUnlock()">🔓 Solicitar corrección al administrador</button>
+      </div>
       <div id="q-container"></div>
     </div>
   </div>
@@ -296,6 +307,9 @@ select.inp{cursor:pointer}
       Si necesitás hacer correcciones, solicitalo al administrador.</div>
     <button class="btn-unlock" id="btn-unlock" onclick="requestUnlock()">
       🔓 Solicitar corrección al administrador
+    </button>
+    <button class="btn-sec" onclick="enterQuestions()" style="margin-top:8px">
+      👁 Ver mi autoevaluación (solo lectura)
     </button>
     <button class="btn-sec" onclick="location.reload()" style="margin-top:8px">
       ↩ Volver al inicio
@@ -443,15 +457,30 @@ async function step2Next(){
     });
     S.answers = (ans && ans.answers) ? ans.answers : {};
     document.getElementById('hdr-dist-name').textContent = dist;
-    if(S.submitted && !S.unlock_granted){ showStep(4); updateDoneScreen(); return; }
-    buildQuestionsUI();
-    showStep(3);
-    // Guía por punto + buscador en el manual (se activa sólo si la base la entrega; ver ae_guia_ui.js)
-    try{ if(window.AEGuia) AEGuia.init({ questions:S.questions, load:function(){
-      return sbc.rpc('ae_get_guia',{p_codigo:S.codigo,p_distribuidor:S.distribuidor,p_pin:S.pin}).then(function(r){ return (r&&r.data&&r.data.data)||null; });
-    }}); }catch(e){}
+    enterQuestions();
   }catch(e){ setErr('err2','Error de conexión. Intentá de nuevo.'); }
   finally{ setBtn('btn2', false); }
+}
+
+// Enviada y sin desbloqueo del admin → se puede entrar y mirar, pero no modificar (el servidor también lo bloquea)
+function isLocked(){ return !!(S.submitted && !S.unlock_granted); }
+
+function enterQuestions(){
+  clearTimeout(_saveTimer);
+  buildQuestionsUI();
+  const s3=document.getElementById('step3');
+  if(s3) s3.classList.toggle('ro', isLocked());
+  const bu=document.getElementById('btn-unlock-ro');
+  if(bu){
+    bu.disabled=!!S.unlock_requested;
+    bu.textContent=S.unlock_requested?'⏳ Corrección solicitada (pendiente)':'🔓 Solicitar corrección al administrador';
+  }
+  showStep(3);
+  window.scrollTo(0,0);
+  // Guía por punto + buscador en el manual (se activa sólo si la base la entrega; ver ae_guia_ui.js)
+  try{ if(window.AEGuia) AEGuia.init({ questions:S.questions, load:function(){
+    return sbc.rpc('ae_get_guia',{p_codigo:S.codigo,p_distribuidor:S.distribuidor,p_pin:S.pin}).then(function(r){ return (r&&r.data&&r.data.data)||null; });
+  }}); }catch(e){}
 }
 
 function goStep1(){
@@ -545,9 +574,11 @@ function buildQuestionsUI(){
 
   document.getElementById('q-container').innerHTML=html;
 
-  document.getElementById('q-container').addEventListener('click',function(e){
+  const _qc=document.getElementById('q-container');
+  if(!_qc._ansBound){ _qc._ansBound=true; _qc.addEventListener('click',function(e){
     const btn=e.target.closest('.ans-btn[data-val]');
     if(!btn) return;
+    if(isLocked()) return;
     const wrap=btn.closest('[data-comp]');
     if(!wrap) return;
     const compNum=wrap.dataset.comp;
@@ -557,7 +588,7 @@ function buildQuestionsUI(){
     btn.className='ans-btn '+val;
     updateProgress();
     scheduleSave();
-  },{once:false});
+  },{once:false}); }
 
   updateProgress();
 }
@@ -822,6 +853,7 @@ function scheduleSave(){
 
 async function saveDraft(){
   clearTimeout(_saveTimer);
+  if(isLocked()) return;
   try{
     await sbc.rpc('ae_save_answers',{
       p_codigo: S.codigo, p_distribuidor: S.distribuidor, p_pin: S.pin,
@@ -832,6 +864,7 @@ async function saveDraft(){
 }
 
 async function confirmSubmit(){
+  if(isLocked()) return;
   const total = S.questions.length;
   const done  = S.questions.filter(q=>S.answers[String(q.comp_num)]&&S.answers[String(q.comp_num)]!=='').length;
   const pending = total - done;
@@ -847,7 +880,7 @@ async function confirmSubmit(){
     });
     if(error) throw error;
     if(data && data.error){ alert('Error: '+data.error); return; }
-    S.submitted = true;
+    S.submitted = true; S.unlock_granted = false; S.unlock_requested = false;
     showStep(4);
     updateDoneScreen();
   }catch(e){ alert('Error al enviar. Intentá de nuevo.'); document.getElementById('btn-submit').disabled = false; }
@@ -872,6 +905,8 @@ async function requestUnlock(){
       p_codigo: S.codigo, p_distribuidor: S.distribuidor, p_pin: S.pin
     });
     S.unlock_requested = true;
+    const bro=document.getElementById('btn-unlock-ro');
+    if(bro){ bro.disabled=true; bro.textContent='⏳ Corrección solicitada (pendiente)'; }
     btn.textContent = '⏳ Corrección solicitada — el administrador la habilitará';
     toast('✅ Solicitud enviada');
   }catch(e){ btn.disabled = false; toast('Error al enviar solicitud'); }
