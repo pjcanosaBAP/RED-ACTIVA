@@ -6558,6 +6558,39 @@ function openDevModalFromResult(){
 }
 
 /* exportDistExcel: informe Excel formateado con ExcelJS — colores, sin cuadrículas */
+// Nombre de un crítico como figura la BPL (subattr), no como el atributo (bpl_name)
+function critBplName(tag){
+  const n=[...new Set(Q.filter(q=>q.critico===tag).map(q=>(q.subattr||q.bpl_name||'').trim()).filter(Boolean))];
+  return n.join(' / ')||'—';
+}
+// Resultado de los críticos en la edición anterior del mismo distribuidor (null si no hay).
+// Se vincula por nombre de BPL usando la estructura de aquel año; sin estructura, por número de crítico.
+function prevCritResults(dist, ed, pais){
+  const P=(pais||'').toUpperCase();
+  const prev=saved.filter(a=>a.distribuidor===dist&&String(a.edicion||'')<String(ed||'')
+      &&(!P||!a.pais||a.pais.toUpperCase()===P)&&a.scores&&a.scores.critStatus)
+    .sort((a,b)=>String(b.edicion||'').localeCompare(String(a.edicion||'')))[0];
+  if(!prev) return null;
+  let pq=null;
+  try{ const d=JSON.parse(localStorage.getItem(structureKey(prev.pais||pais, prev.edicion))); if(d&&Array.isArray(d.q)&&d.q.length) pq=d.q; }catch(e){}
+  const norm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  const stOf=v=>v&&(v.st||v);
+  return { ed:prev.edicion, get(tag){
+    let pTag=tag, comps=null;
+    if(pq){
+      const names=critBplName(tag).split(' / ').map(norm);
+      const m=pq.filter(q=>q.critico&&names.includes(norm(q.subattr||q.bpl_name)));
+      if(!m.length) return null;   // esa BPL no era crítica en la edición anterior
+      pTag=m[0].critico; comps=m.filter(q=>q.critico===pTag).map(q=>q.comp_num);
+    }
+    const ans=prev.answers||{};
+    const st=stOf(prev.scores.critStatus[pTag]);
+    if(!st||st==='pending') return null;
+    const comp=comps&&Object.keys(ans).length?comps.filter(c=>ans[c]==='si').length+'/'+comps.length:'';
+    return {met:st==='met', comp};
+  }};
+}
+
 async function exportDistExcel(){
   if(typeof ExcelJS==='undefined'){showToast('⚠️ ExcelJS no cargó aún, reintentá en unos segundos');return;}
   const dist=(document.getElementById('sel-dist')||{}).value||'';
@@ -6733,10 +6766,13 @@ async function exportDistExcel(){
 
     ws.addRow([]).height=12;
 
-    // Tabla de críticos — header: ATRIBUTO BPL | COD. | ÁREA | COMP. | ESTADO
-    {const r=ws.addRow(['','ATRIBUTO BPL','COD.','ÁREA','COMP.','ESTADO','']);
-     r.height=20;
-     [2,3,4,5,6].forEach(i=>applyStyle(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
+    // Tabla de críticos — header: BPL CRÍTICO | COD. | ÁREA | COMP. | ESTADO | edición anterior (si existe)
+    const prevCr=prevCritResults(dist,edicion,audit.pais||cfg.pais);
+    if(prevCr) ws.getColumn(8).width=20;
+    const critCols=prevCr?[2,3,4,5,6,7,8]:[2,3,4,5,6,7];
+    {const r=ws.addRow(['','BPL CRÍTICO','','COD.','ÁREA','COMP.',prevCr?'ESTADO '+edicion:'ESTADO',...(prevCr?['ESTADO '+prevCr.ed]:[])]);
+     r.height=20; ws.mergeCells(`B${r.number}:C${r.number}`);
+     critCols.forEach(i=>applyStyle(r.getCell(i),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(NAVY),centerMid,bottomBorder('FF475569')));
     }
 
     CRIT_LIST.forEach((c,ci)=>{
@@ -6744,13 +6780,16 @@ async function exportDistExcel(){
       const qs=Q.filter(q=>q.critico===c.tag);
       const siQ=qs.filter(q=>ans[q.comp_num]==='si').length;
       const bg=ci%2===0?LGRAY:'FFFFFFFF';
-      const rC=ws.addRow(['',qs[0]?.bpl_name||'—','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE','']);
-      rC.height=18;
+      const p=prevCr?prevCr.get(c.tag):null;
+      const rC=ws.addRow(['',critBplName(c.tag),'','C'+c.tag.replace('CRITICO ',''),qs[0]?.sheet||'',siQ+'/'+qs.length,met?'✓ CUMPLE':'✗ NO CUMPLE',
+        ...(prevCr?[p?(p.met?'✓ CUMPLE':'✗ NO CUMPLE')+(p.comp?' ('+p.comp+')':''):'—']:[])]);
+      rC.height=18; ws.mergeCells(`B${rC.number}:C${rC.number}`);
       applyStyle(rC.getCell(2),{name:'Calibri',size:10,color:{argb:NAVY}},solidFill(bg),leftMid);
-      applyStyle(rC.getCell(3),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(4),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(5),{name:'Calibri',bold:true,size:10,color:{argb:met?'FF00A854':'FFD63030'}},solidFill(bg),centerMid);
-      applyStyle(rC.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(met?'FF00A854':'FFD63030'),centerMid);
+      applyStyle(rC.getCell(4),{name:'Calibri',bold:true,size:10,color:{argb:NAVY}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(5),{name:'Calibri',size:10,color:{argb:'FF64748B'}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(6),{name:'Calibri',bold:true,size:10,color:{argb:met?'FF00A854':'FFD63030'}},solidFill(bg),centerMid);
+      applyStyle(rC.getCell(7),{name:'Calibri',bold:true,size:10,color:{argb:WHITE}},solidFill(met?'FF00A854':'FFD63030'),centerMid);
+      if(prevCr) applyStyle(rC.getCell(8),{name:'Calibri',bold:true,size:10,color:{argb:p?(p.met?'FF00A854':'FFD63030'):'FF94A3B8'}},solidFill(p?(p.met?'FFE8F5EE':'FFFDEAEA'):bg),centerMid);
     });
   }
 
@@ -8715,7 +8754,10 @@ async function generateDistPPTX(){
     s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:LX,y:LY+LH+LGap,w:LW,h:LH,fill:{color:'D63030'},line:{color:'D63030',width:0},rectRadius:0.12});
     s.addText('✗',{x:LX,y:LY+LH+LGap,w:LW,h:LH*0.50,fontFace:FF,fontSize:32,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
     s.addText(unmetC+' INCUMPLEN',{x:LX,y:LY+LH+LGap+LH*0.50,w:LW,h:LH*0.50,fontFace:FF,fontSize:13,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-    const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:4.10,x:tcX+1.30},{l:'COMP.',w:1.00,x:tcX+5.40},{l:'ESTADO',w:3.40,x:tcX+6.40}];
+    const prevCr=prevCritResults(dist,ed,curAudit.pais||cfg.pais);
+    const wBpl=prevCr?3.90:4.10, wCmp=prevCr?0.80:1.00, wSt=prevCr?1.90:3.40;
+    const xCmp=tcX+1.30+wBpl, xSt=xCmp+wCmp, xPrev=xSt+wSt, wPrev=tcX+tcW-xPrev;
+    const tcols2=[{l:'COD.',w:0.58,x:tcX},{l:'ÁREA',w:0.72,x:tcX+0.58},{l:'BPL CRÍTICO',w:wBpl,x:tcX+1.30},{l:'COMP.',w:wCmp,x:xCmp},{l:prevCr?'ESTADO '+ed:'ESTADO',w:wSt,x:xSt},...(prevCr?[{l:'ESTADO '+prevCr.ed,w:wPrev,x:xPrev}]:[])];
     let ty=0.68;
     tcols2.forEach(c=>{
       s.addShape(pptx.shapes.RECTANGLE,{x:c.x,y:ty,w:c.w,h:0.26,fill:{color:'1A2E4A'},line:{color:'1A2E4A',width:0}});
@@ -8726,15 +8768,21 @@ async function generateDistPPTX(){
       const tag=crit.tag; const isMet=_isMet(tag);
       const qs=Q.filter(q=>q.critico===tag);
       const siQ=qs.filter(q=>(curAudit.answers||{})[q.comp_num]==='si').length;
-      const bName=qs[0]?.bpl_name||'—'; const sh=qs[0]?.sheet||'—';
+      const bName=critBplName(tag); const sh=qs[0]?.sheet||'—';
       const bg=ri%2===0?'F8FAFC':'FFFFFF';
       s.addShape(pptx.shapes.RECTANGLE,{x:tcX,y:ty,w:tcW,h:0.24,fill:{color:bg},line:{color:'E8EDF3',width:0.5}});
       s.addText('C'+tag.replace('CRITICO ',''),{x:tcX,y:ty,w:0.58,h:0.24,fontFace:FF,fontSize:8,bold:true,color:'1A2E4A',align:'center',valign:'middle'});
       s.addText(sh,{x:tcX+0.58,y:ty,w:0.72,h:0.24,fontFace:FF,fontSize:8,color:'3D5573',align:'center',valign:'middle'});
-      s.addText(bName,{x:tcX+1.30,y:ty,w:4.10,h:0.24,fontFace:FF,fontSize:8,color:'3D5573',valign:'middle'});
-      s.addText(siQ+'/'+qs.length,{x:tcX+5.40,y:ty,w:1.00,h:0.24,fontFace:FF,fontSize:8,bold:true,color:isMet?'00A854':'D63030',align:'center',valign:'middle'});
-      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:tcX+6.44,y:ty+0.03,w:3.30,h:0.18,fill:{color:isMet?'00A854':'D63030'},line:{color:isMet?'00A854':'D63030',width:0},rectRadius:0.04});
-      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:tcX+6.44,y:ty+0.03,w:3.30,h:0.18,fontFace:FF,fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText(bName,{x:tcX+1.30,y:ty,w:wBpl,h:0.24,fontFace:FF,fontSize:8,color:'3D5573',valign:'middle'});
+      s.addText(siQ+'/'+qs.length,{x:xCmp,y:ty,w:wCmp,h:0.24,fontFace:FF,fontSize:8,bold:true,color:isMet?'00A854':'D63030',align:'center',valign:'middle'});
+      s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:xSt+0.04,y:ty+0.03,w:wSt-0.10,h:0.18,fill:{color:isMet?'00A854':'D63030'},line:{color:isMet?'00A854':'D63030',width:0},rectRadius:0.04});
+      s.addText(isMet?'✓ CUMPLE':'✗ NO CUMPLE',{x:xSt+0.04,y:ty+0.03,w:wSt-0.10,h:0.18,fontFace:FF,fontSize:8,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      if(prevCr){
+        const p=prevCr.get(tag);
+        const pc=p?(p.met?'00A854':'D63030'):'94A3B8';
+        if(p) s.addShape(pptx.shapes.ROUNDED_RECTANGLE,{x:xPrev+0.04,y:ty+0.03,w:wPrev-0.10,h:0.18,fill:{color:p.met?'E8F5EE':'FDEAEA'},line:{color:pc,width:0.75},rectRadius:0.04});
+        s.addText(p?(p.met?'✓ CUMPLE':'✗ NO CUMPLE')+(p.comp?'  '+p.comp:''):'—',{x:xPrev+0.04,y:ty+0.03,w:wPrev-0.10,h:0.18,fontFace:FF,fontSize:8,bold:true,color:pc,align:'center',valign:'middle'});
+      }
       ty+=0.25;
     });
     // ─ Matriz BPL Críticos
