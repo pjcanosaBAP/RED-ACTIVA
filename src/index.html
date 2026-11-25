@@ -6771,7 +6771,8 @@ async function exportDistExcel(){
       const last=ws.rowCount;
       for(let n=1;n<=last;n++){
         const g=ws.getCell(n,7), h=ws.getCell(n,8);
-        if(g.isMerged&&g.master.address!==g.address){
+        if(n===2){ h.style={...g.style}; ws.mergeCells('F2:H2'); }   // fila del distribuidor: que entre el nombre del auditor
+        else if(g.isMerged&&g.master.address!==g.address){
           const m=g.master.address, st={...g.master.style};
           ws.unMergeCells(m); h.style=st; ws.mergeCells(m+':H'+n);
         } else if(g.fill&&g.fill.type){ h.style={...g.style}; ws.mergeCells('G'+n+':H'+n); }
